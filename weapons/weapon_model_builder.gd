@@ -10,7 +10,7 @@ extends RefCounted
 ## com o caminho de um .tscn/.glb que siga essas convenções e tenha um nó
 ## filho chamado "Muzzle". Opcionalmente "Pump", "Slide" ou "Bolt".
 
-const VIEWMODEL_FOV := 62.0
+const VIEWMODEL_FOV := 74.0
 
 static var _materials := {}
 

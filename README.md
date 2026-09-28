@@ -100,7 +100,7 @@ As rotas alternativas passam pelos prédios (portas e janelas), pelo beco sul e 
 
 ## Substituindo placeholders
 - **Sons:** coloque arquivos em `assets/audio/` com o nome da chave (`mp4_fire.ogg`, `reload_mag.wav`, `footstep.ogg`, `ambient.ogg`…). A lista completa está em `core/placeholder_sounds.gd`. Quando o arquivo existe, ele tem prioridade sobre o som sintetizado.
-- **Modelos de arma:** 4 das 5 armas já usam modelos 3D reais do Sketchfab. Os créditos e licenças estão em `CREDITS.md`. O jogo encaixa cada modelo sozinho a partir de alguns campos no `weapon_config.gd`:
+- **Modelos de arma:** As 5 armas usam modelos 3D reais do Sketchfab. Os créditos e licenças estão em `CREDITS.md`. O jogo encaixa cada modelo sozinho a partir de alguns campos no `weapon_config.gd`:
   - `model_rotation`, `model_length` e `model_sight_drop`: orientação, tamanho real e altura da linha de mira;
   - `model_offset`: ajuste fino da posição;
   - `model_hidden_bones`: partes do modelo para esconder.

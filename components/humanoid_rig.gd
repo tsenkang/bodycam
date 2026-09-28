@@ -170,6 +170,7 @@ func _add_part(parent: Node3D, region: StringName, pos: Vector3, rot: Vector3, s
 		var mi: MeshInstance3D
 		if sphere:
 			mi = MeshInstance3D.new()
+			mi.layers = DecalBuilder.CHARACTER_LAYER
 			var sm := SphereMesh.new()
 			sm.radius = size.x * 0.5
 			sm.height = size.x
@@ -182,6 +183,7 @@ func _add_part(parent: Node3D, region: StringName, pos: Vector3, rot: Vector3, s
 
 func _mesh_box(size: Vector3, mat: Material) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
+	mi.layers = DecalBuilder.CHARACTER_LAYER
 	var bm := BoxMesh.new()
 	bm.size = size
 	mi.mesh = bm

@@ -310,6 +310,74 @@ func electrical_box(base: Vector3, yaw: float) -> void:
 	collider(base + Vector3(0, 0.7, 0), Vector3(0.8, 1.4, 0.4), yaw)
 
 
+## Calha vertical no canto do prédio.
+func drain_pipe(base: Vector3, height: float) -> void:
+	var mat := MapMaterials.plain(Color(0.3, 0.31, 0.3), 0.5, 0.6)
+	vcyl(detail, base + Vector3(0, height * 0.5, 0), 0.05, height, mat, -1.0, 8)
+	vbox(detail, base + Vector3(0, 0.12, 0), Vector3(0.18, 0.08, 0.18), mat)
+
+
+## Meio-fio em volta de uma calçada retangular (só visual).
+func curb_rect(center: Vector3, size: Vector2) -> void:
+	var mat := MapMaterials.get_material("concrete", Color(0.85, 0.85, 0.83))
+	var h := 0.12
+	var t := 0.18
+	var y := h * 0.5 - 0.02
+	vbox(detail, center + Vector3(0, y, -size.y * 0.5), Vector3(size.x, h, t), mat)
+	vbox(detail, center + Vector3(0, y, size.y * 0.5), Vector3(size.x, h, t), mat)
+	vbox(detail, center + Vector3(-size.x * 0.5, y, 0), Vector3(t, h, size.y), mat)
+	vbox(detail, center + Vector3(size.x * 0.5, y, 0), Vector3(t, h, size.y), mat)
+
+
+## Placa de rua simples com texto.
+func street_sign(base: Vector3, text: String) -> void:
+	var metal := MapMaterials.plain(Color(0.45, 0.46, 0.47), 0.4, 0.7)
+	vcyl(detail, base + Vector3(0, 1.3, 0), 0.035, 2.6, metal, -1.0, 8)
+	var red := text == "PARE"
+	var plate := vbox(detail, base + Vector3(0, 2.35, 0), Vector3(0.7, 0.7 if red else 0.35, 0.03),
+		MapMaterials.plain(Color(0.7, 0.08, 0.06) if red else Color(0.08, 0.3, 0.16), 0.5))
+	for side in [1.0, -1.0]:
+		var l := Label3D.new()
+		l.text = text
+		l.font_size = 64 if red else 40
+		l.pixel_size = 0.004
+		l.modulate = Color(0.95, 0.95, 0.95)
+		l.outline_size = 0
+		l.position = plate.position + Vector3(0, 0, 0.02 * side)
+		l.rotation.y = 0.0 if side > 0.0 else PI
+		detail.add_child(l)
+
+
+## Lixo espalhado (papéis, folhas, bitucas) em uma única MultiMesh.
+## zones: [[centro_x, centro_z, meia_largura, meia_profundidade], ...]
+func litter(rng: RandomNumberGenerator, zones: Array, count: int) -> void:
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.14, 0.1)
+	mm.mesh = quad
+	mm.instance_count = count
+	var palette := [Color(0.8, 0.78, 0.72), Color(0.45, 0.33, 0.18), Color(0.36, 0.3, 0.16),
+		Color(0.6, 0.55, 0.45), Color(0.25, 0.3, 0.18)]
+	for i in count:
+		var z: Array = zones[rng.randi() % zones.size()]
+		var p := Vector3(z[0] + rng.randf_range(-z[2], z[2]), 0.02, z[1] + rng.randf_range(-z[3], z[3]))
+		var b := Basis(Vector3.UP, rng.randf() * TAU) * Basis(Vector3.RIGHT, -PI * 0.5 + rng.randf_range(-0.15, 0.15))
+		var sc := rng.randf_range(0.5, 1.6)
+		mm.set_instance_transform(i, Transform3D(b.scaled(Vector3(sc, sc, sc)), p))
+		mm.set_instance_color(i, palette[rng.randi() % palette.size()])
+	var mmi := MultiMeshInstance3D.new()
+	mmi.multimesh = mm
+	var mat := StandardMaterial3D.new()
+	mat.vertex_color_use_as_albedo = true
+	mat.roughness = 0.9
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mmi.material_override = mat
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	detail.add_child(mmi)
+
+
 # ============================================================================
 #  Iluminação interna
 # ============================================================================

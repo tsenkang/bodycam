@@ -127,11 +127,22 @@ func _build_environment() -> void:
 		env.sdfgi_cascades = 3
 		env.sdfgi_min_cell_size = 0.25
 		env.volumetric_fog_enabled = true
-		env.volumetric_fog_density = L.fog_density * 2.0
+		env.fog_density = L.fog_density * 0.4
+		env.volumetric_fog_density = L.fog_density * 0.5
 		env.volumetric_fog_albedo = L.fog_color
 		env.volumetric_fog_length = 48.0
 	var we := WorldEnvironment.new()
 	we.environment = env
+	# Exposição automática: ao entrar num lugar escuro a imagem "abre" aos
+	# poucos, como uma câmera corporal de verdade.
+	if GameConfig.auto_exposure and quality != "baixa":
+		var cam_attr := CameraAttributesPractical.new()
+		cam_attr.auto_exposure_enabled = true
+		cam_attr.auto_exposure_speed = 0.8
+		cam_attr.auto_exposure_scale = GameConfig.auto_exposure_scale
+		cam_attr.auto_exposure_min_sensitivity = 80.0
+		cam_attr.auto_exposure_max_sensitivity = 1200.0
+		we.camera_attributes = cam_attr
 	add_child(we)
 
 	var sun := DirectionalLight3D.new()

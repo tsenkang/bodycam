@@ -67,6 +67,7 @@ var _roofs: Node3D     # telhados (fora da navmesh)
 var _dynamic: Node3D   # portas e armários (fora da navmesh)
 var _detail: Node3D    # detalhes só visuais (fora da navmesh)
 var _props: PropBuilder
+var _decals: DecalBuilder
 var _data: MapData
 var _m := 1.0          # 1 = lado Oeste, -1 = lado Leste (espelho)
 
@@ -96,6 +97,7 @@ func build(root: Node3D) -> Dictionary:
 	_props = PropBuilder.new(_geo, _detail, _data)
 	_props.street_lights = lighting.street_lights
 	_props.interior_light_energy = lighting.interior_light_energy
+	_decals = DecalBuilder.new(_detail)
 
 	_m = 1.0
 	_build_center()
@@ -105,6 +107,7 @@ func build(root: Node3D) -> Dictionary:
 		_build_half()
 	_m = 1.0
 	_build_skyline()
+	_build_ground_details()
 	_nav_region.navigation_mesh = _make_navmesh()
 	return {"nav_region": _nav_region, "map_data": _data}
 
@@ -147,6 +150,7 @@ func _build_center() -> void:
 	_door_x(8.0, 22.0, 1.4)
 	_roof(Vector3(0, 6.15, 30.1), Vector3(60.6, 0.3, 16.6), false)
 	_props.ground_plane(Vector3(0, 0.02, 30.1), Vector2(60, 15.8), _mat("warehouse_floor"))
+	_interior_probe(Vector3(0, 3.0, 30.1), Vector3(60, 6, 15.8))
 	_shelf(Vector3(0, 0, 27), 9.0)
 	_shelf(Vector3(0, 0, 32.5), 9.0)
 	_pallets(Vector3(-5, 0, 35.5), 0.2, 2)
@@ -394,6 +398,8 @@ func _wall_x(z: float, x0: float, x1: float, h: float, openings: Array, mat: Mat
 	for o in openings:
 		var c := _p(o[0], 0.0, z)
 		_props.opening_frame(Vector2(c.x, c.z), true, o[1], o[2], o[3], WALL_T)
+	for n in [Vector3.BACK, Vector3.FORWARD]:
+		_decals.wall_grime(_p(x0, 0.0, z), _p(x1, 0.0, z), n)
 
 
 ## Parede ao longo do eixo Z em x fixo (espelhada).
@@ -404,6 +410,8 @@ func _wall_z(x: float, z0: float, z1: float, h: float, openings: Array, mat: Mat
 	for o in openings:
 		var c := _p(x, 0.0, o[0])
 		_props.opening_frame(Vector2(c.x, c.z), false, o[1], o[2], o[3], WALL_T)
+	for n in [Vector3.RIGHT, Vector3.LEFT]:
+		_decals.wall_grime(_p(x, 0.0, z0), _p(x, 0.0, z1), n)
 
 
 ## Divide uma parede em pedaços contornando portas e janelas.
@@ -437,6 +445,12 @@ func _building(x0: float, x1: float, z0: float, z1: float, h: float,
 	_wall_z(x0, z0 + t, z1 - t, h, open_w, mat)
 	_wall_z(x1, z0 + t, z1 - t, h, open_e, mat)
 	_roof(_p((x0 + x1) * 0.5, h + 0.15, (z0 + z1) * 0.5), Vector3(absf(x1 - x0) + 0.6, 0.3, absf(z1 - z0) + 0.6))
+	# Calhas nos cantos, meio-fio da calçada e sonda de reflexo interna.
+	for cx in [x0 - 0.25, x1 + 0.25]:
+		for cz in [z0 - 0.25, z1 + 0.25]:
+			_props.drain_pipe(_p(cx, 0.0, cz), h + 0.3)
+	_props.curb_rect(_p((x0 + x1) * 0.5, 0.0, (z0 + z1) * 0.5), Vector2(absf(x1 - x0) + 4.0, absf(z1 - z0) + 4.4))
+	_interior_probe(_p((x0 + x1) * 0.5, h * 0.5, (z0 + z1) * 0.5), Vector3(absf(x1 - x0), h, absf(z1 - z0)))
 
 
 func _roof(center: Vector3, size: Vector3, parapet := true) -> void:
@@ -523,6 +537,53 @@ func _locker(id: StringName, pos: Vector3, color: Color) -> void:
 	l.position = pos
 	_dynamic.add_child(l)
 	l.setup(id, color)
+
+
+## Reflexos corretos dentro de prédios (sem refletir o céu).
+func _interior_probe(center: Vector3, size: Vector3) -> void:
+	var probe := ReflectionProbe.new()
+	probe.position = center
+	probe.size = size + Vector3(0.2, 0.2, 0.2)
+	probe.interior = true
+	probe.box_projection = true
+	probe.update_mode = ReflectionProbe.UPDATE_ONCE
+	probe.ambient_mode = ReflectionProbe.AMBIENT_ENVIRONMENT
+	probe.cull_mask = 0xFFFFF & ~DecalBuilder.EXCLUDE_MASK
+	_detail.add_child(probe)
+
+
+## Poças, manchas, rachaduras, bueiros e lixo espalhado.
+func _build_ground_details() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4242
+	# Zonas de rua (asfalto): [centro_x, centro_z, meia_largura, meia_profundidade]
+	var streets := [[0.0, -29.0, 34.0, 7.0], [-23.0, 0.0, 10.0, 6.0], [23.0, 0.0, 10.0, 6.0],
+		[-41.0, 0.0, 6.0, 30.0], [41.0, 0.0, 6.0, 30.0], [0.0, 20.0, 30.0, 1.6]]
+	for i in 26:
+		var z: Array = streets[rng.randi() % streets.size()]
+		var p := Vector3(z[0] + rng.randf_range(-z[2], z[2]), 0.0, z[1] + rng.randf_range(-z[3], z[3]))
+		match i % 4:
+			0, 1:
+				_decals.puddle(p, rng.randf_range(1.2, 3.2))
+			2:
+				_decals.stain(p, rng.randf_range(0.8, 1.8), true)
+			3:
+				_decals.crack(p, rng.randf_range(1.5, 3.0))
+	for mp in [Vector3(-18, 0, -30), Vector3(18, 0, -30), Vector3(-30, 0, 1.5), Vector3(30, 0, -1.5),
+			Vector3(-41, 0, 8), Vector3(41, 0, -8), Vector3(4, 0, -34)]:
+		_decals.manhole(mp)
+	# Manchas no chão dos prédios e do armazém.
+	for sp in [Vector3(-25, 0, -12), Vector3(24, 0, -14), Vector3(-15, 0, 14), Vector3(20, 0, 12),
+			Vector3(-20, 0, 27), Vector3(18, 0, 33), Vector3(-3, 0, 30), Vector3(6, 0, 28)]:
+		_decals.stain(sp, rng.randf_range(1.0, 2.2), sp.z > 22.0)
+	# Lixo, papéis e folhas (MultiMesh = 1 chamada de desenho).
+	_props.litter(rng, [[0.0, -29.0, 34.0, 7.0], [0.0, 0.0, 11.0, 17.0], [-23.0, 0.0, 10.0, 6.0],
+		[23.0, 0.0, 10.0, 6.0], [0.0, 20.0, 30.0, 1.6], [-41.0, 0.0, 6.0, 30.0], [41.0, 0.0, 6.0, 30.0]], 700)
+	# Placas.
+	_props.street_sign(Vector3(-12.6, 0, -7.6), "PARE")
+	_props.street_sign(Vector3(12.6, 0, 7.6), "PARE")
+	_props.street_sign(Vector3(-33.6, 0, -21), "DISTRITO 7")
+	_props.street_sign(Vector3(33.6, 0, -21), "DISTRITO 7")
 
 
 # ============================================================================

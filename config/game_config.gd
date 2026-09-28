@@ -63,7 +63,7 @@ var shake_max_degrees: float = 0.6
 
 # Pós-processamento estilo bodycam (lente, vinheta, granulação)
 var bodycam_postfx_enabled: bool = true
-var postfx_distortion: float = 0.10
+var postfx_distortion: float = 0.14
 var postfx_vignette: float = 0.45
 var postfx_grain: float = 0.035
 var postfx_chromatic: float = 0.0015
@@ -78,7 +78,10 @@ var show_rec_overlay: bool = true
 var time_of_day: String = "entardecer"
 ## Qualidade gráfica: "baixa", "media" ou "alta".
 ##   baixa: sem AO/GI; media: SSAO + SSIL; alta: + SDFGI e neblina volumétrica.
-var graphics_quality: String = "media"
+var graphics_quality: String = "alta"
+## Exposição automática (a imagem se adapta ao claro/escuro como uma câmera).
+var auto_exposure: bool = true
+var auto_exposure_scale: float = 0.5
 
 var lighting_presets := {
 	"dia": {
@@ -97,7 +100,7 @@ var lighting_presets := {
 		"flashlight_on": false,
 	},
 	"entardecer": {
-		"sun_rotation": Vector3(-19.0, -62.0, 0.0),
+		"sun_rotation": Vector3(-28.0, -70.0, 0.0),
 		"sun_color": Color(1.0, 0.66, 0.42),
 		"sun_energy": 1.1,
 		"sky_top": Color(0.2, 0.25, 0.36),

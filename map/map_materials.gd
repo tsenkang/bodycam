@@ -15,9 +15,9 @@ extends RefCounted
 ##  (ex.: brick_albedo.png). Elas têm prioridade sobre as geradas.
 ## ============================================================================
 
-const SIZE := 256
+const SIZE := 512
 const CACHE_DIR := "user://texture_cache/"
-const CACHE_VERSION := 4
+const CACHE_VERSION := 5
 const TEXTURE_DIR := "res://assets/textures/"
 
 ## nome -> [escala_uv (repetições por metro), rugosidade, metálico, força do relevo]
@@ -55,7 +55,9 @@ static func get_material(kind: String, tint := Color.WHITE) -> StandardMaterial3
 	m.normal_enabled = true
 	m.normal_texture = tex.normal
 	m.normal_scale = def[3]
-	m.roughness = def[1]
+	m.roughness = 1.0 if tex.roughness else def[1]
+	m.roughness_texture = tex.roughness
+	m.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
 	m.metallic = def[2]
 	m.uv1_triplanar = true
 	m.uv1_world_triplanar = true
@@ -136,49 +138,70 @@ static func _get_textures(kind: String) -> Dictionary:
 	if ResourceLoader.exists(user_albedo):
 		result.albedo = load(user_albedo)
 		result.normal = load(user_normal) if ResourceLoader.exists(user_normal) else null
+		var user_rough := TEXTURE_DIR + kind + "_roughness.png"
+		result.roughness = load(user_rough) if ResourceLoader.exists(user_rough) else null
 		_textures[kind] = result
 		return result
 	# 2) Cache em disco.
 	var cache_a := "%s%s_v%d_a.png" % [CACHE_DIR, kind, CACHE_VERSION]
 	var cache_n := "%s%s_v%d_n.png" % [CACHE_DIR, kind, CACHE_VERSION]
+	var cache_r := "%s%s_v%d_r.png" % [CACHE_DIR, kind, CACHE_VERSION]
 	var albedo_img: Image
 	var normal_img: Image
-	if FileAccess.file_exists(cache_a) and FileAccess.file_exists(cache_n):
+	var rough_img: Image
+	if FileAccess.file_exists(cache_a) and FileAccess.file_exists(cache_n) and FileAccess.file_exists(cache_r):
 		albedo_img = Image.load_from_file(cache_a)
 		normal_img = Image.load_from_file(cache_n)
-	if albedo_img == null or normal_img == null:
+		rough_img = Image.load_from_file(cache_r)
+	if albedo_img == null or normal_img == null or rough_img == null:
 		var gen := _generate(kind)
 		albedo_img = gen[0]
 		normal_img = gen[1]
+		rough_img = gen[2]
 		DirAccess.make_dir_recursive_absolute(CACHE_DIR)
 		albedo_img.save_png(cache_a)
 		normal_img.save_png(cache_n)
+		rough_img.save_png(cache_r)
 	albedo_img.generate_mipmaps()
 	normal_img.generate_mipmaps()
+	rough_img.generate_mipmaps()
 	result.albedo = ImageTexture.create_from_image(albedo_img)
 	result.normal = ImageTexture.create_from_image(normal_img)
+	result.roughness = ImageTexture.create_from_image(rough_img)
 	_textures[kind] = result
 	return result
 
 
-## Retorna [albedo: Image, normal: Image].
+## Retorna [albedo, normal, rugosidade] (Images).
+## Os padrões são descritos para 256 px; a textura final tem SIZE px
+## (mais nitidez de perto), por isso as coordenadas são reescaladas.
 static func _generate(kind: String) -> Array:
-	var n1 := _noise_image(hash(kind), 0.02, 5)     # manchas grandes
-	var n2 := _noise_image(hash(kind) + 1, 0.12, 3) # granulado fino
+	var n1 := _noise_image(hash(kind), 0.01, 5)      # manchas grandes
+	var n2 := _noise_image(hash(kind) + 1, 0.06, 3)  # granulado
+	var n3 := _noise_image(hash(kind) + 2, 0.25, 2)  # micro detalhe
 	var albedo := Image.create(SIZE, SIZE, false, Image.FORMAT_RGB8)
 	var height := Image.create(SIZE, SIZE, false, Image.FORMAT_RGB8)
+	var rough := Image.create(SIZE, SIZE, false, Image.FORMAT_RGB8)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(kind) * 31
+	var base_rough: float = DEFS.get(kind, DEFS["concrete"])[1]
+	var k := SIZE / 256
 	for y in SIZE:
 		for x in SIZE:
 			var a := n1.get_pixel(x, y).r
 			var b := n2.get_pixel(x, y).r
-			var px := _pixel(kind, x, y, a, b, rng)
-			albedo.set_pixel(x, y, px[0])
-			var h: float = clampf(px[1], 0.0, 1.0)
+			var c := n3.get_pixel(x, y).r
+			var px := _pixel(kind, x / k, y / k, a, b * 0.7 + c * 0.3, rng)
+			var col: Color = px[0]
+			col = col.darkened((c - 0.5) * 0.08)
+			albedo.set_pixel(x, y, col)
+			var h: float = clampf(px[1] + (c - 0.5) * 0.15, 0.0, 1.0)
 			height.set_pixel(x, y, Color(h, h, h))
-	height.bump_map_to_normal_map(4.0)
-	return [albedo, height]
+			var r: float = px[2] if px.size() > 2 else base_rough + (b - 0.5) * 0.15 + (c - 0.5) * 0.1
+			r = clampf(r, 0.03, 1.0)
+			rough.set_pixel(x, y, Color(r, r, r))
+	height.bump_map_to_normal_map(6.0)
+	return [albedo, height, rough]
 
 
 static func _noise_image(seed_value: int, freq: float, octaves: int) -> Image:
@@ -198,9 +221,9 @@ static func _pixel(kind: String, x: int, y: int, a: float, b: float, rng: Random
 			var v := 0.22 + (a - 0.5) * 0.06 + (b - 0.5) * 0.08
 			if b > 0.72:
 				v += 0.08  # pedrisco claro
-			if a < 0.28:
-				v -= 0.035  # manchas de óleo/umidade
-			return [Color(v, v, v * 1.02), 0.5 + (b - 0.5) * 0.8]
+			var wet := smoothstep(0.32, 0.22, a)  # partes úmidas: escuras e brilhantes
+			v -= wet * 0.05
+			return [Color(v, v, v * 1.02), 0.5 + (b - 0.5) * 0.8, lerpf(0.9 + (b - 0.5) * 0.15, 0.25, wet)]
 		"sidewalk":
 			# Placas de 1 m (128 px), junta escura.
 			var gx := x % 128
@@ -269,7 +292,7 @@ static func _pixel(kind: String, x: int, y: int, a: float, b: float, rng: Random
 				return [Color(0.35, 0.34, 0.32), 0.1]
 			var rt := _cell_rand(x / 64, y / 64)
 			var tv := 0.72 + rt * 0.05 + (a - 0.5) * 0.08
-			return [Color(tv, tv * 0.98, tv * 0.94), 0.8]
+			return [Color(tv, tv * 0.98, tv * 0.94), 0.8, 0.25 + (b - 0.5) * 0.15 + (1.0 - a) * 0.15]
 		"wood":
 			var plank := y / 32
 			var iy3 := y % 32

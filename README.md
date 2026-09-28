@@ -88,12 +88,15 @@ As rotas alternativas passam pelos prédios (portas e janelas), pelo beco sul e 
 ## Visual realista (estilo bodycam)
 - **Materiais procedurais** (`map/map_materials.gd`): asfalto, calçada, piso de praça, tijolo, reboco, concreto, metal ondulado, piso cerâmico, madeira e fachadas com janelas. Todos têm relevo (normal map) e são gerados por código. A primeira partida demora uns segundos para gerar; depois ficam em cache em `user://texture_cache/`.
 - **Objetos de cenário** (`map/prop_builder.gd`): carros detalhados, caminhão, postes com luz, caçambas, barris, pallets com caixas, estantes, árvores, bancos, hidrantes, cones, ar-condicionado, luminárias (algumas piscando), sinalização de rua, molduras de janela e porta, e prédios de fundo.
+- **Decals** (`map/decal_builder.gd`): sujeira e umidade na base das paredes, poças que refletem a luz, manchas de óleo, rachaduras e bueiros.
+- **Detalhes:** meio-fio, calhas, placas, lixo e folhas espalhados (MultiMesh) e sondas de reflexo dentro dos prédios.
+- **Exposição automática:** a imagem se adapta ao claro e ao escuro, como uma câmera corporal de verdade.
 - **Horários** (menu ou `GameConfig.time_of_day`): Dia, Entardecer ou Noite. À noite a lanterna (**F**) já começa ligada.
 - **Qualidade** (menu ou `GameConfig.graphics_quality`):
   - Baixa: sem efeitos extras.
   - Média: SSAO e SSIL.
   - Alta: SDFGI, reflexos e neblina volumétrica.
-- **Texturas fotográficas:** coloque `res://assets/textures/<tipo>_albedo.png` e `<tipo>_normal.png` (por exemplo `brick_albedo.png`). Elas substituem as texturas geradas.
+- **Texturas fotográficas:** coloque `res://assets/textures/<tipo>_albedo.png`, `<tipo>_normal.png` e `<tipo>_roughness.png` (por exemplo `brick_albedo.png`). Elas substituem as texturas geradas. Os tipos estão listados em `MapMaterials.DEFS`. Recomendo as texturas CC0 do Poly Haven ou do ambientCG.
 
 ## Substituindo placeholders
 - **Sons:** coloque arquivos em `assets/audio/` com o nome da chave (`mp4_fire.ogg`, `reload_mag.wav`, `footstep.ogg`, `ambient.ogg`…). A lista completa está em `core/placeholder_sounds.gd`. Quando o arquivo existe, ele tem prioridade sobre o som sintetizado.

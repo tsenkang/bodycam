@@ -72,6 +72,74 @@ var postfx_saturation: float = 0.82
 var show_rec_overlay: bool = true
 
 # ----------------------------------------------------------------------------
+#  AMBIENTE / ILUMINAÇÃO / GRÁFICOS
+# ----------------------------------------------------------------------------
+## Horário da partida: "dia", "entardecer" ou "noite".
+var time_of_day: String = "entardecer"
+## Qualidade gráfica: "baixa", "media" ou "alta".
+##   baixa: sem AO/GI; media: SSAO + SSIL; alta: + SDFGI e neblina volumétrica.
+var graphics_quality: String = "media"
+
+var lighting_presets := {
+	"dia": {
+		"sun_rotation": Vector3(-50.0, -35.0, 0.0),
+		"sun_color": Color(1.0, 0.96, 0.9),
+		"sun_energy": 1.15,
+		"sky_top": Color(0.38, 0.5, 0.66),
+		"sky_horizon": Color(0.68, 0.71, 0.74),
+		"ground": Color(0.25, 0.24, 0.22),
+		"ambient_energy": 0.75,
+		"fog_color": Color(0.64, 0.67, 0.7),
+		"fog_density": 0.004,
+		"exposure": 1.0,
+		"street_lights": false,
+		"interior_light_energy": 0.8,
+		"flashlight_on": false,
+	},
+	"entardecer": {
+		"sun_rotation": Vector3(-19.0, -62.0, 0.0),
+		"sun_color": Color(1.0, 0.66, 0.42),
+		"sun_energy": 1.1,
+		"sky_top": Color(0.2, 0.25, 0.36),
+		"sky_horizon": Color(0.78, 0.52, 0.36),
+		"ground": Color(0.12, 0.11, 0.1),
+		"ambient_energy": 0.9,
+		"fog_color": Color(0.55, 0.47, 0.42),
+		"fog_density": 0.006,
+		"exposure": 1.15,
+		"street_lights": true,
+		"interior_light_energy": 1.0,
+		"flashlight_on": false,
+	},
+	"noite": {
+		"sun_rotation": Vector3(-38.0, 20.0, 0.0),
+		"sun_color": Color(0.55, 0.65, 0.9),
+		"sun_energy": 0.12,
+		"sky_top": Color(0.02, 0.03, 0.06),
+		"sky_horizon": Color(0.08, 0.09, 0.13),
+		"ground": Color(0.02, 0.02, 0.02),
+		"ambient_energy": 0.28,
+		"fog_color": Color(0.08, 0.09, 0.12),
+		"fog_density": 0.012,
+		"exposure": 1.25,
+		"street_lights": true,
+		"interior_light_energy": 1.0,
+		"flashlight_on": true,
+	},
+}
+
+# Lanterna (tecla F) — presa ao peito como uma bodycam.
+var flashlight_energy: float = 3.0
+var flashlight_range: float = 28.0
+var flashlight_angle: float = 26.0
+var flashlight_shadows: bool = true
+
+
+func get_lighting() -> Dictionary:
+	return lighting_presets.get(time_of_day, lighting_presets["entardecer"])
+
+
+# ----------------------------------------------------------------------------
 #  MOVIMENTAÇÃO
 # ----------------------------------------------------------------------------
 var walk_speed: float = 4.3

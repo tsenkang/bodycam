@@ -19,6 +19,7 @@ Todo o conteúdo é original e placeholder: formas simples, sons sintetizados e 
 | Botão direito | mirar |
 | R | recarregar |
 | E | interagir (portas / armários de arma) |
+| F | lanterna |
 | 1–5 / roda do mouse | trocar arma |
 | Q | arma anterior |
 | Esc | pausar |
@@ -83,6 +84,16 @@ As rotas alternativas passam pelos prédios (portas e janelas), pelo beco sul e 
 - Escopeta: armazém.
 - AK-47: prédio norte.
 - Rifle de precisão: plataforma elevada.
+
+## Visual realista (estilo bodycam)
+- **Materiais procedurais** (`map/map_materials.gd`): asfalto, calçada, piso de praça, tijolo, reboco, concreto, metal ondulado, piso cerâmico, madeira e fachadas com janelas. Todos têm relevo (normal map) e são gerados por código. A primeira partida demora uns segundos para gerar; depois ficam em cache em `user://texture_cache/`.
+- **Objetos de cenário** (`map/prop_builder.gd`): carros detalhados, caminhão, postes com luz, caçambas, barris, pallets com caixas, estantes, árvores, bancos, hidrantes, cones, ar-condicionado, luminárias (algumas piscando), sinalização de rua, molduras de janela e porta, e prédios de fundo.
+- **Horários** (menu ou `GameConfig.time_of_day`): Dia, Entardecer ou Noite. À noite a lanterna (**F**) já começa ligada.
+- **Qualidade** (menu ou `GameConfig.graphics_quality`):
+  - Baixa: sem efeitos extras.
+  - Média: SSAO e SSIL.
+  - Alta: SDFGI, reflexos e neblina volumétrica.
+- **Texturas fotográficas:** coloque `res://assets/textures/<tipo>_albedo.png` e `<tipo>_normal.png` (por exemplo `brick_albedo.png`). Elas substituem as texturas geradas.
 
 ## Substituindo placeholders
 - **Sons:** coloque arquivos em `assets/audio/` com o nome da chave (`mp4_fire.ogg`, `reload_mag.wav`, `footstep.ogg`, `ambient.ogg`…). A lista completa está em `core/placeholder_sounds.gd`. Quando o arquivo existe, ele tem prioridade sobre o som sintetizado.

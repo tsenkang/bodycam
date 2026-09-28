@@ -11,6 +11,9 @@ extends RefCounted
 ## filho chamado "Muzzle". Opcionalmente "Pump", "Slide" ou "Bolt".
 
 const VIEWMODEL_FOV := 74.0
+## Camada de render da arma em 1ª pessoa (a lanterna não a ilumina,
+## senão a arma "estoura" de branco bem na frente da luz).
+const VIEWMODEL_LAYER := 2
 
 static var _materials := {}
 
@@ -216,6 +219,7 @@ static func _cyl(parent: Node3D, radius: float, length: float, pos: Vector3, mat
 static func _prep(mi: GeometryInstance3D) -> void:
 	# A arma em 1ª pessoa não projeta sombra no mundo.
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.layers = VIEWMODEL_LAYER
 
 
 ## Material com FOV próprio e "z-clip" reduzido: a arma não atravessa

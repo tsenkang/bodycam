@@ -36,6 +36,7 @@ var inventory: Inventory
 var health: Health
 var rig: HumanoidRig
 var interactor: Interactor
+var flashlight: SpotLight3D
 
 var _yaw := 0.0          # radianos
 var _pitch := 0.0        # radianos
@@ -106,6 +107,7 @@ func _ready() -> void:
 	camera.movement = movement
 	camera.weapons = weapon_manager
 	camera.current = true
+	_build_flashlight()
 	interactor = Interactor.new(self, camera)
 
 	for id in GameConfig.player_start_weapons:
@@ -145,6 +147,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		weapon_manager.quick_switch()
 	elif event.is_action_pressed("interact"):
 		interactor.try_interact()
+	elif event.is_action_pressed("flashlight"):
+		flashlight.visible = not flashlight.visible
+		AudioManager.play_2d("empty_click", -10.0)
 	elif event.is_action_pressed("debug_unlock_all") and GameConfig.debug_unlock_key_enabled:
 		for id in WeaponConfig.get_ids_by_slot():
 			inventory.add_weapon(id)
@@ -154,6 +159,23 @@ func _unhandled_input(event: InputEvent) -> void:
 			if event.is_action_pressed("weapon_%d" % i):
 				weapon_manager.select_slot(i)
 				break
+
+
+## Lanterna presa ao peito/arma (tecla F). Ligada por padrão à noite.
+func _build_flashlight() -> void:
+	flashlight = SpotLight3D.new()
+	flashlight.name = "Flashlight"
+	flashlight.position = Vector3(0.12, -0.18, -0.1)
+	flashlight.light_color = Color(0.95, 0.97, 1.0)
+	flashlight.light_energy = GameConfig.flashlight_energy
+	flashlight.spot_range = GameConfig.flashlight_range
+	flashlight.spot_angle = GameConfig.flashlight_angle
+	flashlight.spot_attenuation = 1.2
+	flashlight.spot_angle_attenuation = 0.6
+	flashlight.shadow_enabled = GameConfig.flashlight_shadows
+	flashlight.visible = GameConfig.get_lighting().flashlight_on
+	flashlight.light_cull_mask = 0xFFFFF & ~WeaponModelBuilder.VIEWMODEL_LAYER
+	camera.add_child(flashlight)
 
 
 # ============================================================================

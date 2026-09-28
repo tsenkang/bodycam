@@ -7,6 +7,8 @@ signal start_requested
 
 var _diff_buttons: Array[Button] = []
 var _mode_buttons: Array[Button] = []
+var _time_buttons := {}
+var _quality_buttons := {}
 
 
 func _ready() -> void:
@@ -48,6 +50,23 @@ func _ready() -> void:
 		mode_row.add_child(b)
 		_mode_buttons.append(b)
 
+	box.add_child(_text("HORÁRIO  ·  QUALIDADE GRÁFICA", 12, Color(1, 1, 1, 0.6)))
+	var env_row := HBoxContainer.new()
+	env_row.add_theme_constant_override("separation", 8)
+	box.add_child(env_row)
+	for t in ["dia", "entardecer", "noite"]:
+		var b := _toggle(t.capitalize())
+		b.pressed.connect(func(): _select_time(t))
+		env_row.add_child(b)
+		_time_buttons[t] = b
+	var sep := VSeparator.new()
+	env_row.add_child(sep)
+	for q in ["baixa", "media", "alta"]:
+		var b := _toggle({"baixa": "Baixa", "media": "Média", "alta": "Alta"}[q])
+		b.pressed.connect(func(): _select_quality(q))
+		env_row.add_child(b)
+		_quality_buttons[q] = b
+
 	box.add_child(_slider_row("FOV", 70, 110, GameConfig.camera_fov, func(v): GameConfig.camera_fov = v))
 	box.add_child(_slider_row("Sensibilidade", 0.03, 0.4, GameConfig.mouse_sensitivity, func(v): GameConfig.mouse_sensitivity = v, 0.01))
 	var fx := CheckBox.new()
@@ -72,12 +91,26 @@ func _ready() -> void:
 	box.add_child(_text(
 		"WASD mover · Shift correr · C / Ctrl agachar · Espaço pular\n" +
 		"Botão esq. atirar · Botão dir. mirar · R recarregar · E interagir\n" +
-		"1-5 / roda do mouse trocar arma · Q arma anterior · Esc pausar · F1 (debug) todas as armas",
+		"1-5 / roda do mouse trocar arma · Q arma anterior · F lanterna · Esc pausar · F1 (debug) todas as armas",
 		12, Color(1, 1, 1, 0.45)))
 
 	_select_difficulty(GameConfig.selected_difficulty)
 	_select_mode(GameConfig.selected_mode)
+	_select_time(GameConfig.time_of_day)
+	_select_quality(GameConfig.graphics_quality)
 	play.grab_focus()
+
+
+func _select_time(t: String) -> void:
+	GameConfig.time_of_day = t
+	for k in _time_buttons:
+		_time_buttons[k].button_pressed = k == t
+
+
+func _select_quality(q: String) -> void:
+	GameConfig.graphics_quality = q
+	for k in _quality_buttons:
+		_quality_buttons[k].button_pressed = k == q
 
 
 func _select_difficulty(d: int) -> void:

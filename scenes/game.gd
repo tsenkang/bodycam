@@ -82,38 +82,66 @@ func _on_match_ended(winner: int) -> void:
 	pause_menu.show_end(title)
 
 
+## Iluminação e atmosfera a partir do horário e da qualidade (GameConfig).
 func _build_environment() -> void:
+	var L: Dictionary = GameConfig.get_lighting()
+	var quality := GameConfig.graphics_quality
 	var env := Environment.new()
 	env.background_mode = Environment.BG_SKY
 	var sky := Sky.new()
 	var sky_mat := ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = Color(0.42, 0.5, 0.6)
-	sky_mat.sky_horizon_color = Color(0.68, 0.7, 0.72)
-	sky_mat.ground_horizon_color = Color(0.5, 0.5, 0.5)
-	sky_mat.ground_bottom_color = Color(0.2, 0.2, 0.2)
+	sky_mat.sky_top_color = L.sky_top
+	sky_mat.sky_horizon_color = L.sky_horizon
+	sky_mat.ground_horizon_color = L.sky_horizon.darkened(0.3)
+	sky_mat.ground_bottom_color = L.ground
+	sky_mat.sun_angle_max = 20.0
 	sky.sky_material = sky_mat
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_energy = 0.9
-	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.tonemap_exposure = 1.0
-	env.ssao_enabled = true
-	env.ssao_intensity = 1.5
+	env.ambient_light_color = L.fog_color
+	env.ambient_light_sky_contribution = 0.6
+	env.ambient_light_energy = L.ambient_energy
+	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
+	env.tonemap_mode = Environment.TONE_MAPPER_AGX
+	env.tonemap_exposure = L.exposure
 	env.fog_enabled = true
-	env.fog_light_color = Color(0.62, 0.65, 0.68)
-	env.fog_density = 0.004
+	env.fog_light_color = L.fog_color
+	env.fog_density = L.fog_density
+	env.fog_aerial_perspective = 0.4
 	env.glow_enabled = true
-	env.glow_intensity = 0.4
+	env.glow_intensity = 0.5
+	env.glow_bloom = 0.05
+	env.glow_hdr_threshold = 1.2
+	env.adjustment_enabled = true
+	env.adjustment_contrast = 1.08
+	env.adjustment_saturation = 0.9
+	if quality != "baixa":
+		env.ssao_enabled = true
+		env.ssao_radius = 1.2
+		env.ssao_intensity = 2.0
+		env.ssil_enabled = true
+		env.ssr_enabled = quality == "alta"
+	if quality == "alta":
+		env.sdfgi_enabled = true
+		env.sdfgi_use_occlusion = true
+		env.sdfgi_cascades = 3
+		env.sdfgi_min_cell_size = 0.25
+		env.volumetric_fog_enabled = true
+		env.volumetric_fog_density = L.fog_density * 2.0
+		env.volumetric_fog_albedo = L.fog_color
+		env.volumetric_fog_length = 48.0
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
 
 	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-52, -35, 0)
-	sun.light_energy = 1.1
-	sun.light_color = Color(1.0, 0.96, 0.9)
+	sun.rotation_degrees = L.sun_rotation
+	sun.light_energy = L.sun_energy
+	sun.light_color = L.sun_color
 	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 70.0
+	sun.shadow_blur = 1.5
+	sun.directional_shadow_max_distance = 80.0 if quality != "baixa" else 45.0
+	sun.light_angular_distance = 1.0
 	add_child(sun)
 
 

@@ -21,6 +21,7 @@ const KEY_ACTIONS := {
 	"weapon_5": [KEY_5],
 	"pause": [KEY_ESCAPE],
 	"debug_unlock_all": [KEY_F1],
+	"flashlight": [KEY_F],
 }
 
 const MOUSE_ACTIONS := {

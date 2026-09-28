@@ -87,6 +87,11 @@ func _ready() -> void:
 	add_child(_model)
 	_build_muzzle_flash()
 	visible = false
+	if built.get("needs_fit", false):
+		# Modelo importado: espera o esqueleto/malhas atualizarem e encaixa.
+		await get_tree().process_frame
+		await get_tree().process_frame
+		sight_height = WeaponModelBuilder.fit_scene(_model, data, _muzzle)
 
 
 # ============================================================================

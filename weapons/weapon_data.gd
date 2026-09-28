@@ -58,6 +58,14 @@ var sight := "iron"
 var model_type := "smg"
 var model_color := Color(0.15, 0.15, 0.15)
 var model_scene := ""
+## Ajustes do modelo importado (ver WeaponModelBuilder.fit_scene).
+var model_rotation := Vector3.ZERO
+var model_length := 0.85
+var model_rear_fraction := 0.42
+var model_sight_drop := 0.005
+var model_offset := Vector3.ZERO
+var model_hidden_bones: Array = []
+var model_hands := false
 var hip_position := Vector3(0.17, -0.2, -0.38)
 var ads_distance := 0.26
 var sprint_rotation := Vector3(-12.0, 38.0, 14.0)

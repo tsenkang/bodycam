@@ -37,6 +37,13 @@ extends RefCounted
 ##    weight ........... peso (kg) — afeta balanço, inércia e troca
 ##    move_speed_mult .. multiplicador de velocidade segurando a arma
 ##    sight ............ "iron" (mira simples) ou "scope" (luneta)
+##    model_scene ...... modelo 3D (.glb/.tscn). Vazio = modelo simples gerado
+##    model_rotation ... rotação (graus) para o cano apontar para -Z
+##    model_length ..... comprimento real da arma em metros
+##    model_rear_fraction quanto da arma fica atrás do ponto de empunhadura
+##    model_sight_drop . abaixa a linha de mira a partir do topo do modelo (m)
+##    model_offset ..... ajuste fino da posição do modelo
+##    model_hidden_bones ossos para esconder (partes extras do modelo)
 ## ============================================================================
 
 const WEAPONS := {
@@ -85,9 +92,15 @@ const WEAPONS := {
 		"sight": "iron",
 		"model_type": "smg",
 		"model_color": Color(0.16, 0.17, 0.18),
-		"model_scene": "",
+		"model_scene": "res://assets/models/weapons/mp4_m4_carbine.glb",
+		"model_rotation": Vector3(0.0, 180.0, 0.0),
+		"model_length": 0.84,
+		"model_rear_fraction": 0.42,
+		"model_sight_drop": 0.006,
+		"model_offset": Vector3(0.0, 0.0, 0.0),
+		"model_hidden_bones": [],
 		"hip_position": Vector3(0.17, -0.19, -0.42),
-		"ads_distance": 0.38,
+		"ads_distance": 0.50,
 		"sprint_rotation": Vector3(-12.0, 38.0, 14.0),
 		"sound_fire": "mp4_fire",
 		"sound_reload": "reload_mag",
@@ -140,7 +153,13 @@ const WEAPONS := {
 		"sight": "iron",
 		"model_type": "pistol",
 		"model_color": Color(0.12, 0.12, 0.13),
-		"model_scene": "",
+		"model_scene": "res://assets/models/weapons/glock_scifi_pistol.glb",
+		"model_rotation": Vector3(0.0, -90.0, 0.0),
+		"model_length": 0.22,
+		"model_rear_fraction": 0.30,
+		"model_sight_drop": 0.004,
+		"model_offset": Vector3(0.0, 0.0, 0.0),
+		"model_hidden_bones": [],
 		"hip_position": Vector3(0.14, -0.16, -0.40),
 		"ads_distance": 0.42,
 		"sprint_rotation": Vector3(22.0, 10.0, 6.0),
@@ -198,9 +217,15 @@ const WEAPONS := {
 		"sight": "iron",
 		"model_type": "shotgun",
 		"model_color": Color(0.14, 0.13, 0.12),
-		"model_scene": "",
+		"model_scene": "res://assets/models/weapons/shotgun_escopeta.glb",
+		"model_rotation": Vector3(0.0, -90.0, 0.0),
+		"model_length": 0.98,
+		"model_rear_fraction": 0.40,
+		"model_sight_drop": -0.03,
+		"model_offset": Vector3(0.0, 0.0, 0.0),
+		"model_hidden_bones": [],
 		"hip_position": Vector3(0.17, -0.20, -0.44),
-		"ads_distance": 0.36,
+		"ads_distance": 0.55,
 		"sprint_rotation": Vector3(-14.0, 40.0, 16.0),
 		"sound_fire": "shotgun_fire",
 		"sound_reload": "reload_shell",
@@ -253,7 +278,13 @@ const WEAPONS := {
 		"sight": "iron",
 		"model_type": "rifle",
 		"model_color": Color(0.13, 0.13, 0.12),
-		"model_scene": "",
+		"model_scene": "res://assets/models/weapons/ak47.glb",
+		"model_rotation": Vector3(0.0, 0.0, 0.0),
+		"model_length": 0.88,
+		"model_rear_fraction": 0.42,
+		"model_sight_drop": 0.025,
+		"model_offset": Vector3(-0.12, 0.0, 0.0),
+		"model_hidden_bones": ["Bone.002_01"],
 		"hip_position": Vector3(0.17, -0.20, -0.44),
 		"ads_distance": 0.38,
 		"sprint_rotation": Vector3(-14.0, 40.0, 16.0),
@@ -308,7 +339,13 @@ const WEAPONS := {
 		"sight": "scope",
 		"model_type": "sniper",
 		"model_color": Color(0.2, 0.22, 0.18),
-		"model_scene": "",
+		"model_scene": "res://assets/models/weapons/sniper_sr.glb",
+		"model_rotation": Vector3(0.0, 180.0, 0.0),
+		"model_length": 1.18,
+		"model_rear_fraction": 0.42,
+		"model_sight_drop": 0.030,
+		"model_offset": Vector3(0.0, 0.0, 0.0),
+		"model_hidden_bones": [],
 		"hip_position": Vector3(0.17, -0.20, -0.44),
 		"ads_distance": 0.32,
 		"sprint_rotation": Vector3(-14.0, 42.0, 16.0),

@@ -100,7 +100,12 @@ As rotas alternativas passam pelos prédios (portas e janelas), pelo beco sul e 
 
 ## Substituindo placeholders
 - **Sons:** coloque arquivos em `assets/audio/` com o nome da chave (`mp4_fire.ogg`, `reload_mag.wav`, `footstep.ogg`, `ambient.ogg`…). A lista completa está em `core/placeholder_sounds.gd`. Quando o arquivo existe, ele tem prioridade sobre o som sintetizado.
-- **Modelos de arma:** preencha `model_scene` no `weapon_config.gd` com o caminho de um `.tscn`/`.glb`. O modelo deve apontar para −Z, ter a linha de mira em x = 0 e um nó `Muzzle`.
+- **Modelos de arma:** 4 das 5 armas já usam modelos 3D reais do Sketchfab. Os créditos e licenças estão em `CREDITS.md`. O jogo encaixa cada modelo sozinho a partir de alguns campos no `weapon_config.gd`:
+  - `model_rotation`, `model_length` e `model_sight_drop`: orientação, tamanho real e altura da linha de mira;
+  - `model_offset`: ajuste fino da posição;
+  - `model_hidden_bones`: partes do modelo para esconder.
+
+  Para trocar um modelo, preencha `model_scene` no `weapon_config.gd` com o caminho de um `.glb` ou `.tscn` em qualquer orientação e ajuste `model_rotation` para o cano apontar para −Z.
 - **Personagens:** troque as malhas em `components/humanoid_rig.gd`, mantendo as hitboxes.
 
 ## Próximos passos sugeridos

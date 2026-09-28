@@ -21,24 +21,7 @@ static var _materials := {}
 ## Retorna { root: Node3D, sight_height: float, muzzle: Node3D, parts: Dictionary }
 static func build(data: WeaponData) -> Dictionary:
 	if data.model_scene != "" and ResourceLoader.exists(data.model_scene):
-		var scene: PackedScene = load(data.model_scene)
-		var inst: Node3D = scene.instantiate()
-		_apply_viewmodel_flags(inst)
-		var m: Node3D = inst.find_child("Muzzle", true, false)
-		if m == null:
-			m = Node3D.new()
-			m.position = Vector3(0, 0.03, -0.5)
-			inst.add_child(m)
-		return {
-			"root": inst,
-			"sight_height": float(inst.get_meta("sight_height", 0.07)),
-			"muzzle": m,
-			"parts": {
-				"pump": inst.find_child("Pump", true, false),
-				"slide": inst.find_child("Slide", true, false),
-				"bolt": inst.find_child("Bolt", true, false),
-			},
-		}
+		return _build_from_scene(data)
 	match data.model_type:
 		"pistol":
 			return _pistol(data)
@@ -49,6 +32,94 @@ static func build(data: WeaponData) -> Dictionary:
 		"sniper":
 			return _sniper(data)
 	return _smg(data)
+
+
+# ---------------------------------------------------------------------------
+#  Modelos 3D importados (.glb / .tscn)
+# ---------------------------------------------------------------------------
+## Instancia o modelo. O encaixe (escala, mira, cano) é feito em fit_scene()
+## depois que o modelo entra na árvore (esqueletos precisam de 1 frame).
+static func _build_from_scene(d: WeaponData) -> Dictionary:
+	var root := Node3D.new()
+	var pivot := Node3D.new()
+	pivot.name = "ModelPivot"
+	root.add_child(pivot)
+	var inst: Node3D = load(d.model_scene).instantiate()
+	pivot.add_child(inst)
+	pivot.rotation_degrees = d.model_rotation
+	_apply_viewmodel_flags(inst)
+	# Esconde partes indesejadas do modelo (ex.: carregador extra da AK).
+	for n in inst.find_children("*", "Skeleton3D", true, false):
+		var sk := n as Skeleton3D
+		for bone_name in d.model_hidden_bones:
+			var idx := sk.find_bone(bone_name)
+			if idx >= 0:
+				sk.set_bone_pose_scale(idx, Vector3.ONE * 0.0001)
+	var muzzle := Node3D.new()
+	muzzle.name = "Muzzle"
+	root.add_child(muzzle)
+	return {"root": root, "sight_height": 0.06, "muzzle": muzzle, "parts": {}, "needs_fit": true}
+
+
+## Encaixa um modelo importado nas convenções da arma em 1ª pessoa:
+##   - comprimento real (model_length) no eixo Z, cano apontando para -Z
+##   - linha de mira em x = 0, y = SIGHT_Y (+ ajuste fino)
+##   - traseira da arma a model_rear_fraction * comprimento atrás da origem
+## Retorna a altura da mira.
+const SIGHT_Y := 0.06
+
+static func fit_scene(root: Node3D, d: WeaponData, muzzle: Node3D) -> float:
+	var pivot: Node3D = root.get_node("ModelPivot")
+	var inst: Node3D = pivot.get_child(0)
+	var box := _measure(inst, pivot)
+	if box.size.z <= 0.0:
+		return SIGHT_Y
+	var rot := Basis.from_euler(d.model_rotation * (PI / 180.0))
+	# Caixa já rotacionada (o comprimento fica em Z).
+	var rbox := Transform3D(rot, Vector3.ZERO) * box
+	var s := d.model_length / rbox.size.z
+	var scaled := AABB(rbox.position * s, rbox.size * s)
+	var sight := scaled.end.y - d.model_sight_drop
+	var offset := Vector3(-scaled.get_center().x, SIGHT_Y - sight, d.model_length * d.model_rear_fraction - scaled.end.z)
+	offset += d.model_offset
+	pivot.transform = Transform3D(rot.scaled(Vector3(s, s, s)), offset)
+	if OS.is_debug_build() and OS.has_environment("DEBUG_FIT"):
+		print("fit %s box=%s rbox=%s s=%f offset=%s" % [d.id, box, rbox, s, offset])
+	var front_z := scaled.position.z + offset.z
+	var rear_z := scaled.end.z + offset.z
+	var sight_y := SIGHT_Y + d.model_offset.y
+	muzzle.position = Vector3(0.0, sight_y - d.model_length * 0.035, front_z)
+	if d.model_hands:
+		var L := d.model_length
+		if d.model_type == "pistol":
+			_hands(root, Vector3(0.0, sight_y - 0.085, rear_z - 0.05), Vector3(-0.01, sight_y - 0.095, rear_z - 0.06), true)
+		else:
+			_hands(root, Vector3(0.0, sight_y - 0.11, rear_z - L * 0.37), Vector3(0.0, sight_y - 0.04, rear_z - L * 0.66))
+	return sight_y
+
+
+## Caixa (AABB) de todas as malhas no espaço do "space" (usa a pose do
+## esqueleto para malhas com skin).
+static func _measure(node: Node3D, space: Node3D) -> AABB:
+	var result := AABB()
+	var first := true
+	for c in node.find_children("*", "VisualInstance3D", true, false):
+		var vi := c as VisualInstance3D
+		if not vi.visible:
+			continue
+		var box := vi.get_aabb()
+		if vi is MeshInstance3D and (vi as MeshInstance3D).skin != null:
+			var baked := (vi as MeshInstance3D).bake_mesh_from_current_skeleton_pose()
+			if baked:
+				box = baked.get_aabb()
+		var local := space.global_transform.affine_inverse() * vi.global_transform
+		var b := local * box
+		if first:
+			result = b
+			first = false
+		else:
+			result = result.merge(b)
+	return result
 
 
 # ---------------------------------------------------------------------------

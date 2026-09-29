@@ -1,56 +1,50 @@
-name: "Godot 4 Auto-Deploy para Web"
+name: Deploy Godot to GitHub Pages
+
 on:
   push:
-    branches:
-      - main
-      - master
-  workflow_dispatch:
-
-permissions:
-  contents: write
+    branches: [ "main" ] # Mude se sua branch principal tiver outro nome
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # IMPORTANTE: Necessário para criar Releases e subir no Pages
     steps:
-      - name: Verificar Código
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Corrigir Código do Jogo Automaticamente (API do Godot 4.3)
-        run: |
-          if [ -f "core/impact_effects.gd" ]; then
-            sed -i 's/\.scaled_local(/\.scaled(/g' core/impact_effects.gd
-          fi
-          if [ -f "scenes/game.gd" ]; then
-            sed -i 's/Environment\.TONE_MAPPER_AGX/Environment\.TONE_MAPPER_FILMIC/g' scenes/game.gd
-          fi
-          if [ -f "weapons/weapon_model_builder.gd" ]; then
-            sed -i 's/var baked := (vi as MeshInstance3D)/var baked: Mesh = (vi as MeshInstance3D)/g' weapons/weapon_model_builder.gd
-          fi
-
-      - name: Baixar e Configurar Godot 4
-        uses: chickensoft-games/setup-godot@v2
-        with:
-          version: 4.3.0
-          use-dotnet: false
-          include-templates: true
-
-      - name: Forçar Atualização do Cache de Classes da Godot
-        run: |
-          mkdir -p .godot
-          godot --headless --editor --quit || true
-
-      - name: Criar Pastas de Build
-        run: mkdir -v -p build/web
+      # ... (Mantenha aqui os seus passos de instalação do Godot/Dependências se houver) ...
 
       - name: Exportar Projeto para HTML5
         run: godot --headless --export-release "Web" build/web/index.html
 
-      - name: Corrigir Erro de Segurança Localmente (Sem Depender de Internet)
+      - name: Corrigir Erro de Segurança Localmente (COOP/COEP)
         run: |
           cp coi-serviceworker.js build/web/coi-serviceworker.js
           sed -i 's|<head>|<head><script src="coi-serviceworker.js"></script>|g' build/web/index.html
 
+      # --- NOVO PASSO 1: Enviar o arquivo pesado para uma Release ---
+      - name: Upload do .pck para GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Cria uma release chamada "game-assets" (ignora erro se já existir)
+          gh release create game-assets --title "Assets do Jogo" --notes "Arquivos pesados" || true
+          # Envia o arquivo .pck para essa release (sobrescreve se já existir)
+          gh release upload game-assets build/web/index.pck --clobber
+
+      # --- NOVO PASSO 2: Fazer o jogo baixar o .pck da Release ---
+      - name: Atualizar index.html para usar a Release
+        run: |
+          REPO_URL="https://github.com/${{ github.repository }}"
+          # Troca o caminho local pelo link direto da Release
+          sed -i "s|\"index.pck\"|\"${REPO_URL}/releases/download/game-assets/index.pck\"|g" build/web/index.html
+
+      # --- NOVO PASSO 3: Apagar o .pck local para não estourar o limite do Git ---
+      - name: Remover .pck local
+        run: rm -f build/web/index.pck
+
+      # --- Passo Final: Publicar no GitHub Pages ---
       - name: Publicar no GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:

@@ -1,0 +1,39 @@
+name: "Godot 4 Auto-Deploy para Web"
+on:
+  push:
+    branches:
+      - main # Mude para 'master' se sua branch principal tiver esse nome
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verificar Código
+        uses: actions/checkout@v4
+
+      - name: Baixar e Configurar Godot 4
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.3.0 # Substitua pela versão exata do seu projeto se não for a 4.3
+          use-dotnet: false
+          include-templates: true
+
+      - name: Criar Pastas de Build
+        run: mkdir -v -p build/web
+
+      - name: Exportar Projeto para HTML5
+        run: godot --headless --export-release "Web" build/web/index.html
+
+      - name: Corrigir Erro de Segurança da Godot 4 (COOP/COEP para GitHub Pages)
+        run: |
+          curl -fsSL https://githubusercontent.com -o build/web/coi-serviceworker.js
+          sed -i 's|<head>|<head><script src="coi-serviceworker.js"></script>|g' build/web/index.html
+
+      - name: Publicar no GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./build/web

@@ -16,10 +16,10 @@ jobs:
       - name: Verificar Código
         uses: actions/checkout@v4
 
-      - name: Baixar e Configurar Godot 4
+      - name: Baixar e Configurar Godot 4 (Versão de Compatibilidade)
         uses: chickensoft-games/setup-godot@v2
         with:
-          version: 4.3.0
+          version: 4.2.2 # Mudamos para a 4.2.2 para evitar os erros do GDScript!
           use-dotnet: false
           include-templates: true
 

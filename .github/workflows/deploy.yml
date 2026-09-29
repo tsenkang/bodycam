@@ -2,7 +2,9 @@ name: "Godot 4 Auto-Deploy para Web"
 on:
   push:
     branches:
-      - main # Mude para 'master' se sua branch principal tiver esse nome
+      - main
+      - master
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -17,7 +19,7 @@ jobs:
       - name: Baixar e Configurar Godot 4
         uses: chickensoft-games/setup-godot@v2
         with:
-          version: 4.3.0 # Substitua pela versão exata do seu projeto se não for a 4.3
+          version: 4.3.0
           use-dotnet: false
           include-templates: true
 

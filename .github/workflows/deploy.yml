@@ -18,17 +18,12 @@ jobs:
 
       - name: Corrigir Código do Jogo Automaticamente (API do Godot 4.3)
         run: |
-          # Correção 1: Troca scaled_local por scaled
           if [ -f "core/impact_effects.gd" ]; then
             sed -i 's/\.scaled_local(/\.scaled(/g' core/impact_effects.gd
           fi
-          
-          # Correção 2: Troca TONE_MAPPER_AGX por TONE_MAPPER_FILMIC
           if [ -f "scenes/game.gd" ]; then
             sed -i 's/Environment\.TONE_MAPPER_AGX/Environment\.TONE_MAPPER_FILMIC/g' scenes/game.gd
           fi
-          
-          # Correção 3: Corrige a inferência de tipo da variável baked
           if [ -f "weapons/weapon_model_builder.gd" ]; then
             sed -i 's/var baked := (vi as MeshInstance3D)/var baked: Mesh = (vi as MeshInstance3D)/g' weapons/weapon_model_builder.gd
           fi
@@ -51,9 +46,9 @@ jobs:
       - name: Exportar Projeto para HTML5
         run: godot --headless --export-release "Web" build/web/index.html
 
-      - name: Corrigir Erro de Segurança da Godot 4 (COOP/COEP para GitHub Pages)
+      - name: Corrigir Erro de Segurança Localmente (Sem Depender de Internet)
         run: |
-          curl -fsSL https://githubusercontent.com -o build/web/coi-serviceworker.js
+          cp coi-serviceworker.js build/web/coi-serviceworker.js
           sed -i 's|<head>|<head><script src="coi-serviceworker.js"></script>|g' build/web/index.html
 
       - name: Publicar no GitHub Pages

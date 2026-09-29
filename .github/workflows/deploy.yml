@@ -16,10 +16,27 @@ jobs:
       - name: Verificar Código
         uses: actions/checkout@v4
 
-      - name: Baixar e Configurar Godot 4 (Versão Correta)
+      - name: Corrigir Código do Jogo Automaticamente (API do Godot 4.3)
+        run: |
+          # Correção 1: Troca scaled_local por scaled
+          if [ -f "core/impact_effects.gd" ]; then
+            sed -i 's/\.scaled_local(/\.scaled(/g' core/impact_effects.gd
+          fi
+          
+          # Correção 2: Troca TONE_MAPPER_AGX por TONE_MAPPER_FILMIC
+          if [ -f "scenes/game.gd" ]; then
+            sed -i 's/Environment\.TONE_MAPPER_AGX/Environment\.TONE_MAPPER_FILMIC/g' scenes/game.gd
+          fi
+          
+          # Correção 3: Corrige a inferência de tipo da variável baked
+          if [ -f "weapons/weapon_model_builder.gd" ]; then
+            sed -i 's/var baked := (vi as MeshInstance3D)/var baked: Mesh = (vi as MeshInstance3D)/g' weapons/weapon_model_builder.gd
+          fi
+
+      - name: Baixar e Configurar Godot 4
         uses: chickensoft-games/setup-godot@v2
         with:
-          version: 4.3.0  # Mantido na 4.3 para aceitar o TONE_MAPPER_AGX do seu jogo
+          version: 4.3.0
           use-dotnet: false
           include-templates: true
 

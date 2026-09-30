@@ -4,6 +4,7 @@
 //  cartucho), dispersão, recuo, mira, sacar/guardar e animação procedural.
 // ============================================================================
 import * as THREE from 'three';
+import { clone as cloneSkinned } from '../vendor/addons/utils/SkeletonUtils.js';
 import { GLTFLoader } from '../vendor/addons/loaders/GLTFLoader.js';
 import { WEAPONS, CAMERA, MOVE } from './config.js';
 import { clamp, lerp, damp, moveToward, rand, DEG, smoothstep } from './util.js';
@@ -58,7 +59,7 @@ loader.register((parser) => ({
  * a hospedagem serve). Remonta um .glb na memória e usa o GLTFLoader, sem
  * nenhum outro download.
  */
-async function loadModelFile(url) {
+export async function loadModelFile(url) {
   const js = await (await fetch(url)).json();
   const uri = js.buffers[0].uri;
   delete js.buffers[0].uri;
@@ -358,6 +359,33 @@ function hasSkin(obj) { let s = false; obj.traverse((o) => { if (o.isSkinnedMesh
 export function preloadModels() {
   return Promise.allSettled(Object.values(WEAPONS).map((w) => {
     if (!modelCache[w.model.url]) modelCache[w.model.url] = loadModelFile(w.model.url);
-    return modelCache[w.model.url];
+    return modelCache[w.model.url].then((g) => { loaded[w.model.url] = g; return g; });
   }));
+}
+const loaded = {};
+
+/**
+ * Arma em "terceira pessoa" (nas mãos dos bots): o modelo já carregado,
+ * com o cano para -Z, cabo na origem. Retorna { root, muzzle } ou null.
+ */
+export function buildWorldGun(id) {
+  const mc = WEAPONS[id].model, gltf = loaded[mc.url];
+  if (!gltf) return null;
+  const scene = cloneSkinned(gltf.scene);
+  const pivot = new THREE.Group(); pivot.add(scene);
+  scene.traverse((o) => {
+    if (o.isBone && mc.hideBones && mc.hideBones.includes(o.name)) o.scale.setScalar(1e-4);
+    if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; o.frustumCulled = false; }
+  });
+  pivot.rotation.y = mc.rotY * DEG;
+  pivot.updateMatrixWorld(true);
+  scene.traverse((o) => { if (o.isSkinnedMesh) o.skeleton.update(); });
+  const box = new THREE.Box3().setFromObject(pivot, true);
+  const s = mc.length / Math.max(box.max.z - box.min.z, 1e-6);
+  pivot.scale.setScalar(s);
+  // cabo (≈ 35% a partir de trás) na origem
+  pivot.position.set(-(box.min.x + box.max.x) / 2 * s, -(box.min.y + box.max.y) / 2 * s, -(box.max.z * s - mc.length * 0.3));
+  const root = new THREE.Group(); root.add(pivot);
+  const muzzle = new THREE.Object3D(); muzzle.position.set(0, 0.02, box.min.z * s + pivot.position.z); root.add(muzzle);
+  return { root, muzzle };
 }

@@ -1,5 +1,11 @@
 # Créditos
 
+## Modelo 3D dos soldados (bots, versão web)
+
+"3 soldier low poly (outdated)" de **buh** — [CC-BY 4.0](http://creativecommons.org/licenses/by/4.0/) — https://sketchfab.com/3d-models/3-soldier-low-poly-outdated-9b5bd75966764a87ae09c8b77e21f4c2
+
+Alterações: texturas reduzidas para 512 px, pose (braços segurando a arma, pernas andando/agachando) feita por código e braçadeiras/faixa no capacete com a cor da equipe adicionadas no jogo.
+
 ## Modelos 3D das armas
 
 Os modelos abaixo vêm do Sketchfab. As alterações feitas no jogo são as mesmas para todos: reorientação, redimensionamento para o tamanho real e ajuste da linha de mira (`WeaponModelBuilder.fit_scene`). Os modelos em si não foram modificados.

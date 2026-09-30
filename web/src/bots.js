@@ -11,6 +11,8 @@ import { BOT, BOT_DIFFICULTY, WEAPONS, PLAYER } from './config.js';
 import { clamp, lerp, rand, randInt, pick, DEG, angleDiff, rotateToward, moveToward } from './util.js';
 import { moveCharacter } from './physics.js';
 import { play } from './audio.js';
+import { createSoldier, CROUCH_DROP } from './soldier.js';
+import { buildWorldGun } from './weapons.js';
 
 const TEAM_COLORS = [0x3366bf, 0xb8332b];
 // Relógio do jogo (para durante a pausa). Atualizado pelo Game a cada passo.
@@ -45,6 +47,9 @@ export class Bot {
   equip(id) { this.wid = id; this.w = WEAPONS[id]; this.mag = this.w.mag; this.reloading = false; }
 
   buildMesh() {
+    this.cd = 0.55;   // quanto a parte de cima desce agachado
+    const soldier = createSoldier(this.team, this.game.bots ? this.game.bots.length : 0);
+    if (soldier) return this.buildSoldier(soldier);
     const g = new THREE.Group(), color = TEAM_COLORS[this.team];
     const mat = (c, r = 0.8) => new THREE.MeshStandardMaterial({ color: c, roughness: r });
     const vest = mat(color), cloth = mat(new THREE.Color(color).multiplyScalar(0.45)), skin = mat(0x8c7361), pants = mat(0x292b29), metal = mat(0x141414, 0.5);
@@ -66,24 +71,51 @@ export class Bot {
       const hip = new THREE.Group(); hip.position.set(0.12 * s, 0.87, 0); g.add(hip);
       box(hip, 0.17, 0.86, 0.19, 0, -0.43, 0, pants); this.legs.push(hip);
     }
+    this.addTag(g);
+    this.mesh = g;
+    this.game.scene.add(g);
+  }
+
+  /** Soldado 3D (modelo com esqueleto) segurando a arma do bot. */
+  buildSoldier(soldier) {
+    this.soldier = soldier; this.cd = CROUCH_DROP;
+    const g = soldier.root;
+    // A arma fica num "suporte" que desce junto com o quadril ao agachar.
+    this.upper = new THREE.Group(); g.add(this.upper);
+    const gun = buildWorldGun(this.wid);
+    const holder = new THREE.Group(); this.upper.add(holder);
+    holder.position.copy(soldier.gunGrip);
+    holder.lookAt(soldier.gunFore.clone().sub(soldier.gunGrip).multiplyScalar(-1).add(soldier.gunGrip));
+    if (gun) { holder.add(gun.root); this.muzzleObj = gun.muzzle; }
+    else {
+      const metal = new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.5 });
+      const b = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.1, 0.62), metal); b.position.z = -0.2; b.castShadow = true; holder.add(b);
+      this.muzzleObj = new THREE.Object3D(); this.muzzleObj.position.set(0, 0.02, -0.52); holder.add(this.muzzleObj);
+    }
+    this.flash = new THREE.PointLight(0xffc066, 0, 6, 2); this.muzzleObj.add(this.flash);
+    this.legs = null;
+    this.addTag(g);
+    this.mesh = g;
+    this.game.scene.add(g);
+  }
+
+  addTag(g) {
     if (this.team === 0) {
       const c = document.createElement('canvas'); c.width = 256; c.height = 64;
       const x = c.getContext('2d'); x.font = '600 34px system-ui, sans-serif'; x.fillStyle = '#8cc8ff'; x.textAlign = 'center'; x.fillText('▼ ' + this.name, 128, 44);
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
       sp.scale.set(0.9, 0.225, 1); sp.position.y = 2.15; sp.renderOrder = 10; g.add(sp); this.tag = sp;
     }
-    this.mesh = g;
-    this.game.scene.add(g);
   }
 
   // ------------------------------------------------------------ interface de combatente
-  eye() { return [this.pos[0], this.pos[1] + 1.6 - 0.55 * this.crouch, this.pos[2]]; }
-  chest() { return [this.pos[0], this.pos[1] + 1.2 - 0.55 * this.crouch, this.pos[2]]; }
-  head() { return [this.pos[0], this.pos[1] + 1.62 - 0.55 * this.crouch, this.pos[2]]; }
+  eye() { return [this.pos[0], this.pos[1] + 1.6 - this.cd * this.crouch, this.pos[2]]; }
+  chest() { return [this.pos[0], this.pos[1] + 1.2 - this.cd * this.crouch, this.pos[2]]; }
+  head() { return [this.pos[0], this.pos[1] + 1.62 - this.cd * this.crouch, this.pos[2]]; }
   visibility() { return this.crouching ? 0.7 : 1; }
   weaponName() { return this.w.name; }
   hitParts() {
-    const d = 0.55 * this.crouch;
+    const d = this.cd * this.crouch;
     return [
       ['head', 0, 1.62 - d, 0, 0.13, 0.13, 0.13], ['torso', 0, 1.19 - d, 0, 0.23, 0.31, 0.14],
       ['arms', 0.28, 1.25 - d, -0.2, 0.07, 0.12, 0.28], ['arms', -0.28, 1.25 - d, -0.2, 0.07, 0.12, 0.28],
@@ -153,11 +185,14 @@ export class Bot {
     // visual
     this.mesh.position.set(this.pos[0], this.pos[1], this.pos[2]);
     this.mesh.rotation.set(0, this.yaw, 0);
-    this.upper.position.y = -0.55 * this.crouch;
+    this.upper.position.y = -this.cd * this.crouch;
     const hs = this.hspeed();
-    this.walkPhase += hs * dt * 2.2;
-    const swing = Math.sin(this.walkPhase) * Math.min(1, hs / 3) * 0.6;
-    this.legs[0].rotation.x = swing; this.legs[1].rotation.x = -swing;
+    if (this.soldier) this.soldier.pose(dt, hs, this.crouch);
+    else {
+      this.walkPhase += hs * dt * 2.2;
+      const swing = Math.sin(this.walkPhase) * Math.min(1, hs / 3) * 0.6;
+      this.legs[0].rotation.x = swing; this.legs[1].rotation.x = -swing;
+    }
     if (this.flash.intensity > 0) this.flash.intensity = Math.max(0, this.flash.intensity - dt * 60);
   }
 

@@ -11,6 +11,7 @@ import { NavGrid } from './nav.js';
 import { Player } from './player.js';
 import { Bot, setClock } from './bots.js';
 import { preloadModels } from './weapons.js';
+import { loadSoldiers } from './soldier.js';
 import { initAudio, play, startAmbient, stopAmbient } from './audio.js';
 
 const $ = (id) => document.getElementById(id);
@@ -499,15 +500,12 @@ async function startGameInner() {
   if (game) { game.dispose(); game = null; }
   $('load-bar').style.width = '15%';
   await new Promise((r) => setTimeout(r, 30));
-  const models = preloadModels();
-  let done = 0; const total = WEAPON_ORDER.length;
-  WEAPON_ORDER.forEach(() => {});
-  models.then(() => { done = total; });
-  $('load-text').textContent = 'Gerando o mapa…';
+  const models = Promise.all([preloadModels(), loadSoldiers()]);
+  $('load-text').textContent = 'Carregando armas e soldados…';
+  await models;
+  $('load-bar').style.width = '60%'; $('load-text').textContent = 'Gerando o mapa…';
   await new Promise((r) => setTimeout(r, 30));
   game = new Game();
-  $('load-bar').style.width = '60%'; $('load-text').textContent = 'Carregando os modelos das armas…';
-  await models;
   $('load-bar').style.width = '100%';
   onResize();
   // compila shaders antes do primeiro quadro

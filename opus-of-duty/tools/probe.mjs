@@ -75,8 +75,8 @@ const browser = await chromium.launch({
   args: [...(process.platform==='darwin'?['--use-angle=metal']:['--use-angle=swiftshader','--enable-unsafe-swiftshader']), '--ignore-gpu-blocklist', '--force-color-profile=srgb', '--mute-audio'],
 });
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
-await page.goto(`http://127.0.0.1:${PORT}/?capture=1`, { waitUntil: 'domcontentloaded', timeout: 90000 });
-await page.waitForFunction('window.__READY__ === true', null, { timeout: 90000 });
+await page.goto(`http://127.0.0.1:${PORT}/?capture=1`, { waitUntil: 'domcontentloaded', timeout: (process.platform === "darwin" ? 90000 : 1800000) });
+await page.waitForFunction('window.__READY__ === true', null, { timeout: (process.platform === "darwin" ? 90000 : 1800000) });
 
 const shots = String(args.shots ?? 'hero,sunset,night,interior').split(',');
 for (const s of shots) {

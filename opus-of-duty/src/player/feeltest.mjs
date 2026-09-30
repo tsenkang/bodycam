@@ -61,8 +61,8 @@ page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
 let result = null;
 let failed = null;
 try {
-  await page.goto(`http://127.0.0.1:${PORT}/?capture=1`, { waitUntil: 'domcontentloaded', timeout: 90000 });
-  await page.waitForFunction('window.__READY__ === true', null, { timeout: 90000 });
+  await page.goto(`http://127.0.0.1:${PORT}/?capture=1`, { waitUntil: 'domcontentloaded', timeout: (process.platform === "darwin" ? 90000 : 1800000) });
+  await page.waitForFunction('window.__READY__ === true', null, { timeout: (process.platform === "darwin" ? 90000 : 1800000) });
   result = await page.evaluate(runBench);
 } catch (e) {
   failed = e;

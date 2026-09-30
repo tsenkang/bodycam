@@ -55,13 +55,14 @@ const browser = await chromium.launch({
   args: [...(process.platform==='darwin'?['--use-angle=metal']:['--use-angle=swiftshader','--enable-unsafe-swiftshader']), '--ignore-gpu-blocklist', '--force-color-profile=srgb', '--hide-scrollbars', '--mute-audio'],
 });
 const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
+page.setDefaultTimeout(process.platform === "darwin" ? 30000 : 1800000);
 const logs = [];
 page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
 
 try {
   await page.goto(`http://127.0.0.1:${PORT}/?capture=1&shot=hud`, { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction('window.__READY__ === true', null, { timeout: 90000 });
+  await page.waitForFunction('window.__READY__ === true', null, { timeout: (process.platform === "darwin" ? 90000 : 1800000) });
 
   if (args.fonts) {
     const report = await page.evaluate(() => {
@@ -104,6 +105,25 @@ try {
     mkdirSync(dirname(OUT), { recursive: true });
     await page.screenshot({ path: OUT, type: 'png' });
     console.log(JSON.stringify({ ok: true, out: OUT, state: STATE }));
+    // --bgout: the same frame with the HUD removed, a backplate for src/ui/bench.html
+    if (args.bgout) {
+      await page.evaluate(() => {
+        const r = window.__ENGINE__?.ctx.peek('ui')?.root;
+        if (r) r.style.display = 'none';
+      });
+      await page.evaluate(() => new Promise((d) => requestAnimationFrame(() => requestAnimationFrame(d))));
+      await page.screenshot({ path: resolve(String(args.bgout)), type: 'png' });
+      console.log(JSON.stringify({ ok: true, bg: args.bgout }));
+    }
+    // --mmout: the baked minimap bitmap, so the bench draws the real level
+    if (args.mmout) {
+      const url = await page.evaluate(() => window.__ENGINE__?.ctx.peek('ui')?.minimap?.baked?.toDataURL?.('image/png') ?? null);
+      if (url) {
+        const { writeFileSync } = await import('node:fs');
+        writeFileSync(resolve(String(args.mmout)), Buffer.from(url.split(',')[1], 'base64'));
+        console.log(JSON.stringify({ ok: true, minimap: args.mmout }));
+      } else console.log(JSON.stringify({ ok: false, minimap: 'no baked map' }));
+    }
   }
 } catch (e) {
   console.error('FAILED', e.message);

@@ -23,6 +23,8 @@ const PORT = Number(args.port ?? 5173);
 const W = Number(args.w ?? 1920);
 const H = Number(args.h ?? 1080);
 const SETTLE = Number(args.settle ?? 90);
+// Software GL (SwiftShader) boots and renders an order of magnitude slower than a GPU.
+const TIMEOUT = Number(args.timeout ?? (process.platform === 'darwin' ? 90000 : 1800000));
 const OUTDIR = resolve(args.out ?? 'shots/latest');
 const ROOT = resolve(import.meta.dirname, '..');
 
@@ -67,6 +69,7 @@ const browser = await chromium.launch({
 });
 
 const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
+page.setDefaultTimeout(TIMEOUT);
 const logs = [];
 page.on('console', (m) => m.type() !== 'debug' && logs.push(`[${m.type()}] ${m.text()}`));
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
@@ -76,8 +79,8 @@ mkdirSync(OUTDIR, { recursive: true });
 const report = { ok: true, outDir: OUTDIR, size: `${W}x${H}`, shots: [], errors: [] };
 
 try {
-  await page.goto(`http://127.0.0.1:${PORT}/?capture=1`, { waitUntil: 'domcontentloaded', timeout: 90000 });
-  await page.waitForFunction('window.__READY__ === true', null, { timeout: 90000 });
+  await page.goto(`http://127.0.0.1:${PORT}/?capture=1&lockstep=1`, { waitUntil: 'domcontentloaded', timeout: TIMEOUT });
+  await page.waitForFunction('window.__READY__ === true', null, { timeout: TIMEOUT });
 
   const all = await page.evaluate('Object.keys(window.__SHOTS__ ?? {})');
   const wanted = args.shots ? String(args.shots).split(',').map((s) => s.trim()) : all;
@@ -92,15 +95,12 @@ try {
       ({ s, settle }) => window.__APPLY_SHOT__(s, { grabFrame: settle }),
       { s: name, settle: SETTLE }
     );
-    await page.evaluate(
-      (n) =>
-        new Promise((done) => {
-          let i = 0;
-          const tick = () => (++i >= n ? done() : requestAnimationFrame(tick));
-          requestAnimationFrame(tick);
-        }),
-      SETTLE
-    );
+    // Lockstep: the page runs no frame loop of its own, so only these pumped
+    // frames advance and nothing moves while the shutter fires.
+    const t0 = Date.now();
+    await page.evaluate((n) => window.__PUMP__(n), SETTLE);
+    const msPerFrame = Math.round((Date.now() - t0) / SETTLE);
+    await page.evaluate(() => window.__PRESENT__(2));
     const file = `${OUTDIR}/${name}.png`;
     await page.screenshot({ path: file, type: 'png' });
     const info = await page.evaluate('window.__RENDER_INFO__ ?? null');
@@ -110,6 +110,7 @@ try {
       file,
       doc: await page.evaluate((s) => window.__SHOTS__[s]?.doc ?? '', name),
       info,
+      msPerFrame,
       newLogs: logs.slice(before),
     });
   }

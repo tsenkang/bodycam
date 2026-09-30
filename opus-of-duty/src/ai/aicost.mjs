@@ -28,8 +28,8 @@ const browser = await chromium.launch({
 const page = await browser.newPage({ viewport: { width: 1512, height: 982 }, deviceScaleFactor: DPR });
 const errs = [];
 page.on('pageerror', (e) => errs.push(e.message));
-await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'domcontentloaded', timeout: 90000 });
-await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
+await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'domcontentloaded', timeout: (process.platform === "darwin" ? 90000 : 1800000) });
+await page.waitForFunction('window.__READY__ === true', null, { timeout: (process.platform === "darwin" ? 120000 : 1800000) });
 
 await page.evaluate(() => {
   const e = window.__ENGINE__;

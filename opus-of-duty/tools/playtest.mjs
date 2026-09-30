@@ -3,7 +3,7 @@ const b = await chromium.launch({ headless: true, args:[...(process.platform==='
 const p = await b.newPage({ viewport:{width:1280,height:720} });
 const errs=[]; p.on('pageerror',e=>errs.push(e.message)); p.on('console',m=>m.type()==='error'&&errs.push(m.text()));
 await p.goto('http://127.0.0.1:8080/', {waitUntil:'domcontentloaded'});
-await p.waitForFunction('window.__READY__===true',null,{timeout:60000});
+await p.waitForFunction('window.__READY__===true',null,{timeout: (process.platform === "darwin" ? 60000 : 1800000)});
 const snap = () => p.evaluate(()=>{const e=window.__ENGINE__,c=e.camera.position;return{
   pos:[+c.x.toFixed(2),+c.y.toFixed(2),+c.z.toFixed(2)],
   yaw:+e.camera.rotation.y.toFixed(3), frame:e.time.frame,

@@ -66,6 +66,7 @@ const browser = await chromium.launch({
   ],
 });
 const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
+page.setDefaultTimeout(process.platform === "darwin" ? 30000 : 1800000);
 const logs = [];
 page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}\n${e.stack ?? ''}`));
@@ -79,9 +80,9 @@ try {
     (args.arms ? `&arms=${args.arms}` : '');
   await page.goto(`http://127.0.0.1:${PORT}/src/weapons/preview.html?view=${VIEW}${extra}`, {
     waitUntil: 'domcontentloaded',
-    timeout: 60000,
+    timeout: (process.platform === "darwin" ? 60000 : 1800000),
   });
-  await page.waitForFunction('window.__READY__ === true', null, { timeout: 60000 });
+  await page.waitForFunction('window.__READY__ === true', null, { timeout: (process.platform === "darwin" ? 60000 : 1800000) });
   await page.evaluate(
     () =>
       new Promise((d) => {

@@ -58,7 +58,7 @@ try {
   await page.goto(`http://127.0.0.1:${PORT}/?capture=1&shot=${SHOT}`, {
     waitUntil: 'domcontentloaded',
   });
-  await page.waitForFunction('window.__READY__ === true', null, { timeout: 90000 });
+  await page.waitForFunction('window.__READY__ === true', null, { timeout: (process.platform === "darwin" ? 90000 : 1800000) });
   await page.evaluate((s) => window.__APPLY_SHOT__?.(s), SHOT);
   // --pre="js" runs before the settle and the screenshot: use it to hide a batch
   // and find out which merged mesh a mystery silhouette belongs to.

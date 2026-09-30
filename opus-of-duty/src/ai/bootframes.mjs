@@ -35,8 +35,8 @@ await page.addInitScript(() => {
       last = b;
     });
 });
-await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'domcontentloaded', timeout: 90000 });
-await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
+await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'domcontentloaded', timeout: (process.platform === "darwin" ? 90000 : 1800000) });
+await page.waitForFunction('window.__READY__ === true', null, { timeout: (process.platform === "darwin" ? 120000 : 1800000) });
 await page.evaluate((w) => new Promise((r) => setTimeout(r, w)), WAIT);
 const frames = await page.evaluate(() => window.__FRAMES__);
 // the engine loop is whatever runs after boot; report the callback cost, which

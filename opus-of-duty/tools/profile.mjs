@@ -39,8 +39,8 @@ page.on('pageerror', (e) => errs.push(e.message));
 
 const t0 = Date.now();
 const EXTRA = args.query ? `?${args.query}` : '';
-await page.goto(`http://127.0.0.1:${PORT}/${EXTRA}`, { waitUntil: 'domcontentloaded', timeout: 90000 });
-await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
+await page.goto(`http://127.0.0.1:${PORT}/${EXTRA}`, { waitUntil: 'domcontentloaded', timeout: (process.platform === "darwin" ? 90000 : 1800000) });
+await page.waitForFunction('window.__READY__ === true', null, { timeout: (process.platform === "darwin" ? 120000 : 1800000) });
 const bootMs = Date.now() - t0;
 
 // Boot-phase breakdown: how much of that boot was spent where.

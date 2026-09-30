@@ -35,6 +35,8 @@ const OUTDIR = resolve(args.out ?? 'shots/base');
 const ROOT = resolve(import.meta.dirname, '..');
 // Extra query string appended to every shot URL, e.g. --query=prewarm=0
 const EXTRA = args.query ? `&${args.query}` : '';
+// Software GL (SwiftShader) boots and renders an order of magnitude slower than a GPU.
+const TIMEOUT = Number(args.timeout ?? (process.platform === 'darwin' ? 90000 : 1800000));
 
 const portOpen = (p) => new Promise((res) => {
   const s = net.connect({ port: p, host: '127.0.0.1' }, () => (s.destroy(), res(true)));
@@ -59,24 +61,28 @@ const browser = await chromium.launch({
 mkdirSync(OUTDIR, { recursive: true });
 const report = { ok: true, outDir: OUTDIR, size: `${W}x${H}`, isolated: true, settle: SETTLE, shots: [], errors: [] };
 
-// Discover the shot list from a throwaway page.
+// Discover the shot list from a throwaway page (skipped when --shots names them).
+let all = [];
+if (!args.shots) {
 const probe = await browser.newPage({ viewport: { width: W, height: H } });
-await probe.goto(`http://127.0.0.1:${PORT}/?capture=1&lockstep=1`, { waitUntil: 'domcontentloaded', timeout: 90000 });
-await probe.waitForFunction('window.__READY__ === true', null, { timeout: 90000 });
-const all = await probe.evaluate('Object.keys(window.__SHOTS__ ?? {})');
+await probe.goto(`http://127.0.0.1:${PORT}/?capture=1&lockstep=1`, { waitUntil: 'domcontentloaded', timeout: TIMEOUT });
+await probe.waitForFunction('window.__READY__ === true', null, { timeout: TIMEOUT });
+all = await probe.evaluate('Object.keys(window.__SHOTS__ ?? {})');
 await probe.close();
+}
 
 const wanted = args.shots ? String(args.shots).split(',').map((s) => s.trim()) : all;
 
 for (const name of wanted) {
   const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
+  page.setDefaultTimeout(TIMEOUT);
   const logs = [];
   page.on('console', (m) => m.type() !== 'debug' && logs.push(`[${m.type()}] ${m.text()}`));
   page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
   try {
     await page.goto(`http://127.0.0.1:${PORT}/?capture=1&lockstep=1&shot=${encodeURIComponent(name)}${EXTRA}`,
-      { waitUntil: 'domcontentloaded', timeout: 90000 });
-    await page.waitForFunction('window.__READY__ === true', null, { timeout: 90000 });
+      { waitUntil: 'domcontentloaded', timeout: TIMEOUT });
+    await page.waitForFunction('window.__READY__ === true', null, { timeout: TIMEOUT });
 
     const applied = await page.evaluate(
       ({ s, settle }) => window.__APPLY_SHOT__(s, { grabFrame: settle }), { s: name, settle: SETTLE });
@@ -91,14 +97,16 @@ for (const name of wanted) {
     // of its own, so nothing advances during any of the round trips above or
     // during the screenshot below — engine.time.frame at the shutter is a
     // constant (BOOT_FRAMES + SETTLE) on every run and on every machine.
+    const t0 = Date.now();
     await page.evaluate((n) => window.__PUMP__(n), SETTLE);
+    const pumpMs = Date.now() - t0;
     // Yield two rAFs with the simulation frozen so the compositor has certainly
     // picked up the final rendered frame before the shutter.
     await page.evaluate(() => window.__PRESENT__(2));
 
     await page.screenshot({ path: `${OUTDIR}/${name}.png`, type: 'png' });
     const info = await page.evaluate('window.__RENDER_INFO__ ?? null');
-    report.shots.push({ shot: name, ok: !applied?.error, info, logs: logs.filter((l) => /pageerror|\[error\]/.test(l)) });
+    report.shots.push({ shot: name, ok: !applied?.error, info, msPerFrame: Math.round(pumpMs / SETTLE), logs: logs.filter((l) => /pageerror|\[error\]/.test(l)) });
   } catch (e) {
     report.ok = false;
     report.shots.push({ shot: name, ok: false, error: e.message });

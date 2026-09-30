@@ -112,9 +112,9 @@ try {
   // the driver's begin(), but not paying for it at all is cleaner).
   await page.goto(`http://127.0.0.1:${PORT}/?capture=1&lockstep=1&q=ultra&prewarm=0`, {
     waitUntil: 'domcontentloaded',
-    timeout: 180000,
+    timeout: (process.platform === "darwin" ? 180000 : 1800000),
   });
-  await page.waitForFunction('window.__READY__ === true', null, { timeout: 180000 });
+  await page.waitForFunction('window.__READY__ === true', null, { timeout: (process.platform === "darwin" ? 180000 : 1800000) });
   log(`[demo] booted in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 
   const installed = await page.evaluate(readFileSync(join(ROOT, 'tools/demo-driver.js'), 'utf8'));

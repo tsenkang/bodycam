@@ -4,8 +4,8 @@ const b = await chromium.launch({ headless:true, args:[...(process.platform==='d
 const p = await b.newPage({ viewport:{width:1600,height:900} });
 const errs=[]; p.on('pageerror',e=>errs.push(e.message)); p.on('console',m=>m.type()==='error'&&errs.push(m.text()));
 const t0=Date.now();
-const resp = await p.goto(URL,{waitUntil:'domcontentloaded',timeout:60000});
-await p.waitForFunction('window.__READY__===true',null,{timeout:90000});
+const resp = await p.goto(URL,{waitUntil:'domcontentloaded',timeout: (process.platform === "darwin" ? 60000 : 1800000)});
+await p.waitForFunction('window.__READY__===true',null,{timeout: (process.platform === "darwin" ? 90000 : 1800000)});
 const bootMs = Date.now()-t0;
 await p.evaluate(()=>window.__APPLY_SHOT__('hero'));
 await p.evaluate(()=>new Promise(d=>{let i=0;const t=()=>++i>=90?d():requestAnimationFrame(t);requestAnimationFrame(t)}));

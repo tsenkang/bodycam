@@ -160,8 +160,8 @@ export function muzzleFlash(fx, o) {
   // 0.085 -> 0.135 m. At 0.032 m the core was a ~40 px ball at 80 deg FOV: too
   // small to read as burning gas and far too small to be the source of a light
   // that is supposed to wash the handguard.
-  s.size0 = 0.06 * sc;
-  s.size1 = 0.095 * sc;
+  s.size0 = 0.07 * sc;
+  s.size1 = 0.11 * sc;
   s.sizeCurve = 0.35;
   // 50 ms: three frames at 60 Hz. A real flash is ~2 ms, but a sprite that dies
   // inside one frame is a flash the player only ever sees half the time — and
@@ -230,7 +230,7 @@ export function muzzleFlash(fx, o) {
     LOBE.y = d.y * cp + BORE.ty * rc + BORE.by * rs;
     LOBE.z = d.z * cp + BORE.tz * rc + BORE.bz * rs;
     const choke =
-      i === weak ? rng.range(0.45, 0.65) : i === big ? rng.range(1.15, 1.4) : rng.range(0.75, 1.0);
+      i === weak ? rng.range(0.5, 0.7) : i === big ? rng.range(1.08, 1.22) : rng.range(0.78, 1.0);
     const push = rng.range(0.6, 2.2) * choke;
     s = resetSpawn();
     s.tile = P.FLASH_LOBE;
@@ -253,8 +253,10 @@ export function muzzleFlash(fx, o) {
     // Deep orange and an order of magnitude under the core: the core owns the
     // white, the gas around it stays fire-coloured. Only a strong channel
     // *ratio* survives the tone curve as amber rather than as more white.
-    s.r0 = gr; s.g0 = gg; s.b0 = gb; s.i0 = (13 + rng.float() * 7) * gain * choke;
-    s.r1 = tr; s.g1 = tg; s.b1 = tb; s.i1 = 2.4 * gain * choke;
+    // Born at the crown's temperature: the sprite's own ramp (atlas.js) cools
+    // each tongue to orange along its length, so the root stays white-yellow.
+    s.r0 = cr; s.g0 = cg * 0.92; s.b0 = cb * 0.8; s.i0 = (11 + rng.float() * 6) * gain * choke;
+    s.r1 = gr; s.g1 = gg; s.b1 = gb; s.i1 = 2.4 * gain * choke;
     s.alphaCurve = 0.75;
     s.soft = 0.15;
     s.seed = rng.float();

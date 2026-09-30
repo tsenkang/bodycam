@@ -161,24 +161,27 @@ const PARTICLE_PAINTERS = [
     const u = clamp01((x + 1) * 0.5); // 0 at the root, 1 at the tip
     // Width: swells just past the crown where the gas is still choked, then
     // tapers to a torn point. Half-width in painter units.
-    const swell = Math.pow(u + 0.02, 0.5) * Math.pow(1 - u, 0.7);
+    const swell = Math.pow(u + 0.02, 0.45) * Math.pow(1 - u, 1.15);
     // The tongue leans and wanders instead of running straight down +X.
     const lean = 0.26 * u * u - 0.07 * u + 0.2 * (n.fbm(u * 2.4 + 4.1, 8.3, 3) - 0.5) * u;
     // a pointed petal, not a fat tongue: at 1.5x the swell every lobe was
     // nearly round and a set of them fused into one ball
-    let w = 0.035 + 0.9 * swell;
+    let w = 0.03 + 0.66 * swell;
     // Shear only the +Y flank: a smooth pressure face on one side, a shredded
     // shear layer on the other, which is what high-speed film actually shows.
     const shear = n.fbm(u * 4.6 - 3.3, y * 2.2 + 1.9, 4);
     const flank = smoothstep(0.0, 0.5, (y - lean) / Math.max(w, 1e-3));
     w *= 1 - flank * (1 - shear) * 0.5;
     const q = (y - lean) / Math.max(w, 1e-3);
-    let a = Math.exp(-q * q * 2.0);
+    let a = Math.exp(-q * q * 3.0);
     // Tip: the gas has burnt out and is tearing into filaments.
     const frag = n.fbm(u * 6.8 + 12.7, y * 4.4 - 6.4, 4);
     a *= 1 - smoothstep(0.46, 1.0, u) * (1 - frag) * 1.5;
     // Internal turbulence so the body is not a smooth airbrushed blob.
-    a *= 0.72 + 0.46 * n.fbm(u * 7.9 - 8.1, y * 3.6 + 15.2, 4);
+    // Streaks run down the tongue's length (gas jets, not boiling cloud):
+    // noise stretched along u, fine across y.
+    const striae = n.fbm(u * 2.6 - 8.1, y * 10.5 + 15.2, 3);
+    a *= 0.5 + 0.72 * striae;
     // Close the root with a rounded cap, and never let the tip touch the tile
     // edge (a clipped filament reads as a hard rectangle at this intensity).
     a *= smoothstep(-1.0, -0.86, x) * smoothstep(1.0, 0.86, u);
@@ -186,7 +189,7 @@ const PARTICLE_PAINTERS = [
     // Colour: white-hot at the choke, orange through the body, sooty at the
     // shredding tip and along the cool outer edges.
     const edge = clamp01(Math.abs(q) * 0.72);
-    const t = clamp01(smoothstep(0.02, 0.72, u) * 0.85 + edge * 0.4);
+    const t = clamp01(smoothstep(0.08, 0.8, u) * 0.92 + edge * 0.45);
     const soot = smoothstep(0.62, 1.0, u) * 0.34;
     const den = 0.82 + 0.34 * shear;
     out[0] = clamp01((1 - soot) * den);

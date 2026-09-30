@@ -3,7 +3,20 @@
 FPS original com câmera e movimentação no estilo **bodycam**. O modo de jogo é mata-mata em equipe (1v1 até 8v8) contra bots com IA, num mapa compacto.
 Todo o conteúdo é original e placeholder: formas simples, sons sintetizados e nomes genéricos.
 
-## Como rodar
+## Versão para navegador (`web/`)
+
+Não precisa instalar nenhuma engine: a pasta `web/` tem o jogo inteiro em HTML + JavaScript, usando o three.js apenas para desenhar em 3D. Tem o mesmo mapa, as mesmas 5 armas com os modelos 3D, os bots com IA e as 3 dificuldades.
+
+Para rodar no computador, sirva a pasta com um servidor local e abra no navegador:
+```
+cd web
+python3 -m http.server 8000
+```
+Depois acesse http://localhost:8000.
+
+Os números de sensação, armas e bots ficam em `web/src/config.js`. Para converter um modelo `.glb` novo, use `tools/compress_glb.py` (reduz as texturas) e depois `tools/glb_to_gltf_json.py`.
+
+## Como rodar (Godot)
 
 1. Baixe o **Godot 4.7.2 (Standard)** em <https://godotengine.org/download>. Não precisa instalar: é só descompactar e abrir.
 2. No Project Manager, clique em **Import** e escolha o `project.godot` desta pasta.

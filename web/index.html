@@ -1,0 +1,172 @@
+<meta charset="utf-8">
+<title>Bodycam FPS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: tela cheia de jogo; HUD nos cantos; menus centrais sobre a imagem.
+   Visual único e escuro (câmera corporal à noite): sem tema claro, de propósito. */
+:root {
+  --ink: #e9ecef;        /* texto principal do HUD */
+  --dim: #9aa3ab;        /* texto secundário */
+  --panel: #0c0f12e6;    /* fundo dos menus */
+  --line: #ffffff26;     /* bordas finas */
+  --rec: #ff3b30;        /* ponto de gravação / alertas */
+  --blue: #7fb6ff;       /* equipe azul */
+  --red: #ff8a7a;        /* equipe vermelha */
+  --amber: #ffcc66;      /* destaque (recarregar, avisos) */
+  --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: #050607; color: var(--ink); font-family: var(--display); overflow: hidden; user-select: none; -webkit-user-select: none; }
+#game { position: fixed; inset: 0; display: block; width: 100%; height: 100%; }
+.hud { position: fixed; inset: 0; pointer-events: none; }
+.hud * { text-shadow: 0 1px 2px #000c; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+#rec { position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); left: 18px; font-size: 13px; letter-spacing: .06em; line-height: 1.35; opacity: .85; }
+#rec b { color: var(--rec); font-weight: 400; }
+#score { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); text-align: center; }
+#score .teams { font-size: 17px; font-weight: 600; letter-spacing: .08em; }
+#score .teams .b { color: var(--blue); } #score .teams .r { color: var(--red); }
+#score .time { font-size: 12px; color: var(--dim); }
+#feed { position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); right: 18px; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-size: 14px; font-weight: 500; }
+#feed .k-blue { color: var(--blue); } #feed .k-red { color: var(--red); } #feed .w { color: var(--dim); font-family: var(--mono); font-size: 11px; }
+
+#health { position: absolute; left: 18px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); width: 170px; }
+#health .n { font-size: 14px; color: var(--dim); }
+#health .bar { height: 4px; background: #ffffff26; margin-top: 3px; }
+#health .fill { height: 100%; width: 100%; background: var(--ink); transition: width .12s; }
+#health.low .fill { background: var(--rec); }
+
+#ammo { position: absolute; right: 22px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+#ammo .slots { font-size: 12px; color: #ffffff59; letter-spacing: .3em; }
+#ammo .name { font-size: 14px; color: var(--dim); letter-spacing: .08em; text-transform: uppercase; }
+#ammo .count { font-size: 34px; font-weight: 600; line-height: 1; }
+#ammo .count small { font-size: 16px; color: var(--dim); font-weight: 500; }
+#ammo.low .count > span { color: var(--red); }
+#ammo .status { font-size: 12px; color: var(--amber); letter-spacing: .1em; min-height: 14px; }
+#ammo .rbar { width: 110px; height: 2px; background: #ffffff26; }
+#ammo .rbar i { display: block; height: 100%; width: 0; background: var(--ink); }
+
+#cross { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+#cross i { position: absolute; background: #fffd; box-shadow: 0 0 2px #000; }
+#cross .t, #cross .b { width: 2px; height: 7px; left: -1px; }
+#cross .l, #cross .r { height: 2px; width: 7px; top: -1px; }
+#cross .dot { width: 3px; height: 3px; left: -1.5px; top: -1.5px; border-radius: 50%; display: none; }
+#cross.ads .t, #cross.ads .b, #cross.ads .l, #cross.ads .r { display: none; }
+#cross.ads .dot { display: block; }
+#cross.hide { display: none; }
+#hitm { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px; opacity: 0; transition: opacity .15s; }
+#hitm::before, #hitm::after { content: ""; position: absolute; left: 12px; top: 0; width: 2px; height: 26px; background: #fff; transform: rotate(45deg); clip-path: polygon(0 0, 100% 0, 100% 30%, 0 30%, 0 70%, 100% 70%, 100% 100%, 0 100%); }
+#hitm::after { transform: rotate(-45deg); }
+#hitm.kill::before, #hitm.kill::after { background: var(--rec); }
+#hitm.head::before, #hitm.head::after { background: var(--amber); }
+
+#prompt { position: absolute; left: 50%; top: calc(50% + 60px); transform: translateX(-50%); font-size: 17px; font-weight: 500; letter-spacing: .04em; }
+#msg { position: absolute; left: 50%; top: calc(50% - 150px); transform: translateX(-50%); font-size: 18px; font-weight: 600; letter-spacing: .06em; transition: opacity .4s; }
+#death { position: absolute; left: 50%; top: calc(50% - 40px); transform: translateX(-50%); text-align: center; font-size: 26px; font-weight: 700; letter-spacing: .1em; }
+#death small { display: block; font-size: 15px; color: var(--dim); font-weight: 500; letter-spacing: .06em; }
+#vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 55%, #9a0000d9 100%); opacity: 0; }
+#dmgdir { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+#dmgdir i { position: absolute; left: -40px; top: -150px; width: 80px; height: 18px; background: radial-gradient(ellipse at center, #ff2a1acc, transparent 70%); opacity: 0; transform-origin: 40px 150px; }
+#scope { position: absolute; inset: 0; display: none;
+  background: radial-gradient(circle at center, transparent 0 41vh, #000 calc(41vh + 1px)); }
+#scope::before, #scope::after { content: ""; position: absolute; background: #000; }
+#scope::before { left: 50%; top: 9vh; bottom: 9vh; width: 1.5px; transform: translateX(-50%); }
+#scope::after { top: 50%; left: calc(50% - 41vh); right: calc(50% - 41vh); height: 1.5px; transform: translateY(-50%); }
+
+/* Menus */
+.screen { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; background: radial-gradient(ellipse at 30% 20%, #1a2028f2, #07090bf7 70%); z-index: 5; overflow-y: auto; }
+.card { width: min(560px, 100%); display: flex; flex-direction: column; gap: 14px; }
+.card h1 { font-size: clamp(34px, 7vw, 54px); margin: 0; letter-spacing: .06em; line-height: 1; text-wrap: balance; }
+.card h1 span { color: var(--rec); }
+.card p { margin: 0; color: var(--dim); font-size: 15px; letter-spacing: .03em; }
+.label { font-size: 12px; letter-spacing: .18em; color: var(--dim); margin-top: 6px; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button { flex: 1 1 70px; }
+button { font: 600 16px var(--display); letter-spacing: .06em; color: var(--ink); background: #ffffff0d; border: 1px solid var(--line); padding: 9px 12px; cursor: pointer; border-radius: 3px; }
+button:hover { background: #ffffff1a; }
+button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+button.on { background: var(--ink); color: #0b0d10; border-color: var(--ink); }
+button.primary { background: var(--rec); border-color: var(--rec); color: #fff; font-size: 20px; padding: 12px; }
+.row { display: flex; align-items: center; gap: 12px; }
+.row label { flex: 0 0 110px; font-size: 14px; color: var(--dim); letter-spacing: .05em; }
+.row input[type=range] { flex: 1; min-width: 0; accent-color: var(--rec); }
+.row output { flex: 0 0 44px; text-align: right; font-family: var(--mono); font-size: 13px; }
+.keys { font-family: var(--mono); font-size: 12px; color: var(--dim); line-height: 1.7; border-top: 1px solid var(--line); padding-top: 10px; }
+.keys kbd { color: var(--ink); }
+.note { font-size: 13px; color: var(--amber); }
+#loading .bar { height: 3px; background: #ffffff1f; } #loading .bar i { display: block; height: 100%; width: 0; background: var(--rec); transition: width .2s; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<canvas id="game" aria-label="Jogo em primeira pessoa"></canvas>
+
+<div class="hud" id="hud" hidden>
+  <div id="vignette"></div>
+  <div id="dmgdir"><i></i></div>
+  <div id="scope"></div>
+  <div id="rec" class="mono"><b>●</b> REC <span id="rect">00:00:00</span><br>UNIDADE 07</div>
+  <div id="score"><div class="teams"><span class="b">AZUL <span id="s0">0</span></span> · <span class="r"><span id="s1">0</span> VERMELHO</span></div><div class="time mono" id="stime"></div></div>
+  <div id="feed"></div>
+  <div id="cross"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i><i class="dot"></i></div>
+  <div id="hitm"></div>
+  <div id="prompt"></div>
+  <div id="msg"></div>
+  <div id="death"></div>
+  <div id="health"><div class="n mono" id="hpn">100</div><div class="bar"><div class="fill" id="hpf"></div></div></div>
+  <div id="ammo"><div class="slots mono" id="slots"></div><div class="name" id="wname"></div>
+    <div class="count mono"><span id="mag">30</span> <small>/ <span id="res">120</span></small></div>
+    <div class="rbar" id="rbar" hidden><i id="rfill"></i></div><div class="status" id="astatus"></div></div>
+</div>
+
+<div class="screen" id="menu">
+  <div class="card">
+    <h1>BODYCAM<span>·</span>FPS</h1>
+    <p>Mata-mata em equipe no Distrito 7. Câmera corporal, armas com peso, bots com IA.</p>
+    <div class="label">DIFICULDADE DOS BOTS</div>
+    <div class="seg" id="opt-diff"></div>
+    <div class="label">TAMANHO DA PARTIDA</div>
+    <div class="seg" id="opt-mode"></div>
+    <div class="label">HORÁRIO</div>
+    <div class="seg" id="opt-time"></div>
+    <div class="label">QUALIDADE GRÁFICA</div>
+    <div class="seg" id="opt-quality"></div>
+    <div class="row"><label for="opt-fov">Campo de visão</label><input type="range" id="opt-fov" min="70" max="110" step="1"><output id="out-fov"></output></div>
+    <div class="row"><label for="opt-sens">Sensibilidade</label><input type="range" id="opt-sens" min="0.03" max="0.4" step="0.01"><output id="out-sens"></output></div>
+    <div class="row"><label for="opt-fx">Lente bodycam</label><input type="checkbox" id="opt-fx" checked></div>
+    <button class="primary" id="play">JOGAR</button>
+    <div class="note" id="touchnote" hidden>Este jogo precisa de teclado e mouse (computador).</div>
+    <div class="keys">
+      <kbd>WASD</kbd> mover · <kbd>Shift</kbd> correr · <kbd>C</kbd>/<kbd>Ctrl</kbd> agachar · <kbd>Espaço</kbd> pular<br>
+      <kbd>Clique</kbd> atirar · <kbd>Botão direito</kbd> mirar · <kbd>R</kbd> recarregar · <kbd>E</kbd> pegar arma / munição<br>
+      <kbd>1–5</kbd> / roda: trocar arma · <kbd>Q</kbd> arma anterior · <kbd>F</kbd> lanterna · <kbd>Esc</kbd> pausa
+    </div>
+    <div class="keys">Modelos das armas (CC-BY 4.0, Sketchfab): "M4 (Free)" de Skabl · "Sci-fi pistol" de Eugen Vahrushin · "escopeta" de jhonalexlopez23 · "Ak47" de wburton · "SR" de XR0M0PES47. Renderização: three.js (MIT).</div>
+  </div>
+</div>
+
+<div class="screen" id="pause" hidden>
+  <div class="card">
+    <h1 id="pause-title">PAUSADO</h1>
+    <p id="pause-sub">Clique em continuar para voltar ao jogo.</p>
+    <button class="primary" id="resume">CONTINUAR</button>
+    <button id="restart">Reiniciar partida</button>
+    <button id="tomenu">Menu principal</button>
+  </div>
+</div>
+
+<div class="screen" id="loading" hidden>
+  <div class="card">
+    <h1>CARREGANDO<span>·</span></h1>
+    <p id="load-text">Gerando o mapa e carregando as armas…</p>
+    <div class="bar"><i id="load-bar"></i></div>
+  </div>
+</div>
+
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+<script type="module" src="./src/main.js"></script>

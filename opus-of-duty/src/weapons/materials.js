@@ -275,6 +275,31 @@ export const WEAPON_MATERIALS = {
    * F0 pulled well below neutral steel and roughness pushed up near 0.8, which
    * is what gives a barrel its dead, non-reflective grey-brown look.
    */
+  /**
+   * Paint-filled laser engraving (rollmarks, selector markings, serial). A
+   * light grey fill sitting 0.2 mm proud of the anodising; same base surface as
+   * `alu` so it shares its grain, with the tint lifted ~8x. Physical fill paint
+   * is ~0.35-0.45 linear; this is held under that with the rest of the gun
+   * until the viewmodel light rig is recalibrated.
+   */
+  engrave: [
+    'rubber',
+    {
+      ...BASE,
+      bake: { size: 512, seed: 811, relief: 0.001 },
+      scale: 0.03,
+      tint: c(1.9, 1.9, 1.95),
+      roughness: [0.7, 0.08, 0.5],
+      normalStrength: 0.4,
+      detail: [16, 0.3, 0.3, 3],
+      wear: [0.1, 0.4, 0.8, 0],
+      wearColor: 0x2a2c2f,
+      wearMaterial: [0.7, 0.0, 0, 0.5],
+      grimeColor: 0x0b0a08,
+      three: { physical: true, specularIntensity: 0.12 },
+    },
+  ],
+
   steel: [
     'metal_brushed',
     {
@@ -1152,6 +1177,56 @@ export class WeaponMaterials {
     return m;
   }
 
+  /**
+   * Emitter bloom for the red dot: an additive quad with a physically shaped
+   * falloff (a narrow core lobe plus a wide 1/r^2-ish scatter tail), which is
+   * what the eye sees of an LED through coated glass and what a flat halo disc
+   * cannot draw. Kept well under display white so AgX leaves it red.
+   */
+  reticleGlow(color = 0xff2008, intensity = 0.5) {
+    const key = `reticleGlow:${color}:${intensity}`;
+    let m = this.cache.get(key);
+    if (m) return m;
+    if (!this._glowTex) {
+      const N = 64;
+      const data = new Uint8Array(N * N * 4);
+      for (let y = 0; y < N; y++) {
+        for (let x = 0; x < N; x++) {
+          const r = Math.hypot((x + 0.5) / N - 0.5, (y + 0.5) / N - 0.5) * 2;
+          const core = Math.exp(-r * r * 60);
+          const tail = 0.22 / (1 + r * r * 90);
+          const edge = Math.max(0, 1 - r);
+          const a = Math.min(1, (core + tail) * edge * edge);
+          const i = (y * N + x) * 4;
+          data[i] = data[i + 1] = data[i + 2] = Math.round(a * 255);
+          data[i + 3] = 255;
+        }
+      }
+      const t = new THREE.DataTexture(data, N, N, THREE.RGBAFormat);
+      t.needsUpdate = true;
+      t.minFilter = THREE.LinearFilter;
+      t.magFilter = THREE.LinearFilter;
+      t.generateMipmaps = false;
+      this._glowTex = t;
+      this.ownedTex.push(t);
+    }
+    m = new THREE.MeshBasicMaterial({
+      color: new THREE.Color(color).multiplyScalar(intensity),
+      map: this._glowTex,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      depthTest: true,
+      side: THREE.DoubleSide,
+      toneMapped: true,
+      fog: false,
+    });
+    m.name = 'ow-reticle-glow';
+    this.cache.set(key, m);
+    this.owned.push(m);
+    return m;
+  }
+
   /** Additive, unlit, depth-tested reticle. */
   reticle(color = 0xff2a12, intensity = 6.5) {
     const key = `reticle:${color}:${intensity}`;
@@ -1207,6 +1282,7 @@ export class WeaponMaterials {
     for (const t of this.ownedTex) t.dispose();
     this.ownedTex.length = 0;
     this._rimTex = null;
+    this._glowTex = null;
     this.cache.clear();
     this._fallbacks.clear();
   }

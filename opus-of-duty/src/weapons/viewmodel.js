@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Arm, HAND_POSES } from './hands.js';
 import { buildClips, makeSampleResult } from './clips.js';
-import { triCount, mergeAll } from './geometry.js';
+import { triCount } from './geometry.js';
 import {
   Spring,
   Spring3,
@@ -145,11 +145,15 @@ export class Viewmodel {
     // bought by cheating the bones 10% long instead — see hands.js L_UPPER.
     this.armL = new Arm(-1, handMats, {
       scale: 0.97,
-      shoulderX: 0.2,
-      shoulderY: -0.22,
-      shoulderZ: 0.02,
+      shoulderX: 0.24,
+      shoulderY: -0.26,
+      shoulderZ: 0.06,
       pose: 'clamp',
     });
+    // Elbow hangs low and outboard: the forearm rises steeply from the bottom
+    // edge to the handguard, the way a shooter's support arm actually reads,
+    // instead of reaching across the frame.
+    this.armL.pole.set(-0.6, -0.75, 0.2).normalize();
     this.rig.add(this.armR.root);
     this.rig.add(this.armL.root);
     /**
@@ -167,7 +171,7 @@ export class Viewmodel {
     // Body-fixed shoulders, expressed in camera space and re-based into rig
     // space every frame so the elbows do not swing when the gun moves.
     this.shoulderR = new THREE.Vector3(0.205, -0.2, 0.06);
-    this.shoulderL = new THREE.Vector3(-0.2, -0.22, 0.02);
+    this.shoulderL = new THREE.Vector3(-0.24, -0.26, 0.06);
 
     // ---- reticle ----------------------------------------------------------
     this.reticle = new THREE.Object3D();
@@ -210,18 +214,18 @@ export class Viewmodel {
     const core = new THREE.CircleGeometry(1, 32);
     const halo = new THREE.CircleGeometry(1.6, 32);
     const rim = new THREE.RingGeometry(1, 1.42, 32, 1);
-    const RING_SEGS = 12;
-    const ringArcs = [];
-    for (let i = 0; i < RING_SEGS; i++) {
-      const a0 = (i / RING_SEGS) * TAU;
-      ringArcs.push(new THREE.RingGeometry(2.98, 3.42, 4, 1, a0, (TAU / RING_SEGS) * 0.56));
-    }
-    const ring = mergeAll(ringArcs);
-    this._reticleGeo = [core, halo, rim, ring];
+    // Continuous 65 MOA circle: a segmented ring read as a "dashed circle".
+    const ring = new THREE.RingGeometry(3.02, 3.34, 96, 1);
+    const glow = new THREE.PlaneGeometry(2, 2);
+    this._reticleGeo = [core, halo, rim, ring, glow];
     this.dotCore = new THREE.Mesh(core, mats.reticle(0xff1206, 0.95));
     this.dotHalo = new THREE.Mesh(halo, mats.reticle(0xff2a0c, 0.34));
     this.dotRim = new THREE.Mesh(rim, mats.reticleOutline(0.85));
     this.dotRing = new THREE.Mesh(ring, mats.reticle(0xff1206, 0.95 * 0.5));
+    // Emitter bloom: 9x the core radius, soft falloff (see mats.reticleGlow).
+    this.dotGlow = new THREE.Mesh(glow, mats.reticleGlow(0xff1a06, 0.55));
+    this.dotGlow.renderOrder = 18;
+    this.reticle.add(this.dotGlow);
     this.dotHalo.renderOrder = 19;
     this.dotRim.renderOrder = 20;
     this.dotRing.renderOrder = 20;
@@ -230,7 +234,7 @@ export class Viewmodel {
     this.reticle.add(this.dotRim);
     this.reticle.add(this.dotRing);
     this.reticle.add(this.dotCore);
-    for (const m of [this.dotCore, this.dotHalo, this.dotRim, this.dotRing]) {
+    for (const m of [this.dotCore, this.dotHalo, this.dotRim, this.dotRing, this.dotGlow]) {
       m.frustumCulled = false;
       m.userData.owNoPrepass = true;
       m.userData.owNoShadow = true;
@@ -437,6 +441,7 @@ export class Viewmodel {
       lhandPose: model.id === 'pistol' ? 'cup' : 'clamp',
     };
     this._fitSupportHand(entry);
+    this._fitShootingHand(entry);
     this.weapons.set(model.id, entry);
     return entry;
   }
@@ -489,6 +494,30 @@ export class Viewmodel {
   }
 
   /**
+   * Wrap the shooting hand round the pistol grip and put the index pad on the
+   * trigger face — the same build-time search as the support hand, against the
+   * grip's own axis. Needs `nodes.grip` (and optionally `nodes.triggerFace`).
+   */
+  _fitShootingHand(w) {
+    const g = w.model.nodes.grip;
+    const gR = w.gripR;
+    if (!g || !gR) return;
+    this._handPos.fromArray(gR.pos);
+    handBasis(this._handQuat, gR.finger, gR.back);
+    const poseName = `grip:${w.id}`;
+    this.armR.setPose('grip');
+    const contacts = this.armR.fitToCylinder(this._handPos, this._handQuat, g.axis, g.dir, g.r, {
+      clearance: 0.001,
+      poseName,
+      skip: [0],
+      trigger: w.model.nodes.triggerFace ?? null,
+    });
+    this.armR.bakeContactAO(contacts, 0.012, 0.6);
+    w.rhandPose = poseName;
+    this.armR.setPose(poseName);
+  }
+
+  /**
    * The weapon side of the same contact gradient. The handguard geometry already
    * carries wear/grime/AO masks from `bakeMasks`, so this only ever RAISES the
    * AO channel — the edge-wear and grime layers are untouched.
@@ -531,7 +560,7 @@ export class Viewmodel {
     this.boltHold = 0;
     this.magInHand = 0;
     this.magVisible = true;
-    this.armR.setPose('grip');
+    this.armR.setPose(w.rhandPose ?? 'grip');
     // The FITTED clamp for this weapon, not the authored one — see _fitSupportHand.
     this.armL.setPose(w.lhandPose ?? (id === 'pistol' ? 'cup' : 'clamp'));
     return w;
@@ -1029,6 +1058,8 @@ export class Viewmodel {
     this.dotRim.scale.setScalar(coreR);
     this.dotHalo.scale.setScalar(coreR);
     this.dotRing.scale.setScalar(coreR);
+    this.dotGlow.scale.setScalar(coreR * 9);
+    this.dotGlow.material.opacity = alpha;
     this.dotCore.material.opacity = alpha;
     this.dotRim.material.opacity = alpha * 0.8;
     this.dotRing.material.opacity = alpha;

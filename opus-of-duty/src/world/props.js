@@ -155,6 +155,36 @@ function crate(rng, s = 0.62, slats = true) {
   return g;
 }
 
+/**
+ * The steel on a slatted crate: two bands strapped over the lid and down the
+ * long faces, and folded angle plates on the four top corners. A companion
+ * prototype of `crate()` — placed with the same matrix — so the timber and the
+ * steel can keep separate materials. Dimensions track `crate()` exactly.
+ */
+function crateHardware(s = 0.62) {
+  const p = new PB();
+  const zf = s * 0.46 + 0.008 + 0.004; // over the slats
+  const xf = s * 0.5 + 0.008 + 0.004;
+  const yt = s * 0.44 + 0.011 + 0.006; // over the lid batten
+  const band = 0.028;
+  for (const bx of [-0.3, 0.3]) {
+    const x = bx * s;
+    for (const sz of [-1, 1]) {
+      p.box(band, s * 0.86, 0.004, x, 0, sz * zf, { bevel: 0.001, wear: 1, grime: 0.3 });
+    }
+    p.box(band, 0.004, zf * 2, x, yt, 0, { bevel: 0.001, wear: 1 });
+  }
+  // folded corner plates
+  for (const sx of [-1, 1])
+    for (const sz of [-1, 1]) {
+      p.box(0.07, 0.07, 0.004, sx * (xf - 0.035), s * 0.39, sz * zf, { bevel: 0.001, wear: 1 });
+      p.box(0.004, 0.07, 0.07, sx * xf, s * 0.39, sz * (zf - 0.035), { bevel: 0.001, wear: 1 });
+    }
+  const g = p.build();
+  g.translate(0, s * 0.425, 0);
+  return g;
+}
+
 function cardboardBox(rng, s = 0.45) {
   const p = new PB();
   const h = s * rng.range(0.6, 0.9);
@@ -278,9 +308,33 @@ function jerseyBarrier(rng) {
     bevelThickness: 0.015,
     bevelSize: 0.015,
     bevelSegments: 1,
-    steps: 1,
+    // 20 rows along the run so the arrises can be chipped and the grime can
+    // vary along the length instead of being one gradient end to end
+    steps: 20,
   });
   g.translate(0, 0, -0.95);
+  // Knocked about by forklifts and trucks: bites out of the top arrises and the
+  // foot, and the ends rounded off. Deterministic (fbm on position), no rng.
+  {
+    const pa = g.getAttribute('position');
+    for (let i = 0; i < pa.count; i++) {
+      let x = pa.getX(i);
+      let y = pa.getY(i);
+      const z = pa.getZ(i);
+      const n = fbm3(z * 3.1 + 7.3, y * 2.3, x * 2.0 + 1.1, 3);
+      const bite = Math.max(0, n - 0.56) * 2.6; // 0..~0.9, patchy
+      if (y > 0.86) {
+        // top arris: pull the corner in and down
+        y -= bite * 0.045;
+        x -= Math.sign(x) * bite * 0.03;
+      } else if (y < 0.12) {
+        x -= Math.sign(x) * bite * 0.04;
+      }
+      const end = Math.max(0, Math.abs(z) - 0.9) / 0.07;
+      if (end > 0 && y > 0.7) y -= end * bite * 0.04;
+      pa.setXY(i, x, y);
+    }
+  }
   g.computeVertexNormals();
   autoEdgeWear(g, 0.035, 1);
   const p = new PB();
@@ -290,7 +344,13 @@ function jerseyBarrier(rng) {
   p.cyl(0.035, 0.1, 0, 0.95, 0.55, { radial: 8, rx: Math.PI / 2, wear: 1 });
   const out = p.build();
   paintMasks(out, (x, y, z, nx, ny, nz, o) => {
-    o[1] = Math.min(1, o[1] + Math.max(0, 1 - y / 0.35) ** 2 * 0.6 + Math.max(0, -ny) * 0.4);
+    // splash band with a ragged top, plus rust weeps under the lifting eyes and
+    // a few dirty runs down the sloped face
+    const rag = 0.25 + 0.2 * fbm3(z * 2.4, 0.3, x, 2);
+    const weep = Math.exp(-(((Math.abs(z) - 0.55) / 0.06) ** 2)) * Math.max(0, (y - 0.3) / 0.6);
+    const run = Math.max(0, fbm3(z * 5.5 + 3, 1.7, x * 0.5, 2) - 0.55) * 2.2 * Math.max(0, y - 0.2);
+    o[0] = Math.min(1, o[0] + Math.max(0, fbm3(z * 4 + 9, y * 4, x * 4, 2) - 0.6) * 1.5);
+    o[1] = Math.min(1, o[1] + Math.max(0, 1 - y / rag) ** 2 * 0.75 + Math.max(0, -ny) * 0.4 + weep * 0.55 + run * 0.5);
     o[2] = Math.min(1, o[2] + Math.max(0, 1 - y / 0.3) ** 2 * 0.45);
   });
   return out;
@@ -914,9 +974,12 @@ export function registerProps(A, rngIn) {
   const LOOSE = (tilt, sink) => ({ tilt, sink });
 
   // containers
-  P('crate_a', 'wood_prop', crate(rng, 0.64), { skirt: 0.37, ...LOOSE(0.09, 0.022) });
-  P('crate_b', 'wood_prop', crate(rng, 0.48), LOOSE(0.10, 0.018));
-  P('crate_c', 'wood_prop_dark', crate(rng, 0.82), { skirt: 0.45, ...LOOSE(0.075, 0.026) });
+  P('crate_a_hw', 'metal_rust_prop', crateHardware(0.64), { castShadow: false, maxDist: 45 });
+  P('crate_b_hw', 'metal_rust_prop', crateHardware(0.48), { castShadow: false, maxDist: 40 });
+  P('crate_c_hw', 'metal_rust_prop', crateHardware(0.82), { castShadow: false, maxDist: 50 });
+  P('crate_a', 'wood_prop', crate(rng, 0.64), { skirt: 0.37, companions: ['crate_a_hw'], ...LOOSE(0.09, 0.022) });
+  P('crate_b', 'wood_prop', crate(rng, 0.48), { companions: ['crate_b_hw'], ...LOOSE(0.10, 0.018) });
+  P('crate_c', 'wood_prop_dark', crate(rng, 0.82), { skirt: 0.45, companions: ['crate_c_hw'], ...LOOSE(0.075, 0.026) });
   P('crate_flat', 'wood_prop', crate(rng, 0.55, false), LOOSE(0.10, 0.02));
   P('box_card_a', 'wood_pale', cardboardBox(rng, 0.46), LOOSE(0.10, 0.016));
   P('box_card_b', 'wood_pale', cardboardBox(rng, 0.34), LOOSE(0.11, 0.012));

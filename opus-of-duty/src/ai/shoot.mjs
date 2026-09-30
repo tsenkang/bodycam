@@ -38,6 +38,8 @@ if (!(await portOpen(PORT))) {
   server = spawn(resolve(root, 'node_modules/.bin/vite'), ['--port', String(PORT), '--strictPort'], {
     cwd: root,
     stdio: 'ignore',
+    // no HMR: an edit to src/ai mid-capture must not reload the page under us
+    env: { ...process.env, OW_NO_HMR: '1' },
   });
   let up = false;
   for (let i = 0; i < 120 && !up; i++) {
@@ -67,7 +69,7 @@ page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}\n${e.stack ?? ''}`));
 
 const qs = new URLSearchParams();
-for (const k of ['view', 'variant', 'clip', 'phase', 'aim']) if (args[k]) qs.set(k, args[k]);
+for (const k of ['view', 'variant', 'clip', 'phase', 'aim', 'poses', 'lean']) if (args[k]) qs.set(k, args[k]);
 
 let failed = null;
 try {

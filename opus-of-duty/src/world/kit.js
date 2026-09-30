@@ -623,7 +623,20 @@ export function shopfront(A, pm, o, rng, opts = {}) {
         A.add(
           'metal_rust',
           thin,
-          LL(pm, bx + b * 0.5, sy - 0.12, t + 0.09, 0, 0.03, 0.24, 0.18),
+          LL(pm, bx + b * 0.5, sy - 0.14, t + 0.012, 0, 0.035, 0.28, 0.02),
+          { masks: [0.9, 0.6, 0.2] }
+        );
+        // the diagonal strut of the bracket: what shows a shelf is carried
+        A.add(
+          'metal_rust',
+          thin,
+          LL(pm, bx + b * 0.5, sy - 0.12, t + 0.14, 0, 0.03, 0.36, 0.03, -Math.PI / 4),
+          { masks: [0.9, 0.6, 0.2] }
+        );
+        A.add(
+          'metal_rust',
+          thin,
+          LL(pm, bx + b * 0.5, sy - 0.03, t + 0.16, 0, 0.035, 0.018, 0.3),
           { masks: [0.9, 0.6, 0.2] }
         );
       }

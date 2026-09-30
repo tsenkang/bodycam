@@ -759,7 +759,9 @@ export class SkySystem {
     // and lets the street go dark. This is that decision, on a curve, so the sky
     // stays inside the part of the tone curve that still has a gradient in it.
     this.exposureBias =
-      1.35 * (1 - THREE.MathUtils.smoothstep(altDeg, 1.0, 13.0)) * beamAlive +
+      // 1.35 -> 0.8: at 1.35 the street crushed to brown-black (critic: "no
+      // readable detail at 5-8%"); the sky roll-off now carries the gradient.
+      0.8 * (1 - THREE.MathUtils.smoothstep(altDeg, 1.0, 13.0)) * beamAlive +
       // ...and half a stop after dark. The meter is (correctly) weighted onto
       // the geometry, and once the only key is a moon plus twenty-two sodium
       // lamps it opens up until a midnight street reads as an overcast evening.

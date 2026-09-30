@@ -1031,9 +1031,11 @@ export function catenaryTube(from, to, sagAmt, radius, opts = {}) {
  */
 export function sackGeometry(rng, w = 0.5, h = 0.17, d = 0.3, opts = {}) {
   const { variant = 0, box = 3.1, lump = 1 } = opts;
-  const g = new THREE.SphereGeometry(0.5, 20, 12);
+  const g = new THREE.SphereGeometry(0.5, 26, 14);
   const pa = g.getAttribute('position');
   const seed = rng.float() * 50;
+  // per-bag phases for the wrinkle field, from the seed (no extra rng draws)
+  const wPh = seed * 1.7;
   for (let i = 0; i < pa.count; i++) {
     _v0.fromBufferAttribute(pa, i);
     // unit direction -> Lp ball: the boxy silhouette of a filled bag
@@ -1060,6 +1062,19 @@ export function sackGeometry(rng, w = 0.5, h = 0.17, d = 0.3, opts = {}) {
     const neck = Math.max(0, Math.abs(t) - 0.7) / 0.3;
     z *= 1 - neck * neck * 0.3;
     y *= 1 - neck * neck * 0.55;
+    // Gathered cloth: radial pleats converge on the tie, so the end of a bag is
+    // a fan of folds rather than a smooth dome.
+    const ang = Math.atan2(uy, uz);
+    const pleatZone = Math.max(0, Math.abs(t) - 0.45) / 0.55;
+    const pleat = pleatZone * pleatZone * (0.5 + 0.5 * Math.sin(ang * 7 + wPh + t * 2.0));
+    y *= 1 - pleat * 0.16;
+    z *= 1 - pleat * 0.16;
+    // Crumple creases across the body: thin ridged valleys where the hessian
+    // has buckled under the load, which is what kills the inflated-capsule read.
+    const cr = Math.abs(fbm3(ux * 2.1 + wPh, uy * 1.3 + seed, uz * 2.3 - wPh, 2) - 0.5);
+    const crease = Math.exp(-((cr / 0.05) ** 2)) * (1 - neck) * lump;
+    y *= 1 - crease * 0.07;
+    z *= 1 - crease * 0.05;
     // the sewn end seam stands out as a small flat lip
     if (neck > 0.55) y += Math.sign(uy) * h * 0.02 * (neck - 0.55) * 2;
     // the sewn seam runs the length of the crown on every bag

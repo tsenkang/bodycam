@@ -993,10 +993,12 @@ export class AiSystem {
     const right = new THREE.Vector3(F.z, 0, -F.x);
     const squad = this.createSquad();
 
-    /** [variant, ndcX, depth, crouch, speed, fire, reloadEvery] */
+    /** [variant, ndcX, depth, crouch, speed, fire, reloadEvery, lean] */
     const LAYOUT = [
-      // hero: up and firing, left of frame, close enough to read the kit
-      ['vanguard', -0.44, 8.0, false, 0, true, 0],
+      // hero: up and firing, left of frame, close enough to read the kit;
+      // leaning out toward frame centre (his left) the way a man shoots round
+      // a corner
+      ['vanguard', -0.44, 8.0, false, 0, true, 0, -0.75],
       // second man crouched in cover, right of frame
       ['breacher', 0.30, 12.0, true, 0, true, 0],
       // one caught mid-stride between positions
@@ -1008,7 +1010,7 @@ export class AiSystem {
     ];
 
     const placedPositions = [];
-    for (const [variant, ndcX, d, crouch, speed, fire, reload] of LAYOUT) {
+    for (const [variant, ndcX, d, crouch, speed, fire, reload, lean] of LAYOUT) {
       const pos = this._stageSlot(cam, ndcX, d, placedPositions);
       const yaw = Math.atan2(cam.position.x - pos.x, cam.position.z - pos.z);
       const a = this.spawn(variant, pos, yaw);
@@ -1021,6 +1023,7 @@ export class AiSystem {
         heading: right.clone().multiplyScalar(-1),
         aimWeight: 1,
         reloadEvery: reload || 0,
+        lean: lean || 0,
         suppression: crouch ? 0.15 : 0,
       };
       // stagger the burst timers so the frame catches muzzle flashes

@@ -243,7 +243,7 @@ function radiusAt(radii, t) {
 
 /** Deltoid cap so the shoulder is round rather than a tube end. */
 export function shoulderCap(nz, shoulder, side) {
-  const m = ellipsoid(0.052, 0.064, 0.056, { seg: 18, rows: 12 });
+  const m = ellipsoid(0.047, 0.058, 0.052, { seg: 18, rows: 12 });
   computeNormals(m);
   warp(m, (v) => {
     v.y *= 1.0;
@@ -1070,4 +1070,342 @@ export function knuckleGuard(wrist, gripAxis, palmNormal) {
   computeNormals(g);
   transformMesh(g, m);
   return g;
+}
+
+/* ================================================================== */
+/* Silhouette break-up kit                                            */
+/* ================================================================== */
+/*
+ * Everything below exists for one reason: at 15-30 m a soldier is ~100 px tall,
+ * and what separates a real operator from a mannequin at that size is the
+ * OUTLINE — ear cups widening the head, a stowed NVG breaking the helmet dome,
+ * a pack deepening the torso in profile, pouches and a holster breaking the
+ * smooth line of the waist and thigh. Surface detail is sub-pixel by then.
+ */
+
+/** Short capped cylinder between two points. */
+function rod(a, b, r0, r1 = r0, seg = 12, caps = true) {
+  const pts = [];
+  for (let i = 0; i <= 3; i++) {
+    const t = i / 3;
+    pts.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]);
+  }
+  const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2];
+  // any up vector not parallel to the axis
+  const up = Math.abs(dy) > 0.9 * Math.hypot(dx, dy, dz) ? [0, 0, 1] : [0, 1, 0];
+  const m = tube(pts, (t) => ellipseProfile(r0 + (r1 - r0) * t, r0 + (r1 - r0) * t, seg), {
+    capStart: caps,
+    capEnd: caps,
+    up,
+  });
+  computeNormals(m);
+  return m;
+}
+
+/**
+ * Electronic hearing protection (ComTac-style) worn under the helmet: two fat
+ * ear cups proud of the helmet's ear cut plus a boom mic on the left. The cups
+ * are the single biggest width cue on a helmeted head.
+ */
+export function headset(nz, base) {
+  const out = emptyMesh();
+  const bx = base[0], by = base[1], bz = base[2];
+  for (const side of [-1, 1]) {
+    const cup = ellipsoid(0.024, 0.043, 0.038, { seg: 16, rows: 10 });
+    computeNormals(cup);
+    warp(cup, (v) => {
+      // flat against the head, domed outward
+      if (v.x * side < 0) v.x *= 0.35;
+    });
+    place(cup, bx + side * 0.098, by + 0.098, bz - 0.004, 0, 0, side * 0.08);
+    displace(cup, (x, y, z) => nz.fbm3(x * 60, y * 60, z * 60, 2) * 0.0008);
+    appendMesh(out, cup);
+    // volume knob / stem up into the helmet rail
+    appendMesh(out, rod(
+      [bx + side * 0.112, by + 0.128, bz + 0.004],
+      [bx + side * 0.112, by + 0.150, bz + 0.004], 0.009, 0.008, 8));
+  }
+  // boom mic on the left cup, swept forward to the mouth
+  const boom = [];
+  for (let i = 0; i <= 5; i++) {
+    const t = i / 5;
+    boom.push([
+      bx + 0.108 - t * 0.060,
+      by + 0.084 - t * 0.050,
+      bz + 0.020 + Math.sin(t * 1.4) * 0.090,
+    ]);
+  }
+  const bm = tube(boom, () => ellipseProfile(0.0042, 0.0042, 8), { capStart: true, capEnd: true, up: [0, 1, 0] });
+  computeNormals(bm);
+  appendMesh(out, bm);
+  const mic = ellipsoid(0.010, 0.009, 0.013, { seg: 10, rows: 6 });
+  computeNormals(mic);
+  place(mic, bx + 0.048, by + 0.034, bz + 0.106);
+  appendMesh(out, mic);
+  return out;
+}
+
+/**
+ * Night-vision device stowed UP on the helmet shroud: J-arm mount plus either
+ * a single PVS-14 style tube or a dual-tube binocular. Stowed NVGs are the
+ * defining outline of a modern CoD helmet — they turn the dome into a shape.
+ */
+export function nvgStowed(nz, base, kind = 'mono') {
+  const out = emptyMesh();
+  const bx = base[0], by = base[1], bz = base[2];
+  const cy = by + 0.100;
+  // mount arm off the shroud, folded up over the brow
+  const arm = boxRound(0.018, 0.030, 0.012, { n: 4, seg: 10, rows: 5, roundY: 0.4 });
+  place(arm, bx, cy + 0.080, bz + 0.146, -0.35, 0, 0);
+  appendMesh(out, arm);
+  const hinge = rod([bx - 0.022, cy + 0.100, bz + 0.150], [bx + 0.022, cy + 0.100, bz + 0.150], 0.010, 0.010, 10);
+  appendMesh(out, hinge);
+  // tubes: lie back along the helmet front, objective lens up, eyepiece forward
+  const tubes = kind === 'bino' ? [-0.033, 0.033] : [0.0];
+  for (const x of tubes) {
+    const eye = [bx + x, cy + 0.102, bz + 0.182];
+    const obj = [bx + x * 1.08, cy + 0.172, bz + 0.128];
+    appendMesh(out, rod(eye, obj, kind === 'bino' ? 0.019 : 0.022, kind === 'bino' ? 0.021 : 0.024, 14));
+    // eyecup and objective bell
+    appendMesh(out, rod(
+      [eye[0], eye[1] - 0.012, eye[2] + 0.010], eye, 0.017, 0.020, 12));
+    appendMesh(out, rod(
+      obj, [obj[0], obj[1] + 0.016, obj[2] - 0.012], 0.025, 0.026, 14));
+  }
+  if (kind === 'bino') {
+    const bridge = boxRound(0.030, 0.018, 0.016, { n: 4, seg: 10, rows: 5, roundY: 0.4 });
+    place(bridge, bx, cy + 0.132, bz + 0.160, -0.9, 0, 0);
+    appendMesh(out, bridge);
+  }
+  // battery pack on the back of the helmet (the counterweight pouch already
+  // exists; this is the hard box on top of it) with a cable over the crown
+  const batt = boxRound(0.030, 0.018, 0.016, { n: 4, seg: 10, rows: 5, roundY: 0.4 });
+  place(batt, bx, cy + 0.108, bz - 0.148, 0.55, 0, 0);
+  appendMesh(out, batt);
+  const cable = [];
+  for (let i = 0; i <= 8; i++) {
+    const t = i / 8;
+    const a = -0.95 + t * 2.1; // from the back over the crown to the brow
+    cable.push([bx + 0.030, cy + Math.cos(a) * 0.166, bz - 0.004 + Math.sin(a) * 0.146]);
+  }
+  const cb = tube(cable, () => ellipseProfile(0.004, 0.004, 6), { capStart: true, capEnd: true, up: [1, 0, 0] });
+  computeNormals(cb);
+  appendMesh(out, cb);
+  return out;
+}
+
+/**
+ * Bungee "cat-eye" band around the covered helmet, a Velcro patch on each side
+ * and an IR strobe on the crown. Breaks the smooth dome into bands of value.
+ */
+export function helmetBand(nz, base) {
+  const out = emptyMesh();
+  const bx = base[0], by = base[1], bz = base[2];
+  const cy = by + 0.100;
+  const pts = [];
+  const n = 30;
+  for (let i = 0; i <= n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    const sx = Math.sin(a), sz = Math.cos(a);
+    // rides lower at the back than the front
+    const y = cy + 0.066 - Math.max(0, -sz) * 0.018 + Math.max(0, sz) * 0.006;
+    const k = 1.035;
+    pts.push([bx + sx * 0.1105 * k, y, bz - 0.006 + sz * 0.1225 * k]);
+  }
+  const band = ribbon(pts, 0.017, 0.005, { seg: 6, up: [0, 1, 0], upright: true });
+  computeNormals(band);
+  displace(band, (x, y, z) => nz.fbm3(x * 50, y * 50, z * 50, 2) * 0.0012);
+  appendMesh(out, band);
+  for (const side of [-1, 1]) {
+    const patch = boxRound(0.004, 0.022, 0.032, { n: 5, seg: 10, rows: 4, roundY: 0.3 });
+    place(patch, bx + side * 0.120, cy + 0.098, bz - 0.030, 0, 0, side * -0.55);
+    appendMesh(out, patch);
+  }
+  return out;
+}
+
+/** IR strobe on the back of the crown (hard polymer). */
+export function helmetStrobe(base) {
+  const bx = base[0], by = base[1], bz = base[2];
+  const s = boxRound(0.017, 0.012, 0.022, { n: 4, seg: 10, rows: 5, roundY: 0.5 });
+  place(s, bx - 0.030, by + 0.100 + 0.150, bz - 0.070, 0.6, 0, 0);
+  return s;
+}
+
+/**
+ * Back load. `kind`:
+ *   'assault'   — 20 L assault pack with a lid pocket and compression straps
+ *   'hydration' — slim bladder carrier zipped to the back plate, drink tube
+ *                 routed over the right shoulder
+ *   'daypack'   — soft civilian-ish pack for the irregular, riding low
+ * Returns { body (gear), tube (rubber or null) }.
+ */
+export function backPack(nz, kind = 'assault') {
+  const body = emptyMesh();
+  let drink = null;
+  if (kind === 'hydration') {
+    const m = boxRound(0.108, 0.150, 0.030, { n: 4.2, seg: 18, rows: 9, roundY: 0.3 });
+    computeNormals(m);
+    displace(m, (x, y, z) => nz.fbm3(x * 30, y * 30, z * 30, 3) * 0.003);
+    place(m, 0, 1.275, -0.168, 0.06, 0, 0);
+    bendY(m, 0.26, -0.168);
+    appendMesh(body, m);
+    // PALS rows across it
+    for (let r = 0; r < 3; r++) {
+      const row = boxRound(0.100, 0.007, 0.004, { n: 5, seg: 12, rows: 3, roundY: 0.5 });
+      place(row, 0, 1.225 + r * 0.045, -0.199 + r * 0.003, 0.06, 0, 0);
+      appendMesh(body, row);
+    }
+    // drink tube: out of the top, over the right shoulder, clipped to the strap
+    const pts = [
+      [-0.050, 1.425, -0.170],
+      [-0.085, 1.470, -0.100],
+      [-0.100, 1.485, 0.000],
+      [-0.095, 1.455, 0.100],
+      [-0.085, 1.395, 0.160],
+      [-0.080, 1.340, 0.172],
+    ];
+    drink = tube(pts, () => ellipseProfile(0.0065, 0.0065, 8), { capStart: true, capEnd: true, up: [0, 1, 0] });
+    computeNormals(drink);
+    return { body, tube: drink };
+  }
+  const daypack = kind === 'daypack';
+  const hx = daypack ? 0.118 : 0.128, hy = daypack ? 0.150 : 0.170, hz = daypack ? 0.062 : 0.066;
+  const cy = daypack ? 1.125 : 1.205, cz = daypack ? -0.215 : -0.228;
+  const m = boxRound(hx, hy, hz, { n: daypack ? 2.8 : 4.0, seg: 20, rows: 10, roundY: daypack ? 0.45 : 0.3 });
+  computeNormals(m);
+  // soft pack: bulges at the bottom, sags, never a clean box
+  warp(m, (v) => {
+    const t = Math.max(0, -v.y / hy);
+    v.z *= 1 + 0.18 * t;
+    v.x *= 1 + 0.05 * t;
+  });
+  displace(m, (x, y, z) => nz.fbm3(x * 22, y * 18, z * 22, 3) * (daypack ? 0.007 : 0.004));
+  place(m, 0.004, cy, cz, daypack ? 0.16 : 0.10, 0.03, daypack ? -0.05 : 0.02);
+  appendMesh(body, m);
+  // lid / front pocket
+  const lid = boxRound(hx * 0.86, hy * 0.40, 0.024, { n: 3.6, seg: 16, rows: 6, roundY: 0.4 });
+  computeNormals(lid);
+  displace(lid, (x, y, z) => nz.fbm3(x * 30, y * 30, z * 30, 2) * 0.003);
+  place(lid, 0.004, cy - hy * 0.35, cz - hz - 0.016, daypack ? 0.16 : 0.10, 0.03, 0);
+  appendMesh(body, lid);
+  // top grab handle
+  const handle = ribbon(
+    [
+      [-0.030, cy + hy - 0.004, cz + 0.02],
+      [0, cy + hy + 0.024, cz + 0.02],
+      [0.030, cy + hy - 0.004, cz + 0.02],
+    ],
+    0.020,
+    0.006,
+    { seg: 5, up: [0, 0, 1] }
+  );
+  computeNormals(handle);
+  appendMesh(body, handle);
+  // side compression straps
+  for (const side of [-1, 1]) {
+    for (const dy of [-0.06, 0.05]) {
+      const pts = [
+        [side * (hx - 0.03), cy + dy, cz + hz + 0.00],
+        [side * (hx + 0.008), cy + dy, cz],
+        [side * (hx - 0.03), cy + dy - 0.004, cz - hz - 0.010],
+      ];
+      const s = ribbon(pts, 0.020, 0.005, { seg: 5, up: [0, 1, 0], upright: true });
+      computeNormals(s);
+      appendMesh(body, s);
+    }
+  }
+  if (daypack) {
+    // shoulder straps over the front of the chest rig
+    for (const side of [-1, 1]) {
+      const pts = [
+        [side * 0.070, cy + hy - 0.02, cz + hz - 0.02],
+        [side * 0.100, 1.470, -0.070],
+        [side * 0.112, 1.482, 0.030],
+        [side * 0.118, 1.420, 0.130],
+        [side * 0.128, 1.300, 0.150],
+      ];
+      const s = ribbon(pts, 0.050, 0.012, { seg: 6, up: [0, 1, 0] });
+      computeNormals(s);
+      appendMesh(body, s);
+    }
+  }
+  return { body, tube: null };
+}
+
+/** Frag + smoke pouches on the cummerbund, one per side. */
+export function sidePouches(nz) {
+  const out = emptyMesh();
+  for (const side of [-1, 1]) {
+    // cylindrical frag/smoke pouch hanging off the cummerbund flank
+    const x = side * 0.178, z = 0.038;
+    const p = rod([x, 1.105, z], [x, 1.205, z], 0.030, 0.029, 14);
+    displace(p, (px, py, pz) => nz.fbm3(px * 40, py * 40, pz * 40, 2) * 0.0015);
+    appendMesh(out, p);
+    const lid = rod([x, 1.200, z], [x, 1.218, z + 0.004], 0.032, 0.031, 14);
+    appendMesh(out, lid);
+    // second, boxy pouch further back on the right: radio/utility
+    if (side < 0) {
+      const u = pouch(nz, {
+        hx: 0.030, hy: 0.052, hz: 0.026,
+        x: side * 0.170, y: 1.150, z: -0.058, ry: side * 1.35,
+      });
+      appendMesh(out, u);
+    }
+  }
+  return out;
+}
+
+/** Tourniquet in a rubber-banded pouch on the left shoulder strap. */
+export function tourniquet(nz) {
+  const t = boxRound(0.019, 0.040, 0.015, { n: 3.2, seg: 10, rows: 6, roundY: 0.45 });
+  computeNormals(t);
+  displace(t, (x, y, z) => nz.fbm3(x * 70, y * 70, z * 70, 2) * 0.0012);
+  place(t, 0.088, 1.395, 0.162, -0.35, 0.1, 0.05);
+  return t;
+}
+
+/**
+ * Faction armband: a band of coloured tape round the upper arm, 35 % of the
+ * way from shoulder to elbow. `sh`, `el` = bind positions.
+ */
+export function armband(sh, el, r = 0.060, width = 0.042, at = 0.36) {
+  const d = [el[0] - sh[0], el[1] - sh[1], el[2] - sh[2]];
+  const l = Math.hypot(d[0], d[1], d[2]);
+  const u = [d[0] / l, d[1] / l, d[2] / l];
+  const c = [sh[0] + d[0] * at, sh[1] + 0.03 + d[1] * at, sh[2] + d[2] * at];
+  const a = [c[0] - u[0] * width * 0.5, c[1] - u[1] * width * 0.5, c[2] - u[2] * width * 0.5];
+  const b = [c[0] + u[0] * width * 0.5, c[1] + u[1] * width * 0.5, c[2] + u[2] * width * 0.5];
+  return rod(a, b, r, r * 0.985, 16, false);
+}
+
+/** Drop-leg pistol holster on the right thigh with its two leg straps. */
+export function thighHolster(nz, hip, knee) {
+  const out = emptyMesh();
+  const x = hip[0] - 0.110, y = hip[1] - 0.20, z = hip[2] + 0.012;
+  const shell = boxRound(0.020, 0.078, 0.046, { n: 3.4, seg: 12, rows: 8, roundY: 0.35 });
+  computeNormals(shell);
+  displace(shell, (px, py, pz) => nz.fbm3(px * 50, py * 50, pz * 50, 2) * 0.0015);
+  place(shell, x, y, z, 0.12, 0, 0.05);
+  appendMesh(out, shell);
+  // pistol grip poking out of the top
+  const grip = boxRound(0.014, 0.036, 0.018, { n: 3.2, seg: 10, rows: 5, roundY: 0.4 });
+  place(grip, x + 0.002, y + 0.094, z - 0.018, 0.35, 0, 0.05);
+  appendMesh(out, grip);
+  // hanger from the belt
+  const hanger = boxRound(0.014, 0.050, 0.008, { n: 4, seg: 8, rows: 4, roundY: 0.4 });
+  place(hanger, x + 0.010, y + 0.118, z + 0.004, 0, 0, 0.12);
+  appendMesh(out, hanger);
+  // leg straps
+  for (const dy of [-0.035, 0.040]) {
+    const pts = [];
+    for (let i = 0; i <= 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      pts.push([hip[0] - 0.002 + Math.sin(a) * 0.094, y + dy, hip[2] + 0.008 + Math.cos(a) * 0.082]);
+    }
+    const s = ribbon(pts, 0.022, 0.005, { seg: 5, up: [0, 1, 0], upright: true });
+    computeNormals(s);
+    appendMesh(out, s);
+  }
+  return out;
 }

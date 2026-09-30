@@ -109,8 +109,12 @@ export const WEAPON_DEFS = {
      * downrange of a shoulder 200 mm off the eye, and a 572 mm arm has nothing
      * left. The butt pad ends up 60 mm in FRONT of the eye but 140 mm off axis,
      * so it is outside the frustum rather than clipped by the near plane. */
-    hipPos: [0.118, -0.185, -0.3],
-    hipRot: [-0.05, 0.081, -0.135],
+    // Re-posed with the new arms: 100 mm closer and yawed further so the
+    // support hand sits on the rear of the handguard with the barrel and
+    // muzzle clear to its left, and the forearm rises steeply from the bottom
+    // edge instead of crossing the frame.
+    hipPos: [0.105, -0.14, -0.2],
+    hipRot: [-0.02, 0.15, -0.1],
     adsCant: [0, 0, 0.004],
     /* Eye to the rear lens.
      *

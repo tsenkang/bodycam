@@ -95,6 +95,9 @@ const GEAR = {
   mask: [0.62, 0.63, 0.66],
 };
 
+/** Faction tape colour, relative to the neutral nylon bake (see armband). */
+const FACTION = [0.98, 0.30, 0.22];
+
 /**
  * Visual variants. Each is a different silhouette, not a recolour: helmet vs
  * wrapped head, full plate vs chest rig, carbine vs long rifle.
@@ -113,9 +116,17 @@ export const VARIANTS = {
     helmet: true,
     helmetCover: true,
     helmetTint: [0.72, 0.72, 0.68],
-    goggles: true,
-    gogglesDown: true,
+    // No goggles over the eyes: a knit balaclava with the eye band open is what
+    // gives the covered head a FACE at range (skin strip + brow shadow + eyes)
+    // without ever showing an uncanny bare face up close.
+    goggles: false,
+    gogglesDown: false,
     faceWrap: true,
+    wrapColour: [0.34, 0.335, 0.33],
+    nvg: 'mono',
+    headset: true,
+    helmetBand: true,
+    pack: 'assault',
     beard: false,
     kneePads: true,
     fullCarrier: true,
@@ -137,6 +148,7 @@ export const VARIANTS = {
     shades: true,
     faceWrap: true,
     beard: true,
+    pack: 'daypack',
     kneePads: false,
     fullCarrier: false,
     weapon: 'ak',
@@ -145,19 +157,25 @@ export const VARIANTS = {
   },
   breacher: {
     camo: 'urban',
-    clothTint: [0.98, 0.99, 1.02],
-    gearTint: [0.84, 0.86, 0.90], // wolf grey
-    plateTint: [0.86, 0.88, 0.92],
+    clothTint: [1.0, 1.0, 0.98],
+    // ranger green / black: the old wolf grey read as a pale blue ghost in the
+    // street's sky light ("glowing blue figure" in the round-0 critique)
+    gearTint: [0.62, 0.64, 0.58],
+    plateTint: [0.60, 0.62, 0.57],
     skinTint: [1.06, 0.98, 0.92],
     helmet: true,
     helmetCover: false, // bare painted shell instead of a cloth cover
-    helmetTint: [0.82, 0.83, 0.86],
-    // goggles parked on the shell (not over the eyes like vanguard) plus a hard
-    // ballistic half-mask: same helmet family, completely different head read
-    goggles: true,
+    helmetTint: [0.62, 0.63, 0.60],
+    // bare shell, stowed dual-tube NVG, headset and a hard ballistic half-mask:
+    // same helmet family as vanguard, a completely different head outline
+    goggles: false,
     gogglesDown: false,
     faceWrap: true,
     maskHard: true,
+    nvg: 'bino',
+    headset: true,
+    pack: 'hydration',
+    holster: true,
     beard: true,
     kneePads: true,
     fullCarrier: true,
@@ -274,7 +292,7 @@ export function buildSoldier(name, { rng, materials }) {
     });
     B.add(
       P.limbTube(nz, [sh[0] + side * 0.012, sh[1] + 0.055, sh[2]], el, wr,
-        [0.050, 0.062, 0.056, 0.050, 0.046, 0.042, 0.038], {
+        [0.050, 0.057, 0.054, 0.049, 0.045, 0.041, 0.037], {
         rings: 22,
         seg: 16,
         fold: 0.0016,
@@ -317,6 +335,22 @@ export function buildSoldier(name, { rng, materials }) {
         name: `elbowPad${suffix}`,
       }
     );
+    // FACTION MARK: rust-red tape round the upper arm. The one colour on the
+    // figure that is not a field colour, so every man in the squad reads as the
+    // same side at any range; muted and matte so it is tape, not a toy stripe.
+    // The vertex colour divides out the variant's gear tint so all three land on
+    // the same red.
+    B.add(P.armband(sh, el, 0.0595), {
+      material: 'gear',
+      bones: [`UpperArm${suffix}`],
+      bias: [1],
+      colour: FACTION.map((c, k) => Math.min(1, c / V.gearTint[k])),
+      grime: 0.7,
+      dirt: 0.1,
+      dust: 0.3,
+      wear: 0.25,
+      name: `armband${suffix}`,
+    });
   }
 
   // trousers
@@ -366,6 +400,18 @@ export function buildSoldier(name, { rng, materials }) {
         name: `cargo${suffix}`,
       }
     );
+    if (V.holster && suffix === 'R') {
+      B.add(P.thighHolster(nz, hip, kn), {
+        material: 'polymer',
+        bones: [`UpLeg${suffix}`, 'Hips'],
+        bias: [1, 0.25],
+        grime: 0.6,
+        dirt: 0.3,
+        dust: 0.3,
+        wear: 0.3,
+        name: 'holster',
+      });
+    }
     if (V.kneePads) {
       B.add(P.kneePad(nz, kn, side), {
         material: 'gear',
@@ -524,6 +570,48 @@ export function buildSoldier(name, { rng, materials }) {
     wear: 0.26,
     name: 'dumpPouch',
   });
+  B.add(P.sidePouches(nz), {
+    material: 'gear',
+    bones: ['Spine', 'Spine1', 'Hips'],
+    bias: [1, 0.6, 0.3],
+    colour: GEAR.pouchAlt,
+    grime: 0.9,
+    dirt: 0.3,
+    dust: 0.45,
+    wear: 0.28,
+    name: 'sidePouches',
+  });
+  B.add(P.tourniquet(nz), {
+    material: 'polymer',
+    bones: ['Spine2', 'ClavicleL'],
+    bias: [1, 0.4],
+    grime: 0.5,
+    wear: 0.2,
+    name: 'tourniquet',
+  });
+  if (V.pack) {
+    const pk = P.backPack(nz, V.pack);
+    B.add(pk.body, {
+      material: 'gear',
+      bones: ['Spine1', 'Spine2', 'Spine'],
+      bias: [1, 0.8, 0.5],
+      colour: V.pack === 'daypack' ? GEAR.dump : GEAR.pouch,
+      grime: 0.95,
+      dirt: 0.35,
+      dust: 0.55,
+      wear: 0.25,
+      name: 'pack',
+    });
+    if (pk.tube) {
+      B.add(pk.tube, {
+        material: 'rubber',
+        bones: ['Spine2', 'ClavicleR', 'Spine1'],
+        bias: [1, 0.6, 0.4],
+        grime: 0.6,
+        name: 'drinkTube',
+      });
+    }
+  }
 
   /* ---------------- head --------------------------------------------- */
   const wrapped = V.faceWrap;
@@ -569,7 +657,7 @@ export function buildSoldier(name, { rng, materials }) {
       material: V.maskHard ? 'polymer' : 'gear',
       bones: ['Head', 'Neck'],
       bias: [1, 0.5],
-      colour: V.maskHard ? GEAR.mask : V.helmet ? GEAR.wrap : [0.78, 0.74, 0.66],
+      colour: V.maskHard ? GEAR.mask : V.wrapColour ?? (V.helmet ? GEAR.wrap : [0.78, 0.74, 0.66]),
       grime: V.maskHard ? 0.5 : 0.85,
       dirt: V.maskHard ? 0.1 : 0.2,
       dust: V.maskHard ? 0.2 : 0.3,
@@ -610,6 +698,36 @@ export function buildSoldier(name, { rng, materials }) {
       wear: 0.18,
       name: 'chinStrap',
     });
+    if (V.headset) {
+      B.add(P.headset(nz, head), {
+        material: 'polymer',
+        bone: 'Head',
+        grime: 0.45,
+        wear: 0.3,
+        name: 'headset',
+      });
+    }
+    if (V.nvg) {
+      B.add(P.nvgStowed(nz, head, V.nvg), {
+        material: 'polymer',
+        bone: 'Head',
+        grime: 0.4,
+        wear: 0.4,
+        name: 'nvg',
+      });
+      B.add(P.helmetStrobe(head), { material: 'polymer', bone: 'Head', grime: 0.4, wear: 0.3, name: 'strobe' });
+    }
+    if (V.helmetBand) {
+      B.add(P.helmetBand(nz, head), {
+        material: 'gear',
+        bone: 'Head',
+        colour: GEAR.strap,
+        grime: 0.8,
+        dust: 0.4,
+        wear: 0.2,
+        name: 'helmetBand',
+      });
+    }
     if (V.goggles) {
       const g = P.goggles(head, V.gogglesDown);
       B.add(g.frame, { material: 'polymer', bone: 'Head', grime: 0.4, wear: 0.35, name: 'goggleFrame' });

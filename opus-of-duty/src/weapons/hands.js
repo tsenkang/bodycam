@@ -381,12 +381,11 @@ function buildWatch(materials, zc, s, radialSign) {
   head.add(new THREE.Mesh(dial, materials.watchFace ?? materials.watch));
   if (materials.seam) head.add(new THREE.Mesh(mergeAll(hands), materials.seam));
   // seat on the dorsal surface, rolled toward the thumb
-  head.position.set(0, 0.0196 * s, zc);
-  const roll = -0.42 * radialSign;
+  // 40 mm class case: the 44 mm authoring read as a wrist computer at 0.3 m.
+  head.scale.setScalar(0.84);
   const pivot = new THREE.Object3D();
-  pivot.rotation.z = roll;
-  pivot.position.set(0, 0, 0);
-  head.position.set(0, 0.0205 * s, zc);
+  pivot.rotation.z = -0.42 * radialSign;
+  head.position.set(0, 0.0212 * s, zc);
   pivot.add(head);
   g.add(pivot);
   return g;
@@ -767,24 +766,92 @@ export class Arm {
      */
     const fingers = [];
     const contacts = [];
+    const skip = opts.skip ?? [];
+    let triggerRest = null;
     for (let i = 0; i < 4; i++) {
       const f = this.fingers[i];
       const curl = base.fingers[i].slice();
       for (let j = 0; j < 3; j++) f.joints[j].rotation.x = -curl[j];
+      if (skip.includes(i)) {
+        /**
+         * The trigger finger does not wrap: its distal pad goes ON the trigger
+         * face. Same two-parameter search, scored by distance to that point.
+         */
+        if (opts.trigger && i === 0) {
+          const ll0 = this._segLength[0];
+          const rr0 = this._segRadius[0];
+          const tp = new THREE.Vector3().fromArray(opts.trigger); // build time only
+          let best = [0.55, 0.72, 0.34];
+          let bestD = Infinity;
+          for (let km = 0; km <= 30; km++) {
+            const m = -0.2 + (km / 30) * 1.4;
+            f.joints[0].rotation.x = -m;
+            for (let k = 0; k <= 30; k++) {
+              const a = (k / 30) * 1.6;
+              f.joints[1].rotation.x = -a;
+              f.joints[2].rotation.x = -a * 0.6;
+              f.joints[2].updateWorldMatrix(true, false);
+              _fitP.set(0, -rr0[3] * 1.05, -ll0[2] * 0.5).applyMatrix4(f.joints[2].matrixWorld).applyMatrix4(_fitInv);
+              const d = _fitP.distanceTo(tp) + Math.abs(m - a * 0.6) * 0.002;
+              if (d < bestD) {
+                bestD = d;
+                best = [m, a, a * 0.6];
+              }
+            }
+          }
+          triggerRest = best;
+          for (let j = 0; j < 3; j++) f.joints[j].rotation.x = -best[j];
+          fingers.push(best.slice());
+        } else {
+          fingers.push(curl);
+        }
+        continue;
+      }
       const rr = this._segRadius?.[i] ?? [0.01, 0.0094, 0.0084, 0.006];
       const ll = this._segLength?.[i] ?? [0.046, 0.029, 0.022];
-      for (let j = 0; j < 2; j++) {
-        // The next joint's origin sits ON the finger's own axis, so it wants to
-        // be one segment-radius clear of the surface, not on it.
-        const a = fitJoint(f.joints[j], [0, 0, -ll[j]], -1.75, -0.05, rr[j + 1] * 0.92);
-        curl[j] = -a;
-      }
-      // The fingertip grip patch: palmar side, one radius below the axis, half
-      // way along the distal segment — the same numbers as the `tip` blob in
-      // buildFinger, so the mask and the mesh agree.
+      /**
+       * Wrap search. A finger closes on a tube with the PIP and DIP coupled
+       * (DIP ~0.7 x PIP) and the MCP free, so scan those two parameters and
+       * score the whole chain: every sample along the finger wants to
+       * be one local radius off the surface, burying is punished hard, and the
+       * fingertip pad counts double. Fitting the joints one at a time instead
+       * converges on kinked, anatomically impossible curls.
+       */
       const local = [0, -rr[3] * 1.05, -ll[2] * 0.5];
-      const a2 = fitJoint(f.joints[2], local, -1.95, -0.1, 0);
-      curl[2] = -a2;
+      let bestM = 0;
+      let bestA = 0;
+      let bestC = Infinity;
+      const N = 36;
+      for (let km = 0; km <= N; km++) {
+        const m = (km / N) * 1.5;
+        f.joints[0].rotation.x = -m;
+        for (let k = 0; k <= N; k++) {
+          const a = (k / N) * 1.6;
+          f.joints[1].rotation.x = -a;
+          f.joints[2].rotation.x = -a * 0.7;
+          let cost = 0;
+          for (let j = 0; j < 3; j++) {
+            for (const u of [0.5, 1]) {
+              const g = gapAt(f.joints[j], 0, 0, -ll[j] * u) - rr[j + (u === 1 ? 1 : 0)] * 0.95;
+              cost += g < 0 ? -g * 12 : g * (j === 0 ? 0.4 : 1);
+            }
+          }
+          const gt = gapAt(f.joints[2], local[0], local[1], local[2]);
+          cost += gt < -0.001 ? (-gt - 0.001) * 12 : Math.abs(gt) * 2;
+          // mild preference for a relaxed, even curl
+          cost += Math.abs(m - a * 0.8) * 0.002;
+          if (cost < bestC) {
+            bestC = cost;
+            bestM = m;
+            bestA = a;
+          }
+        }
+      }
+      const R = [bestM, bestA, bestA * 0.7];
+      for (let j = 0; j < 3; j++) {
+        curl[j] = R[j];
+        f.joints[j].rotation.x = -curl[j];
+      }
       fingers.push(curl);
       const p = new THREE.Vector3();
       gapAt(f.joints[2], local[0], local[1], local[2], p);
@@ -877,7 +944,7 @@ export class Arm {
     gapAt(this.thumb.joints[1], tLocal[0], tLocal[1], tLocal[2], tp);
     contacts.push(tp);
 
-    this.poses[poseName] = { fingers, thumb, thumbBase };
+    this.poses[poseName] = { fingers, thumb, thumbBase, triggerRest };
     this.pose = poseName;
     return contacts;
   }
@@ -1002,11 +1069,12 @@ export class Arm {
   /** Trigger-finger curl, 0 = off the trigger, 1 = fully pressed. */
   setTrigger(t) {
     const f = this.fingers[0];
-    // Rest pose matches HAND_POSES.grip.fingers[0]: the finger is already ON the
-    // trigger with the slack taken up, not standing off it straight.
-    f.joints[0].rotation.x = -(0.55 + t * 0.3);
-    f.joints[1].rotation.x = -(0.72 + t * 0.42);
-    f.joints[2].rotation.x = -(0.34 + t * 0.3);
+    // Rest pose: solved onto the trigger face per weapon (fitToCylinder with a
+    // `trigger` target), else the authored grip value. Pressing curls from it.
+    const r = this.poses?.[this.pose]?.triggerRest ?? TRIGGER_REST;
+    f.joints[0].rotation.x = -(r[0] + t * 0.12);
+    f.joints[1].rotation.x = -(r[1] + t * 0.3);
+    f.joints[2].rotation.x = -(r[2] + t * 0.22);
   }
 
   /**
@@ -1070,6 +1138,8 @@ export class Arm {
  * These are read straight off reference photos of a firing grip: the little
  * finger curls hardest, the index rides the trigger, the thumb wraps high.
  */
+const TRIGGER_REST = [0.55, 0.72, 0.34];
+
 export const HAND_POSES = {
   /** Firing grip on a pistol grip. */
   grip: {

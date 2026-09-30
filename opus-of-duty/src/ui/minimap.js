@@ -34,7 +34,7 @@ export class Minimap {
 
     this.rng = rng;
     this.k = 1;
-    this.cssSize = 238;
+    this.cssSize = 250;
     this.span = 190; // metres covered by the bake
     this.viewSpan = 70; // metres visible in the widget
     this.centre = new THREE.Vector2(0, 0);

@@ -21,6 +21,16 @@ const LIFETIME = 9.0;
 const FADE = 0.7;
 /** Length of the modelled case (5.56x45), in metres — the scale=1 reference. */
 const CASE_LEN = 0.045;
+/**
+ * Young brass is drawn in the VIEWMODEL pass. The world pass is composited
+ * under the weapon, and a casing leaving the port spends its first few hundred
+ * milliseconds exactly where the receiver and the right hand cover the screen —
+ * so in world space it was never visible at all, and the `muzzle` shot showed
+ * no brass. Anything younger than this and within VIEW_RANGE of the eye is
+ * re-expressed in viewCamera space and drawn over the weapon instead.
+ */
+const VIEW_AGE = 0.45;
+const VIEW_RANGE = 1.5;
 
 function caseProfile() {
   // metres; a 5.56x45 case is 45 mm long, 9.6 mm at the base
@@ -74,6 +84,25 @@ export class ShellSystem {
     this.mesh.name = 'fx-shells';
     this.mesh.userData.owProbe = true;
     this.mesh.userData.owNoShadow = true;
+
+    // viewmodel-pass mirror, attached by FxSystem._attachView
+    // Own material: the viewmodel rig lights far hotter per unit albedo than
+    // the world (every weapon albedo is authored against it), so brass carries
+    // the same cut the weapon's metals do or it clips to a white stick.
+    this.viewMaterial = mat.clone();
+    this.viewMaterial.name = 'fx-brass-view';
+    this.viewMaterial.color.multiplyScalar(0.4);
+    this.viewMesh = new THREE.InstancedMesh(geo, this.viewMaterial, CAPACITY);
+    this.viewMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.viewMesh.frustumCulled = false;
+    this.viewMesh.count = 0;
+    this.viewMesh.visible = false;
+    this.viewMesh.name = 'fx-shells-view';
+    this.viewMesh.userData.owNoShadow = true;
+    this.viewMesh.userData.owNoPrepass = true;
+    this._w2v = new THREE.Matrix4();
+    this._vm = new THREE.Matrix4();
+    this._eye = new THREE.Vector3();
 
     this.slots = [];
     for (let i = 0; i < CAPACITY; i++) {
@@ -218,20 +247,45 @@ export class ShellSystem {
     }
     if (count === 0 && this._lastCount === 0) {
       this.mesh.visible = false;
+      this.viewMesh.visible = false;
       return;
     }
     this._lastCount = count;
     // Write instance matrices; dead slots collapse to zero scale.
+    const ctx = this.fx.ctx;
+    const vm = this.viewMesh.parent ? this.viewMesh : null;
+    let vcount = 0;
+    if (vm) {
+      ctx.camera.updateMatrixWorld();
+      ctx.viewCamera.updateMatrixWorld();
+      this._w2v.multiplyMatrices(ctx.viewCamera.matrixWorld, ctx.camera.matrixWorldInverse);
+      this._eye.setFromMatrixPosition(ctx.camera.matrixWorld);
+    }
     for (let i = 0; i < this.slots.length; i++) {
       const slot = this.slots[i];
-      const sc = slot.alive ? slot.scale : 0;
+      let sc = slot.alive ? slot.scale : 0;
+      const inView =
+        vm && sc > 0 && slot.age < VIEW_AGE && slot.pos.distanceToSquared(this._eye) < VIEW_RANGE * VIEW_RANGE;
       this._s.set(sc, sc, sc);
       this._m.compose(slot.pos, slot.quat, this._s);
+      if (vm) {
+        if (inView) {
+          this._vm.multiplyMatrices(this._w2v, this._m);
+          vcount = i + 1;
+        } else this._vm.makeScale(0, 0, 0);
+        vm.setMatrixAt(i, this._vm);
+      }
+      if (inView) this._m.makeScale(0, 0, 0);
       this.mesh.setMatrixAt(i, this._m);
     }
     this.mesh.count = count;
     this.mesh.instanceMatrix.needsUpdate = true;
     this.mesh.visible = count > 0;
+    if (vm) {
+      vm.count = vcount;
+      vm.instanceMatrix.needsUpdate = true;
+      vm.visible = vcount > 0;
+    }
   }
 
   dispose() {
@@ -240,6 +294,9 @@ export class ShellSystem {
     this.material.dispose();
     this.textures.normal.dispose();
     this.textures.orm.dispose();
+    this.viewMesh.parent?.remove(this.viewMesh);
+    this.viewMesh.dispose();
+    this.viewMaterial.dispose();
     this.mesh.dispose();
   }
 }

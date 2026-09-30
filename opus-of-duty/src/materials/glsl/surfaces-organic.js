@@ -153,9 +153,12 @@ void owSurface(vec2 uv, out vec3 alb, out float h, out float rough, out float me
 
   vec3 cA = uTintA;
   vec3 cB = uTintB;
-  vec3 c = mix(cA, cB, threadId * 0.6 + slub * 0.4);
-  c *= 0.865 + 0.215 * (weave * 0.5 + 0.5);
-  c *= 0.960 + 0.075 * fuzz;
+  // Per-thread colour must stay tiny: a 2.7 mm thread is under a pixel past
+  // two metres, and random per-cell colour there is exactly the "felt" noise.
+  // Canvas reads by its large-scale fading and dirt, not by its threads.
+  vec3 c = mix(cA, cB, 0.25 + threadId * 0.08 + slub * 0.12);
+  c *= 0.93 + 0.10 * (weave * 0.5 + 0.5);
+  c *= 0.985 + 0.03 * fuzz;
   c *= 0.90 + 0.20 * macro;
 
   h = 0.55 + weave * 0.30 + (fuzz - 0.5) * 0.03 + (slub - 0.5) * 0.05;

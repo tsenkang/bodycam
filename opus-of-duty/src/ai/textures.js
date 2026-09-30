@@ -241,30 +241,32 @@ export const CAMO = {
     mid: [0.241, 0.186, 0.116],
     dark: [0.146, 0.111, 0.072],
     olive: [0.176, 0.190, 0.116],
-    macro: 2,
+    macro: 3,
     warp: 0.15,
   },
   woodland: {
-    // olive drab in the field sits well under desert tan
-    budget: 0.092,
-    pale: [0.354, 0.340, 0.230],
-    base: [0.246, 0.259, 0.170],
-    mid: [0.174, 0.190, 0.126],
-    dark: [0.104, 0.110, 0.083],
-    olive: [0.210, 0.196, 0.132],
+    // muted field olive, not the saturated toy green it used to be: real
+    // woodland prints fade to grey-green within weeks of wear
+    budget: 0.090,
+    pale: [0.318, 0.305, 0.228],
+    base: [0.238, 0.240, 0.175],
+    mid: [0.176, 0.180, 0.132],
+    dark: [0.100, 0.098, 0.080],
+    olive: [0.205, 0.192, 0.136],
     macro: 3,
     warp: 0.17,
   },
   urban: {
-    // wolf grey / near-black urban kit: the darkest of the three, and the one
-    // that reads as a plaster mannequin if it is allowed anywhere near 0.2
-    budget: 0.083,
-    pale: [0.330, 0.334, 0.342],
-    base: [0.226, 0.230, 0.239],
-    mid: [0.150, 0.154, 0.163],
-    dark: [0.078, 0.079, 0.088],
-    olive: [0.190, 0.188, 0.182],
-    macro: 2,
+    // "urban" is now a dark ranger-green / charcoal print (multicam-black
+    // family). The old wolf-grey had a 0.33 pale family that went blue-white
+    // under sky light and read as a ghost at 20 m.
+    budget: 0.074,
+    pale: [0.232, 0.236, 0.212],
+    base: [0.150, 0.158, 0.138],
+    mid: [0.108, 0.114, 0.100],
+    dark: [0.060, 0.061, 0.058],
+    olive: [0.160, 0.158, 0.120],
+    macro: 3,
     warp: 0.14,
   },
 };
@@ -362,7 +364,12 @@ function garmentRelief(nz, u, v) {
  * the environment albedo to physical values, these four numbers plus `KIT_CAL`
  * are the only thing that has to move.
  */
-export const CLOTH_BUDGET = { mean: 0.104, min: 0.040, max: 0.152, contrast: 1.5, sat: 1.35 };
+// contrast 1.5 -> 0.45, sat 1.35 -> 1.15 (round 1). At 1.5 most texels hit the
+// clamps and the pattern read as "noisy vertex-colour camo" at 20 m in the blind
+// review. Contrast is absolute and the source pattern mean is ~0.25, so 0.45
+// keeps the RELATIVE contrast of the printed palette roughly 1:1. Printed multicam is a MODERATE-contrast print; its legibility comes
+// from shape (macro blotches + crisp micro twigs), not from value extremes.
+export const CLOTH_BUDGET = { mean: 0.104, min: 0.040, max: 0.152, contrast: 0.45, sat: 1.15 };
 
 /**
  * Per-pattern budget. Only the MEAN moves: the 0.085-0.325 window, the contrast
@@ -472,10 +479,17 @@ export function camoTexel(nz, cfg, u, v, out) {
   col = mix3(col, cfg.mid, smooth(0.515, 0.565, c));
   col = mix3(col, cfg.dark, smooth(0.605, 0.655, d));
 
-  // ---- fine 3 cm pixel/dot layer, low amplitude ---------------------------
-  const f1 = smooth(0.40, 0.60, nz.fbm(u + 3.7, v + 1.3, 24, 2, 0.35));
-  const f2 = smooth(0.52, 0.70, nz.n2(u + 7.1, v + 2.9, 48));
-  const fine = 0.88 + 0.26 * f1 - 0.12 * f2;
+  // ---- micro layer: sparse, CRISP 1.5-4 cm twig/dot shapes -----------------
+  // Not a noise multiplier (that is what read as vertex noise): discrete dark
+  // brown twigs and a few pale flecks with hard edges, laid over the macro
+  // families the way the second screen of a multicam print is.
+  const wu = u + (nz.fbm(u + 5.1, v + 0.7, 16, 2) - 0.5) * 0.02;
+  const wv = v + (nz.fbm(u + 0.9, v + 6.3, 16, 2) - 0.5) * 0.05;
+  const twig = smooth(0.70, 0.73, nz.fbm(wu + 3.7, wv * 0.55 + 1.3, 30, 2, 0.45));
+  const fleck = smooth(0.74, 0.77, nz.fbm(wu + 9.2, wv + 4.4, 40, 2, 0.45));
+  col = mix3(col, cfg.dark, twig * 0.85);
+  col = mix3(col, cfg.pale, fleck * 0.6 * (1 - twig));
+  const fine = 0.97 + 0.06 * nz.n2(u + 7.1, v + 2.9, 96);
 
   const h = garmentRelief(nz, u, v);
   out.h = h;

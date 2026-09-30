@@ -91,11 +91,13 @@ export class Animator {
       aimWeight: 1,
       suppress: 0,
       hurt: 0,
+      lean: 0,
     };
 
     this.phase = 0;
     this.prevClip = 'idle';
     this.blend = 1; // weight of the current clip vs the previous one
+    this.leanCur = 0;
     this.time = 0;
 
     // one-shot timers (negative = inactive)
@@ -180,6 +182,7 @@ export class Animator {
     if (s.aimWeight !== undefined) st.aimWeight = s.aimWeight;
     if (s.suppress !== undefined) st.suppress = s.suppress;
     if (s.hurt !== undefined) st.hurt = s.hurt;
+    if (s.lean !== undefined) st.lean = s.lean;
   }
 
   /* ---------------- one-shot triggers ---------------- */
@@ -255,6 +258,12 @@ export class Animator {
     /* --- layer 2: additives --- */
     P.w = 1;
     if (st.aimWeight > 0 && !this.vaulting) C.aimAdd(P, st.aimWeight * (1 - (this.reloadT >= 0 ? 0.6 : 0)));
+    // lean eases in/out over ~0.25 s so a peek is a motion, not a pop
+    {
+      const want = this.vaulting ? 0 : (st.lean ?? 0);
+      this.leanCur += (want - this.leanCur) * Math.min(1, dt * 7);
+      if (Math.abs(this.leanCur) > 0.01) C.leanAdd(P, Math.sign(this.leanCur), Math.abs(this.leanCur));
+    }
     if (st.suppress > 0) C.suppressAdd(P, Math.min(1, st.suppress));
     if (this.recoilT >= 0) {
       C.recoilAdd(P, this.recoilT, this.recoilK);

@@ -33,7 +33,7 @@ export class CombatDemo {
     const s = ui.state;
     s.health = 62;
     s.maxHealth = 100;
-    s.armour = 78;
+    s.armour = 0;
     s.maxArmour = 150;
     s.regen = false;
     s.ammo = 26;
@@ -73,11 +73,8 @@ export class CombatDemo {
       it.t = e.age;
     }
 
-    ui.setObjectives([
-      { position: new THREE.Vector3(-6.5, 1.4, -2.5), label: 'A', name: 'PLANT' },
-      { position: new THREE.Vector3(15.5, 1.4, -11), label: 'B', name: 'HOLD' },
-      { position: new THREE.Vector3(-19, 1.4, 25), label: 'C', name: 'EXFIL' },
-    ]);
+    // Team deathmatch: no objectives on the compass, map or in the world.
+    ui.setObjectives([]);
 
     // Enemy / friendly contacts around the player for the minimap.
     ui.setBlips([
@@ -88,7 +85,7 @@ export class CombatDemo {
       { x: 8, z: 22, kind: 'friend', heading: 340 },
     ]);
 
-    ui.setPrompt({ key: 'F', text: 'Pick up ammo', sub: 'hold', progress: 0.42 });
+    ui.setPrompt({ key: 'F', text: 'Swap for AK-74', sub: 'hold', progress: 0.42 });
   }
 
   stop(ui) {
@@ -163,7 +160,7 @@ export class CombatDemo {
         if (shot === 2) {
           ui.hitmarker('hit');
         } else if (shot === 7) {
-          ui.hitmarker('armour');
+          ui.hitmarker('hit');
         } else if (shot === 8) {
           // the frame-86 headshot — this is what the critic shot lands on
           ui.hitmarker('head');

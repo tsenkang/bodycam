@@ -91,7 +91,14 @@ const materials = new SoldierMaterials(rng.fork(), {
 
 const view = q.get('view') ?? 'front';
 const variantName = q.get('variant') ?? 'vanguard';
-const names = view === 'line' ? Object.keys(VARIANTS) : [variantName];
+const lineup = view === 'line' || view.startsWith('squad');
+const names = lineup ? Object.keys(VARIANTS) : [variantName];
+// poses=1: a combat tableau — standing aimed, kneeling in cover, leaning out
+const POSES = q.get('poses') ? [
+  { clip: 'idle', lean: 0 },
+  { clip: 'crouchIdle', lean: 0 },
+  { clip: 'idle', lean: -0.85 },
+] : null;
 const actors = [];
 
 for (let i = 0; i < names.length; i++) {
@@ -104,10 +111,14 @@ for (let i = 0; i < names.length; i++) {
   group.add(root);
   group.add(mesh);
   mesh.bind(skeleton);
-  group.position.x = (i - (names.length - 1) / 2) * 1.15;
+  group.position.x = (i - (names.length - 1) / 2) * (POSES ? 1.5 : 1.15);
+  if (POSES) group.rotation.y = 0.5;
   scene.add(group);
   const animator = new Animator(RIG, bones, { rng: rng.fork() });
-  actors.push({ group, mesh, bones, animator, def });
+  // in the line-up each man aims at a point 10 m out along his own facing,
+  // slightly across the body, so the rifles read in three-quarter
+  const aim = new THREE.Vector3(group.position.x + Math.sin(0.5) * 10 - 1.5, 1.35, Math.cos(0.5) * 10);
+  actors.push({ group, mesh, bones, animator, def, aim });
   console.info(`[preview] ${names[i]} ${def.stats.triangles} tris ${def.stats.vertices} verts`);
 }
 
@@ -127,6 +138,10 @@ const VIEWS = {
   far: { pos: [0.9, 1.35, 25], look: [0, 1.0, 0], fov: 30 },
   // 12 m: mid-range, where the gear silhouette has to read
   mid: { pos: [0.6, 1.3, 12], look: [0, 1.0, 0], fov: 30 },
+  // combat line-up (poses=1): three-quarter from the shooter's side, near and far
+  squad: { pos: [2.2, 1.45, 4.4], look: [0, 0.95, 0], fov: 40 },
+  squadfar: { pos: [5.5, 1.7, 17], look: [0, 0.95, 0], fov: 16 },
+  squadback: { pos: [-2.6, 1.5, -3.8], look: [0, 0.95, 0], fov: 40 },
 };
 const V = VIEWS[view] ?? VIEWS.front;
 camera.position.fromArray(V.pos);
@@ -149,7 +164,15 @@ let t = phase;
 function frame(dt) {
   t = phase + frameIndex * dt;
   for (const a of actors) {
-    a.animator.setState({ clip, speed: 1, aimTarget, lookTarget: aimTarget, aimWeight: 1 });
+    const pz = POSES ? POSES[actors.indexOf(a) % POSES.length] : null;
+    a.animator.setState({
+      clip: pz ? pz.clip : clip,
+      lean: pz ? pz.lean : Number(q.get('lean') ?? 0),
+      speed: 1,
+      aimTarget: pz ? a.aim : aimTarget,
+      lookTarget: pz ? a.aim : aimTarget,
+      aimWeight: 1,
+    });
     a.animator.update(dt, t);
     a.group.updateMatrixWorld(true);
   }

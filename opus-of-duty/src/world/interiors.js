@@ -192,6 +192,10 @@ function dressWalls(A, rng, r) {
         A.add('metal_dark', BOX_FINE(A), LL(IDENT, bx, sy - 0.09, bz, s.yaw, 0.03, 0.16, 0.18), {
           masks: [0.6, 0.6, 0.3],
         });
+        const [dx, dz] = at(s, st + bt * (sLen / 2 - 0.12), 0.1);
+        A.add('metal_dark', BOX_FINE(A), LL(IDENT, dx, sy - 0.14, dz, s.yaw, 0.025, 0.3, 0.025, Math.PI / 4), {
+          masks: [0.7, 0.6, 0.3],
+        });
       }
       for (let i = 0; i < rng.int(2, 5); i++) {
         const [gx, gz] = at(s, st + rng.range(-sLen / 2 + 0.12, sLen / 2 - 0.12), rng.range(0.11, 0.2));

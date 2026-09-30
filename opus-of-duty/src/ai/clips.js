@@ -36,8 +36,9 @@ export function idle(P, ph, p = {}) {
   const sway = sin(t * 0.31 + 1.1);
   const micro = sin(t * 1.7 + 0.4) * 0.35 + sin(t * 2.9) * 0.2;
 
-  P.hip(0.012 * sway, -0.008 + 0.004 * breath, 0);
-  P.d('Hips', -1.5, 2.2 * sway, 1.6);
+  // contrapposto: weight on the right leg, pelvis dropped on the free side
+  P.hip(-0.028 + 0.012 * sway, -0.012 + 0.004 * breath, 0);
+  P.d('Hips', -1.5, -6 + 2.2 * sway, 4.5);
   P.d('Spine', 1.6 + 0.7 * breath, -1.4 * sway, -0.8);
   P.d('Spine1', 1.2 + 0.9 * breath, -1.0 * sway, -0.6);
   P.d('Spine2', -0.6 + 1.1 * breath, 1.6 * sway, 0.4);
@@ -45,12 +46,14 @@ export function idle(P, ph, p = {}) {
   P.d('Head', -1.2, 1.0 * micro, 0.6 * sway);
 
   // stance: right leg carries, left slightly forward
-  P.d('UpLegR', -2, 1.5, -1.5);
-  P.d('LegR', -5.5, 0, 0);
-  P.d('FootR', 4.5, -1.5, 0);
-  P.d('UpLegL', 5, -4.5, 2.5);
-  P.d('LegL', -9, 0, 0);
-  P.d('FootL', 5.5, 3.0, 0);
+  P.d('UpLegR', -2, 6, -4.5);
+  P.d('LegR', -3.5, 0, 0);
+  P.d('FootR', 3.0, -6, 0);
+  P.d('UpLegL', 9, -8, 7.5);
+  P.d('LegL', -16, 0, 0);
+  P.d('FootL', 8, 8.0, 0);
+  // shoulders counter the pelvis tilt
+  P.d('Spine1', 0, 3, -3);
 
   // shoulders settle, weapon rides the breath
   P.d('ClavicleR', -1.5 + 0.8 * breath, 0, 1.2);
@@ -64,26 +67,62 @@ export function idle(P, ph, p = {}) {
  * Stock in the shoulder, head over the sights, weight forward on bent knees.
  * Additive over any base — this is what turns a standing mannequin into a man
  * in a gunfight.
+ *
+ * The read that sells a rifleman at 20 m is a BLADED, ASYMMETRIC stance, not a
+ * square one: the pelvis turns ~18 deg off the target with the support-side
+ * foot leading, the chest counter-rotates back square behind the plate, the
+ * firing elbow comes up and out (the chicken-wing that makes the shoulder
+ * pocket), the support elbow tucks under the handguard, and the head drops and
+ * cants onto the stock. The aim IK then only has to trim the residual, so the
+ * spine stays inside its clamps.
  */
 export function aimAdd(P, w = 1) {
-  // fighting stance: knees soft, hips dropped, feet staggered
-  P.hip(0, -0.035 * w, 0.012 * w);
-  P.d('Hips', 4 * w, 3 * w, 0);
-  P.d('UpLegR', 8 * w, 4 * w, -3 * w);
-  P.d('LegR', -17 * w, 0, 0);
-  P.d('FootR', 9 * w, -2 * w, 0);
-  P.d('UpLegL', 3 * w, -6 * w, 4 * w);
-  P.d('LegL', -13 * w, 0, 0);
-  P.d('FootL', 8 * w, 3 * w, 0);
-  P.d('Spine1', 2.5 * w, 0, 0);
-  P.d('Spine2', 3.0 * w, -5.0 * w, 0);
-  P.d('Neck', 5.0 * w, 3.0 * w, 0);
-  P.d('Head', -3.5 * w, 2.0 * w, -1.5 * w);
-  P.d('ClavicleR', -6.0 * w, -2 * w, 5.0 * w);
-  P.d('ClavicleL', -3.0 * w, 4 * w, -3.0 * w);
-  P.d('UpperArmR', 10 * w, 0, 14 * w);
-  P.d('ForearmR', -12 * w, 0, 0);
-  P.d('UpperArmL', 8 * w, 0, -6 * w);
+  // fighting stance: knees soft, hips dropped and pushed back, feet staggered
+  P.hip(0.018 * w, -0.05 * w, -0.012 * w);
+  P.d('Hips', 5 * w, -16 * w, 2.5 * w);
+  // support (left) leg leads and takes the weight; firing leg braces behind
+  P.d('UpLegR', -2 * w, 10 * w, -7 * w);
+  P.d('LegR', -14 * w, 0, 0);
+  P.d('FootR', 8 * w, 12 * w, 0);
+  P.d('UpLegL', 17 * w, 4 * w, 6 * w);
+  P.d('LegL', -22 * w, 0, 0);
+  P.d('FootL', 5 * w, -6 * w, 0);
+  // chest counter-rotates back toward the target and leans into the recoil
+  P.d('Spine', 4 * w, 5 * w, -1.5 * w);
+  P.d('Spine1', 5.5 * w, 5 * w, -1.5 * w);
+  P.d('Spine2', 5.0 * w, 2.0 * w, -1.0 * w);
+  // head down and canted onto the stock (cheek weld)
+  P.d('Neck', 10.0 * w, 6.0 * w, -3 * w);
+  P.d('Head', -1.0 * w, 5.0 * w, -9.0 * w);
+  // firing shoulder: clavicle up/forward, elbow out
+  P.d('ClavicleR', -8.0 * w, -4 * w, 8.0 * w);
+  P.d('UpperArmR', 14 * w, -6 * w, 26 * w);
+  P.d('ForearmR', -16 * w, 0, 0);
+  P.d('ClavicleL', -5.0 * w, 6 * w, -4.0 * w);
+  P.d('UpperArmL', 10 * w, 0, -4 * w);
+}
+
+/**
+ * Lean out of cover: `side` +1 = toward the character's right, -1 left. The
+ * pelvis shifts AWAY from the lean and the spine curves over it, so the head and
+ * weapon clear the cover edge while the feet stay planted — the peek every CoD
+ * enemy does around a wall corner. The head counter-tilts to keep the eyes
+ * roughly level, which is what makes it read as deliberate, not falling over.
+ */
+export function leanAdd(P, side, w = 1) {
+  if (w <= 0 || !side) return;
+  const k = side * w;
+  P.hip(0.05 * k, -0.012 * w, 0);
+  P.d('Hips', 0, 2 * k, 3 * k);
+  P.d('Spine', 0, 1.5 * k, 7 * k);
+  P.d('Spine1', 0, 2 * k, 9 * k);
+  P.d('Spine2', 0, 2.5 * k, 9 * k);
+  P.d('Neck', 0, 0, -6 * k);
+  P.d('Head', 0, 0, -8 * k);
+  // the leg on the lean side takes the load, the other goes light
+  P.d(side > 0 ? 'UpLegR' : 'UpLegL', 3 * w, 0, -side * 3 * w);
+  P.d(side > 0 ? 'LegR' : 'LegL', -8 * w, 0, 0);
+  P.d(side > 0 ? 'UpLegL' : 'UpLegR', -1 * w, 0, side * 4 * w);
 }
 
 /* ------------------------------------------------------------------ */
@@ -164,22 +203,31 @@ export function crouchWalk(P, ph) {
   P.d('Spine2', 4, 0, 0);
 }
 
-/** Static crouch — knees loaded, torso upright behind the weapon. */
+/**
+ * Static crouch behind cover: a real one-knee kneel, not a squat. Firing-side
+ * knee on the ground with the toes tucked, support foot planted forward with
+ * the shin vertical, torso upright over the hips and the support elbow resting
+ * near the lead knee. This is the pose every shooter drops into behind low cover
+ * and the one a squatting mannequin most obviously is not.
+ */
 export function crouchIdle(P, ph) {
   const t = ph * TAU;
   const breath = sin(t * 0.6);
-  P.hip(0.004 * sin(t * 0.4), -0.315 + 0.004 * breath, -0.02);
-  P.d('Hips', 7, 1.5, 1);
-  P.d('UpLegR', 44, 3, -6);
-  P.d('LegR', -78, 0, 0);
-  P.d('FootR', 30, -2, 0);
-  P.d('UpLegL', 36, -6, 7);
-  P.d('LegL', -86, 0, 0);
-  P.d('FootL', 32, 4, 0);
-  P.d('Spine', 6 + 0.6 * breath, 0, 0);
-  P.d('Spine1', 5 + 0.8 * breath, 0, 0);
-  P.d('Spine2', 3 + 1.0 * breath, 0, 0);
-  P.d('Neck', 2, 0, 0);
+  P.hip(0.03 + 0.004 * sin(t * 0.4), -0.40 + 0.004 * breath, -0.05);
+  P.d('Hips', 8, -12, 3);
+  // firing knee down: thigh near vertical, shin back along the ground
+  P.d('UpLegR', -2, 8, -5);
+  P.d('LegR', -98, 0, 0);
+  P.d('FootR', -18, -2, 0);
+  P.d('ToeR', 40, 0, 0);
+  // support leg up: thigh forward, shin vertical
+  P.d('UpLegL', 84, -6, 9);
+  P.d('LegL', -92, 0, 0);
+  P.d('FootL', 10, 4, 0);
+  P.d('Spine', 3 + 0.6 * breath, 4, -1.5);
+  P.d('Spine1', 4 + 0.8 * breath, 4, -1);
+  P.d('Spine2', 3 + 1.0 * breath, 2, 0);
+  P.d('Neck', 4, 0, 0);
   P.d('ClavicleR', -2, 0, 1.5);
   P.d('ClavicleL', -1.5, 0, -1.5);
 }

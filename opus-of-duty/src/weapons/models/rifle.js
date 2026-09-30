@@ -24,6 +24,7 @@ import {
   triggerPart,
   cartridge,
 } from '../parts.js';
+import { addEngraving } from '../engrave.js';
 
 /**
  * The assault rifle — an AR-15/M4 pattern carbine with a free-float handguard,
@@ -120,15 +121,19 @@ export function buildRifle() {
 
   // Rollmark + calibre stamp on the left of the magwell — the side that faces the
   // camera in the hipfire pose, engraved as geometry so it cannot swim.
-  addRollmark(body, 'cavity', { x: -0.0149, y: 0.0355, z: -0.031, h: 0.0036 });
-  addRollmark(body, 'cavity', {
-    x: -0.0149,
-    y: 0.0272,
-    z: -0.033,
-    h: 0.0024,
-    pitch: 0.0014,
-    pattern: [2, 3, 1, 0, 2, 2, 3, 0, 3, 2],
-  });
+  // Real, readable markings on the left of the magwell and round the selector.
+  // The magwell leans magTilt, so the magwell lines lean with it (rx) and step
+  // along Z by their height above the well's centre.
+  const mwY = 0.0285;
+  const mwX = -0.0161;
+  const onWell = (y) => ({ x: mwX, y, z: -0.0625 - (y - mwY) * Math.sin(magTilt), rx: -magTilt });
+  addEngraving(body, 'engrave', 'M4A1 CARBINE', { ...onWell(0.0352), height: 0.0031 });
+  addEngraving(body, 'engrave', 'CAL 5.56 MM', { ...onWell(0.0296), height: 0.0022 });
+  addEngraving(body, 'engrave', 'OPUS ARMS', { ...onWell(0.0175), height: 0.0024 });
+  addEngraving(body, 'engrave', 'SN OD-041722', { ...onWell(0.013), height: 0.0017 });
+  addEngraving(body, 'engrave', 'SAFE', { x: -0.0143, y: 0.0592, z: 0.0262, height: 0.0017 });
+  addEngraving(body, 'engrave', 'SEMI', { x: -0.0143, y: 0.0512, z: 0.0292, height: 0.0017 });
+  addEngraving(body, 'engrave', 'AUTO', { x: -0.0143, y: 0.0432, z: 0.0262, height: 0.0017 });
 
   // ---- barrel, gas system, muzzle -----------------------------------------
   const barrel = addBarrel(body, 'steel', 'cavity', {
@@ -345,11 +350,22 @@ export function buildRifle() {
        * what wraps the fingertips around onto the far side where the camera can
        * see them.
        */
+      /**
+       * SUPERSEDES THE NOTE ABOVE. Derived against the grip's own axis (raked
+       * 0.38 rad): knuckle row on the front-right corner of the grip (60 deg
+       * round from the right flank), 18 mm below the top, 12 mm off a 17.5 mm
+       * grip radius; metacarpals along the wrap tangent with 0.3 of the grip
+       * axis mixed in so the hand angles down the grip; dorsum out to the right
+       * and tilted up 0.3. The fingers are then wrapped round `grip` and the
+       * index pad put on `triggerFace` at build time (Viewmodel._fitShootingHand).
+       */
       gripR: {
-        pos: [0.0251, 0.06, 0.1223],
-        finger: [0.05, -0.55, -0.833],
-        back: [1, 0.03, 0.04],
+        pos: [0.0928, 0.0614, 0.0255],
+        finger: [-0.796, -0.5363, -0.2807],
+        back: [0.5, -0.0212, -0.8042],
       },
+      grip: { axis: [0, 0.035, 0.015], dir: [0, -0.9287, 0.3709], r: 0.0175 },
+      triggerFace: [0, 0.031, -0.013],
       /**
        * Support hand: knuckles over the lower-left of the handguard, wrist low
        * and outboard, so the fingers close around a 47 mm tube.
@@ -432,10 +448,20 @@ export function buildRifle() {
        * The per-fingertip solve re-runs against this target at build time and just
        * uses less curl, so the contact is preserved.
        */
+      /**
+       * SUPERSEDES THE NOTES ABOVE. Hand on the LEFT flank of the handguard,
+       * just ahead of the receiver, fingers rolling up and over the top rail
+       * and the thumb under the tube: the back of the glove turns to the
+       * camera (tilt 1.3 rearward), which is the whole read of a CoD support
+       * hand. Knuckle row 21 mm off the tube so the wrap solve
+       * (Arm.fitToCylinder) can close every finger without burying the
+       * proximal phalanx. Derived with phi = 180 deg, fingers = tangent + 1.0
+       * forward, pos = knuckle - 0.098 * finger.
+       */
       gripL: {
-        pos: [-0.1, 0.0734, handZ + 0.0252],
-        finger: [0.8977, -0.3267, -0.2955],
-        back: [-0.2784, -0.7648, 0.581],
+        pos: [-0.0481, 0.0057, -0.1307],
+        finger: [0, 0.7071, -0.7071],
+        back: [-1, 0, 1.3],
       },
       /**
        * The handguard's collision profile, for the build-time fingertip contact

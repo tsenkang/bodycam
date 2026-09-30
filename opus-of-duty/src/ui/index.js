@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { installStyles, removeStyles } from './style.js';
-import { el, clamp, clamp01, damp, setStyle } from './util.js';
+import { el, clamp, clamp01, damp, setStyle, setClass } from './util.js';
 import { Crosshair } from './crosshair.js';
 import { Hitmarkers } from './hitmarkers.js';
 import { DamageArcs } from './damage.js';
@@ -120,6 +120,8 @@ export class UiSystem {
       scoreThem: 0,
       timeLeft: 600,
       mode: 'TDM',
+      /** health/armour widget: only modes that carry them (not TDM) */
+      showVitals: false,
       /** true when no player/weapons subsystem is driving us (stub-safe demo) */
       simulate: false,
       time: 0,
@@ -521,6 +523,7 @@ export class UiSystem {
     this.arcs.update(dt, rx, rz, fx, fz);
     this.health.update(dt, s);
     this.ammo.update(dt, s);
+    setClass(this.root, 'vitals', !!s.showVitals);
     this.killfeed.update(dt);
     this.matchBar.update(s);
     this.prompt.update(dt);

@@ -269,6 +269,7 @@ export class RenderSystem {
     this._viewFillSky = new THREE.Vector3();
     this._viewFillGnd = new THREE.Vector3();
     this._viewIndoor = 0;
+    this._nightK = 0;
     this._viewEnvIntensity = 0.5;
     // The frame loop skips the viewmodel pass when nothing but our own rig is
     // in there; remember how many children that is.
@@ -343,7 +344,9 @@ export class RenderSystem {
       vignette: 0.24,
       // Closes in while the sights are up: the frame has to tell you your eye is
       // behind a tube, not just that the gun moved.
-      adsVignette: 0.34,
+      adsVignette: 0.62,
+      // Near-weapon defocus while ADS, px at 1080p (see composite.js).
+      adsViewBlur: 7.0,
       grain: 0.010,
       // ---- ADS depth of field (see dof.js) ---------------------------------
       // maxCoc is in pixels at 1080p and is reached well beyond focusMax, so
@@ -418,6 +421,7 @@ export class RenderSystem {
       // them buys most of both, and it is applied here rather than at the
       // source because the balance is a lighting decision, not an art one.
       practicalGain: 0.55,
+      practicalNight: 1.5,
       // ---- viewmodel (see VIEWMODEL LIGHTING CONTRACT, _updateViewRig) -----
       // Fraction of the world's sky band a shouldered weapon receives: the
       // shooter's head, shoulders and chest take the rest of the upper dome.
@@ -455,6 +459,14 @@ export class RenderSystem {
     this._noCascadeCull = /[?&]owNoCascadeCull=1/.test(location.search);
     this._visit = this._visit.bind(this);
     this._visitView = this._visitView.bind(this);
+
+    // A camera cut or a time-of-day jump is a new exposure, not something to
+    // adapt into over a second and a half: the capture harness settles six
+    // frames, which left every shot metered with the PREVIOUS shot's exposure
+    // (measured: night came out at EV100 -1.68, the daylight value).
+    this._onCut = () => this.exposure.reset();
+    ctx.events.on('shot:applied', this._onCut);
+    ctx.events.on('sky:changed', this._onCut);
 
     const w = ctx.canvas.clientWidth || 1920;
     const h = ctx.canvas.clientHeight || 1080;
@@ -1344,7 +1356,10 @@ export class RenderSystem {
       // that asked to be distance-culled inside a room-or-street radius; the FX
       // flash pool deliberately registers at 90 m so the fade never bites it,
       // and a muzzle flash must not be dimmed by a room-lighting control.
-      const gain = e.range <= PRACTICAL_RANGE ? s.practicalGain : 1;
+      // The trim is a DAYLIGHT balance (interior vs the sunlit street through
+      // its door). After dark the practicals ARE the lighting design — pools
+      // under every lamp — so the trim releases and goes above unity.
+      const gain = e.range <= PRACTICAL_RANGE ? THREE.MathUtils.lerp(s.practicalGain, s.practicalNight, this._nightK) : 1;
       e.applied = e.baseIntensity * fade * gain;
       e.light.intensity = e.applied;
       e.light.visible = fade > 0.002;
@@ -1371,6 +1386,8 @@ export class RenderSystem {
     this._updateRooms();
     this._updateBounceFill();
     this._camPos.setFromMatrixPosition(camera.matrixWorld);
+    // 0 by day, 1 once the key is the moon (moon <= 0.3, low sun >= ~1.5).
+    this._nightK = 1 - THREE.MathUtils.smoothstep(this.activeSun.intensity, 0.4, 1.5);
     this._cullLights(this._camPos);
     this._updateViewRig(viewCamera);
     this._adsT = this._readAds();
@@ -1594,6 +1611,12 @@ export class RenderSystem {
       const out = this.pingRt[this._pingIndex];
       vu.tColor.value = color;
       vu.tView.value = this.viewRt.texture;
+      vu.uAds.value.set(
+        this._adsT,
+        this.settings.adsViewBlur * (this.screenSize.height / 1080),
+        this.screenSize.width / Math.max(1, this.screenSize.height),
+        0
+      );
       this.viewComposite.render(renderer, out);
       color = out.texture;
       this._pingIndex ^= 1;
@@ -1790,6 +1813,8 @@ export class RenderSystem {
   }
 
   dispose() {
+    this.ctx?.events.off?.('shot:applied', this._onCut);
+    this.ctx?.events.off?.('sky:changed', this._onCut);
     this.csm.dispose();
     this.gbuffer.dispose();
     this.gtao?.dispose();

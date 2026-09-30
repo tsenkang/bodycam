@@ -163,235 +163,221 @@ const CSS = `
 }
 
 /* ====================================================== vitals (bottom left)
-   Armour plates over a slim health bar, flush to the safe margin. No labels:
-   the shape is the label. The numeral sits at the bar's right end. */
+   Only shown in modes that carry health/armour (`.ow-hud.vitals`); team
+   deathmatch shows none, like the games this is measured against. */
 .ow-vitals {
   position:absolute; left:var(--pad); bottom:calc(var(--pad) + 2px * var(--k));
-  width: calc(236px * var(--k));
+  width: calc(250px * var(--k)); display:none;
 }
-.ow-vt-row { display:flex; align-items:center; gap: calc(8px * var(--k)); }
+.ow-hud.vitals .ow-vitals { display:block; }
+.ow-vt-row { display:flex; align-items:center; gap: calc(9px * var(--k)); }
 .ow-vt-num {
-  font-family: var(--fd); font-size: calc(17px * var(--k)); font-weight:700;
+  font-family: var(--fd); font-size: calc(22px * var(--k)); font-weight:700;
   letter-spacing:0; line-height:1; color: var(--ink);
-  min-width: calc(28px * var(--k)); text-align:right;
-  text-shadow: var(--sh);
-  transform-origin: right center;
-  will-change: color, transform;
+  min-width: calc(34px * var(--k)); text-align:right;
+  text-shadow: var(--sh); transform-origin: right center;
 }
 .ow-vt-num i { display:none; }
-.ow-vt-track {
-  position:relative; flex:1; height: calc(6px * var(--k));
-  background: rgba(10,14,17,.42);
-  box-shadow: 0 0 calc(3px * var(--k)) rgba(0,0,0,.35);
-  overflow:hidden;
-}
-.ow-vt-track > i {
-  position:absolute; left:0; top:0; bottom:0; width:100%;
-  transform-origin:left center;
-  background: rgba(244,247,248,.94);
-  will-change: transform;
-}
+.ow-vt-track { position:relative; flex:1; height: calc(7px * var(--k));
+  background: rgba(10,14,17,.45); overflow:hidden; }
+.ow-vt-track > i { position:absolute; left:0; top:0; bottom:0; width:100%;
+  transform-origin:left center; background: rgba(244,247,248,.94); }
 .ow-vitals.low .ow-vt-track > i { background: #f3c14b; }
-.ow-vitals.low .ow-vt-num { color: #f7cf6a; }
 .ow-vitals.crit .ow-vt-track > i { background: #f0402f; }
-.ow-vitals.crit .ow-vt-num { color: #ff5a48; }
-
-.ow-armour { margin-bottom: calc(4px * var(--k)); padding-right: calc(36px * var(--k)); }
+.ow-armour { margin-bottom: calc(4px * var(--k)); padding-right: calc(43px * var(--k)); }
 .ow-arm-plates { display:flex; gap: calc(3px * var(--k)); }
-.ow-plate {
-  flex:1; height: calc(4px * var(--k));
-  background: rgba(10,14,17,.42);
-  position:relative; overflow:hidden;
-  box-shadow: 0 0 calc(3px * var(--k)) rgba(0,0,0,.3);
-}
-.ow-plate i {
-  position:absolute; left:0; top:0; bottom:0; width:100%;
-  background: #8ec9ee;
-  transform-origin: left center;
-}
+.ow-plate { flex:1; height: calc(5px * var(--k)); background: rgba(10,14,17,.45); position:relative; overflow:hidden; }
+.ow-plate i { position:absolute; left:0; top:0; bottom:0; width:100%; background: #8ec9ee; transform-origin: left center; }
+
+/* Condensed display numerals. No font files ship with the game, so the
+   display face is the system grotesque compressed to 82% width — the same
+   construction the classic "narrow" cuts of those faces use. */
+.ow-cx { display:inline-block; transform: scaleX(.82); }
 
 /* ================================================================== ammo
    Bottom right. Equipment column | hairline | name over count + reserve. */
 .ow-ammo {
   position:absolute; right:var(--pad); bottom:var(--pad);
-  display:flex; align-items:flex-end; gap: calc(12px * var(--k));
+  display:flex; align-items:flex-end; gap: calc(14px * var(--k));
   line-height:1;
 }
 .ow-ammo-main { display:flex; flex-direction:column; align-items:flex-end; }
 .ow-ammo-name {
-  font-size: calc(14px * var(--k)); font-weight:600; letter-spacing:.05em;
+  font-family: var(--fd); font-size: calc(21px * var(--k)); font-weight:700; letter-spacing:.02em;
   color: var(--ink); text-shadow: var(--sh); white-space:nowrap;
-  margin-bottom: calc(2px * var(--k));
+  margin-bottom: calc(5px * var(--k));
+  transform: scaleX(.86); transform-origin: right center;
 }
-.ow-ammo-row { display:flex; align-items:flex-end; gap: calc(9px * var(--k)); }
+.ow-ammo-row { display:flex; align-items:flex-end; gap: calc(6px * var(--k)); }
 .ow-ammo-cur {
   font-family: var(--fd);
-  font-size: calc(50px * var(--k)); font-weight:700; letter-spacing:-.01em;
-  line-height:.8; color: var(--ink);
-  text-shadow: 0 calc(1px * var(--k)) calc(2px * var(--k)) rgba(0,0,0,.55), 0 0 calc(12px * var(--k)) rgba(0,0,0,.28);
+  font-size: calc(76px * var(--k)); font-weight:700; letter-spacing:-.02em;
+  line-height:.74; color: var(--ink);
+  text-shadow: 0 calc(1px * var(--k)) calc(3px * var(--k)) rgba(0,0,0,.5), 0 0 calc(14px * var(--k)) rgba(0,0,0,.25);
   transform-origin: right bottom;
-  will-change: color, transform;
+  margin-right: calc(-4px * var(--k));
 }
-.ow-ammo-side { display:flex; flex-direction:column; align-items:flex-start; gap: calc(5px * var(--k));
-  padding-bottom: calc(1px * var(--k)); }
-.ow-ammo-res { font-family: var(--fd); font-size: calc(20px * var(--k)); font-weight:700; line-height:.8;
-  color: var(--ink-2); text-shadow: var(--sh); }
-.ow-ammo-mode { display:flex; align-items:center; gap: calc(4px * var(--k));
-  font-size: calc(10px * var(--k)); font-weight:600; letter-spacing:.08em; color: var(--ink-2); text-shadow: var(--sh); }
-.ow-ammo-mode svg { width: calc(12px * var(--k)); height: calc(9px * var(--k)); fill: var(--ink); display:block;
+.ow-ammo-side { display:flex; flex-direction:column; align-items:flex-start; gap: calc(7px * var(--k)); }
+.ow-ammo-res { font-family: var(--fd); font-size: calc(29px * var(--k)); font-weight:700; line-height:.74;
+  color: rgba(226,232,236,.72); text-shadow: var(--sh); transform: scaleX(.82); transform-origin: left bottom; }
+.ow-ammo-mode { display:flex; align-items:center; gap: calc(5px * var(--k));
+  font-size: calc(12px * var(--k)); font-weight:700; letter-spacing:.06em; color: rgba(226,232,236,.72); text-shadow: var(--sh); }
+.ow-ammo-mode svg { width: calc(15px * var(--k)); height: calc(11px * var(--k)); fill: var(--ink); display:block;
   filter: drop-shadow(0 1px 1px rgba(0,0,0,.6)); }
 .ow-ammo-low .ow-ammo-cur { color: #f7cf6a; }
 .ow-ammo-empty .ow-ammo-cur { color: #ff5a48; }
-.ow-ammo-rule { width:1px; align-self:stretch; margin: calc(2px * var(--k)) 0;
-  background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,.28) 30%, rgba(255,255,255,.28) 70%, rgba(255,255,255,0)); }
-
+.ow-ammo-rule { width: calc(1.5px * var(--k)); align-self:stretch; margin: calc(4px * var(--k)) 0;
+  background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,.3) 30%, rgba(255,255,255,.3) 70%, rgba(255,255,255,0)); }
 .ow-reload {
-  margin-top: calc(6px * var(--k));
-  font-size: calc(11px * var(--k)); font-weight:700; letter-spacing:.1em; color: #f7cf6a;
-  text-shadow: var(--sh);
+  margin-top: calc(8px * var(--k));
+  font-size: calc(14px * var(--k)); font-weight:700; letter-spacing:.08em; color: #f7cf6a; text-shadow: var(--sh);
 }
-.ow-reload-bar {
-  margin-top: calc(3px * var(--k));
-  width: calc(72px * var(--k)); height: calc(2px * var(--k));
-  background: rgba(10,14,17,.45);
-}
+.ow-reload-bar { margin-top: calc(4px * var(--k)); width: calc(96px * var(--k)); height: calc(3px * var(--k)); background: rgba(10,14,17,.45); }
 .ow-reload-bar i { display:block; height:100%; width:100%; background: #f7cf6a; transform-origin:left; transform:scaleX(0); }
 
-.ow-equip { display:flex; flex-direction:column; gap: calc(7px * var(--k)); padding-bottom: calc(1px * var(--k)); }
-.ow-slot { display:flex; align-items:center; gap: calc(6px * var(--k)); }
-.ow-slot svg { width: calc(13px * var(--k)); height: calc(16px * var(--k)); display:block;
+.ow-equip { display:flex; flex-direction:column; gap: calc(9px * var(--k)); padding-bottom: calc(2px * var(--k)); }
+.ow-slot { display:flex; align-items:center; gap: calc(7px * var(--k)); }
+.ow-slot svg { width: calc(17px * var(--k)); height: calc(21px * var(--k)); display:block;
   filter: drop-shadow(0 1px 1.5px rgba(0,0,0,.6)); }
-.ow-slot span { font-family: var(--fd); font-size: calc(14px * var(--k)); font-weight:700; color: var(--ink);
-  text-shadow: var(--sh); min-width: calc(8px * var(--k)); }
+.ow-slot span { font-family: var(--fd); font-size: calc(19px * var(--k)); font-weight:700; color: var(--ink);
+  text-shadow: var(--sh); min-width: calc(10px * var(--k)); }
 .ow-slot.empty { opacity:.35; }
 
 /* ============================================================== killfeed
-   Lower left, stacked upward from just above the vitals. */
+   Lower left, stacked upward. */
 .ow-killfeed {
-  position:absolute; left:var(--pad); bottom:calc(var(--pad) + 44px * var(--k));
+  position:absolute; left:var(--pad); bottom:calc(var(--pad) + 150px * var(--k));
   display:flex; flex-direction:column; align-items:flex-start;
-  gap: calc(3px * var(--k));
+  gap: calc(4px * var(--k));
   text-transform:none;
 }
+.ow-hud.vitals .ow-killfeed { bottom:calc(var(--pad) + 200px * var(--k)); }
 .ow-kf-row {
   position:relative;
-  display:flex; align-items:center; gap: calc(7px * var(--k));
-  font-size: calc(14px * var(--k)); font-weight:600; letter-spacing:.01em;
-  padding: calc(3px * var(--k)) calc(26px * var(--k)) calc(3px * var(--k)) calc(7px * var(--k));
-  background: linear-gradient(to right, rgba(8,11,14,.46) 0%, rgba(8,11,14,.34) 60%, rgba(8,11,14,0) 100%);
+  display:flex; align-items:center; gap: calc(9px * var(--k));
+  font-size: calc(18px * var(--k)); font-weight:700; letter-spacing:0;
+  padding: calc(4px * var(--k)) calc(34px * var(--k)) calc(4px * var(--k)) calc(9px * var(--k));
+  background: linear-gradient(to right, rgba(8,11,14,.5) 0%, rgba(8,11,14,.38) 60%, rgba(8,11,14,0) 100%);
   text-shadow: 0 1px 1px rgba(0,0,0,.55);
   will-change: transform, opacity;
 }
-.ow-kf-row.mine { background: linear-gradient(to right, rgba(40,32,12,.55) 0%, rgba(30,24,9,.38) 60%, rgba(30,24,9,0) 100%); }
+.ow-kf-row.mine { background: linear-gradient(to right, rgba(46,36,10,.6) 0%, rgba(36,28,8,.42) 60%, rgba(36,28,8,0) 100%); }
+.ow-kf-a, .ow-kf-v { display:inline-block; }
 .ow-kf-a { color: #7fc4ff; }
 .ow-kf-v { color: #ff6a55; }
 .ow-kf-row.mine .ow-kf-a { color: #f5d46b; }
-.ow-kf-w { display:flex; align-items:center; gap:calc(4px * var(--k)); }
-.ow-kf-w svg { width: calc(34px * var(--k)); height: calc(13px * var(--k)); display:block;
+.ow-kf-w { display:flex; align-items:center; gap:calc(5px * var(--k)); }
+.ow-kf-w svg { width: calc(44px * var(--k)); height: calc(17px * var(--k)); display:block;
   filter: drop-shadow(0 1px 1px rgba(0,0,0,.6)); }
-.ow-kf-hs svg { width: calc(12px * var(--k)); height: calc(12px * var(--k)); display:block;
+.ow-kf-hs svg { width: calc(15px * var(--k)); height: calc(15px * var(--k)); display:block;
   filter: drop-shadow(0 1px 1px rgba(0,0,0,.6)); }
 
 /* =============================================================== compass
-   Top centre: a bare tape, ticks every 5 deg, bearings every 15, the heading
-   in a small readout under the centre notch. No box behind it. */
+   Top centre: a tape on a soft dark band, ticks every 5 deg, bearings every
+   15, the heading in a plate under the centre notch. */
 .ow-compass {
-  position:absolute; left:50%; top:calc(var(--pad) * .55);
-  width: calc(560px * var(--k)); height: calc(34px * var(--k));
+  position:absolute; left:50%; top:calc(var(--pad) * .6);
+  width: calc(560px * var(--k)); height: calc(42px * var(--k));
   transform: translateX(-50%);
   -webkit-mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent);
           mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent);
   overflow:hidden;
 }
+.ow-compass::before {
+  content:''; position:absolute; left:0; right:0; top:0; height: calc(34px * var(--k));
+  background: linear-gradient(to bottom, rgba(6,9,12,.0), rgba(6,9,12,.34) 25%, rgba(6,9,12,.34) 75%, rgba(6,9,12,0));
+}
 /* NO will-change:transform on the strip — rasterisation must be a pure
    function of heading for deterministic captures. */
 .ow-compass-strip { position:absolute; left:0; top:0; height:100%; }
 .ow-tick {
-  position:absolute; top: calc(20px * var(--k));
-  width:1px; background: rgba(255,255,255,.55);
-  height: calc(4px * var(--k));
+  position:absolute; top: calc(26px * var(--k));
+  width: calc(1.5px * var(--k)); background: rgba(255,255,255,.6);
+  height: calc(5px * var(--k));
   box-shadow: 0 0 calc(2px * var(--k)) rgba(0,0,0,.6);
 }
-.ow-tick.maj { height: calc(7px * var(--k)); top: calc(18px * var(--k)); background: rgba(255,255,255,.85); }
+.ow-tick.maj { height: calc(9px * var(--k)); top: calc(23px * var(--k)); background: rgba(255,255,255,.9); }
 .ow-tick-l {
-  position:absolute; top: calc(1px * var(--k)); transform: translateX(-50%);
-  font-size: calc(15px * var(--k)); letter-spacing:0; font-weight:700;
+  position:absolute; top: calc(1px * var(--k)); transform: translateX(-50%) scaleX(.86);
+  font-family: var(--fd); font-size: calc(21px * var(--k)); letter-spacing:0; font-weight:700;
   color: #fff; text-shadow: var(--sh);
 }
-.ow-tick-l.sub { font-size: calc(12px * var(--k)); top: calc(3px * var(--k)); color: rgba(240,244,246,.92); }
-.ow-tick-l.num { font-size: calc(10.5px * var(--k)); font-weight:600; top: calc(5px * var(--k)); color: rgba(230,236,240,.72); }
+.ow-tick-l.sub { font-size: calc(16px * var(--k)); top: calc(4px * var(--k)); color: rgba(240,244,246,.94); }
+.ow-tick-l.num { font-size: calc(14px * var(--k)); top: calc(6px * var(--k)); color: rgba(232,238,242,.78); }
 .ow-compass-base { display:none; }
 .ow-compass-caret {
-  position:absolute; left:50%; top:calc(27px * var(--k)); transform:translateX(-50%);
+  position:absolute; left:50%; top:calc(35px * var(--k)); transform:translateX(-50%);
   width:0; height:0;
-  border-left: calc(4px * var(--k)) solid transparent;
-  border-right: calc(4px * var(--k)) solid transparent;
-  border-bottom: calc(5px * var(--k)) solid #fff;
+  border-left: calc(5px * var(--k)) solid transparent;
+  border-right: calc(5px * var(--k)) solid transparent;
+  border-bottom: calc(6px * var(--k)) solid #fff;
   filter: drop-shadow(0 1px 1px rgba(0,0,0,.6));
 }
 .ow-compass-hdg {
-  position:absolute; left:50%; top:calc(var(--pad) * .55 + 35px * var(--k));
+  position:absolute; left:50%; top:calc(var(--pad) * .6 + 43px * var(--k));
   transform: translateX(-50%);
-  font-family: var(--fd); font-size: calc(12px * var(--k)); font-weight:700;
+  font-family: var(--fd); font-size: calc(17px * var(--k)); font-weight:700; line-height:1;
   color: var(--ink); text-shadow: var(--sh);
-  padding: calc(1px * var(--k)) calc(5px * var(--k));
-  background: rgba(8,11,14,.34);
-  min-width: calc(30px * var(--k)); text-align:center;
+  padding: calc(3px * var(--k)) calc(7px * var(--k));
+  background: rgba(8,11,14,.45);
+  min-width: calc(42px * var(--k)); text-align:center;
 }
 .ow-compass-obj {
-  position:absolute; top: calc(1px * var(--k)); transform:translateX(-50%);
-  font-size: calc(10px * var(--k)); font-weight:700;
-  width: calc(15px * var(--k)); height: calc(15px * var(--k));
+  position:absolute; top: calc(2px * var(--k)); transform:translateX(-50%);
+  font-size: calc(13px * var(--k)); font-weight:700;
+  width: calc(20px * var(--k)); height: calc(20px * var(--k));
   display:flex; align-items:center; justify-content:center;
-  color:#fff; background: rgba(40,130,210,.9);
-  border-radius: 50%;
+  color:#fff; background: rgba(40,130,210,.9); border-radius: 50%;
   box-shadow: 0 0 0 1px rgba(255,255,255,.7), 0 1px 2px rgba(0,0,0,.6);
   will-change: transform;
 }
 
 /* ============================================================= score
-   Under the minimap. */
+   Under the minimap: a solid plate per team, score chip + progress rule,
+   mode and round clock to the right. */
 .ow-score {
-  position:absolute; left:var(--pad); top:calc(var(--pad) + 238px * var(--k) + 8px * var(--k));
-  width: calc(238px * var(--k));
-  display:grid; grid-template-columns: 1fr auto; column-gap: calc(8px * var(--k)); row-gap: calc(3px * var(--k));
+  position:absolute; left:var(--pad); top:calc(var(--pad) + 250px * var(--k) + 8px * var(--k));
+  width: calc(250px * var(--k));
+  display:grid; grid-template-columns: 1fr auto; column-gap: calc(10px * var(--k)); row-gap: calc(4px * var(--k));
+  padding: calc(6px * var(--k)) calc(8px * var(--k));
+  background: linear-gradient(to right, rgba(8,11,14,.55), rgba(8,11,14,.38));
 }
-.ow-sc-row { grid-column:1; display:flex; align-items:center; gap: calc(6px * var(--k)); }
+.ow-sc-row { grid-column:1; display:flex; align-items:center; gap: calc(8px * var(--k)); }
 .ow-sc-row b {
-  font-family: var(--fd); font-size: calc(13px * var(--k)); font-weight:700; line-height:1;
-  min-width: calc(28px * var(--k)); text-align:center;
-  padding: calc(2px * var(--k)) calc(3px * var(--k));
+  font-family: var(--fd); font-size: calc(21px * var(--k)); font-weight:700; line-height:1;
+  min-width: calc(40px * var(--k)); text-align:center;
+  padding: calc(2px * var(--k)) calc(4px * var(--k));
   color:#fff; text-shadow: 0 1px 1px rgba(0,0,0,.4);
 }
-.ow-sc-row.us b { background: rgba(38,120,196,.82); }
-.ow-sc-row.them b { background: rgba(196,52,38,.82); }
-.ow-sc-bar { flex:1; height: calc(3px * var(--k)); background: rgba(10,14,17,.4); }
+.ow-sc-row.us b { background: rgba(38,120,196,.9); }
+.ow-sc-row.them b { background: rgba(196,52,38,.9); }
+.ow-sc-bar { flex:1; height: calc(4px * var(--k)); background: rgba(255,255,255,.1); }
 .ow-sc-bar i { display:block; height:100%; width:100%; transform-origin:left; }
 .ow-sc-row.us .ow-sc-bar i { background:#5fb2ff; }
 .ow-sc-row.them .ow-sc-bar i { background:#ff5a44; }
 .ow-sc-meta {
   grid-column:2; grid-row:1 / span 2;
-  display:flex; flex-direction:column; align-items:flex-end; justify-content:center; gap: calc(2px * var(--k));
-  font-size: calc(9.5px * var(--k)); font-weight:600; letter-spacing:.06em; color: var(--ink-2); text-shadow: var(--sh);
+  display:flex; flex-direction:column; align-items:flex-end; justify-content:center; gap: calc(3px * var(--k));
+  font-size: calc(12px * var(--k)); font-weight:700; letter-spacing:.05em; color: rgba(226,232,236,.78); text-shadow: var(--sh);
 }
-.ow-sc-meta .clock { font-family: var(--fd); font-size: calc(15px * var(--k)); font-weight:700; color: var(--ink); letter-spacing:0; }
+.ow-sc-meta .clock { font-family: var(--fd); font-size: calc(24px * var(--k)); font-weight:700; color: var(--ink); letter-spacing:0; line-height:1; }
 .ow-match { display:none; }
 
 /* =============================================================== minimap */
 .ow-minimap {
   position:absolute; left:var(--pad); top:var(--pad);
-  width: calc(238px * var(--k)); height: calc(238px * var(--k));
+  width: calc(250px * var(--k)); height: calc(250px * var(--k));
 }
 .ow-minimap canvas {
   position:absolute; inset:0; width:100%; height:100%; display:block;
   border-radius: calc(3px * var(--k));
-  opacity: .93;
-  box-shadow: 0 0 0 1px rgba(255,255,255,.14), 0 calc(1px * var(--k)) calc(6px * var(--k)) rgba(0,0,0,.35);
+  opacity: .94;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.16), 0 calc(1px * var(--k)) calc(6px * var(--k)) rgba(0,0,0,.35);
 }
 .ow-mm-corner { display:none; }
 .ow-mm-n {
-  position:absolute; left:50%; top:calc(3px * var(--k)); transform:translateX(-50%);
-  font-size: calc(10px * var(--k)); font-weight:700; color: var(--ink); text-shadow: var(--sh);
+  position:absolute; left:50%; top:50%;
+  font-family: var(--fd); font-size: calc(14px * var(--k)); font-weight:700; color: var(--ink); text-shadow: 0 0 calc(3px * var(--k)) rgba(0,0,0,.9);
 }
 .ow-mm-tag { display:none; }
 
@@ -450,38 +436,40 @@ const CSS = `
 .ow-prompt {
   position:absolute; left:50%; top:66%;
   transform: translate(-50%,-50%);
-  display:flex; align-items:center; gap: calc(8px * var(--k));
-  text-transform:none;
+  display:flex; align-items:center; gap: calc(9px * var(--k));
+  padding: calc(6px * var(--k)) calc(14px * var(--k));
+  background: linear-gradient(to right, rgba(8,11,14,0), rgba(8,11,14,.55) 18%, rgba(8,11,14,.55) 82%, rgba(8,11,14,0));
+  text-transform:none; white-space:nowrap;
   will-change: opacity, transform;
 }
 .ow-key {
-  min-width: calc(22px * var(--k)); height: calc(22px * var(--k));
-  padding: 0 calc(5px * var(--k));
+  min-width: calc(28px * var(--k)); height: calc(28px * var(--k));
+  padding: 0 calc(6px * var(--k));
   display:flex; align-items:center; justify-content:center;
-  font-size: calc(12px * var(--k)); font-weight:700; color:#101315;
-  background: rgba(240,243,245,.94); border-radius: calc(3px * var(--k));
+  font-size: calc(16px * var(--k)); font-weight:700; color:#101315;
+  background: rgba(240,243,245,.95); border-radius: calc(3px * var(--k));
   box-shadow: 0 1px 3px rgba(0,0,0,.45);
 }
-.ow-prompt-txt { font-size: calc(14px * var(--k)); font-weight:600; letter-spacing:.01em; text-shadow: var(--sh); }
+.ow-prompt-txt { font-size: calc(19px * var(--k)); font-weight:600; letter-spacing:0; text-shadow: var(--sh); }
 .ow-prompt-sub { display:none !important; }
 .ow-prompt-arc { position:absolute; left:calc(-6px * var(--k)); top:50%; }
 
 /* ================================================================ banner
    Score popup under the reticle: "+100" over the event name. */
 .ow-banner {
-  position:absolute; left:50%; top:57.5%;
+  position:absolute; left:50%; top:57%;
   transform: translate(-50%,-50%);
   display:flex; flex-direction:column-reverse; align-items:center; gap: calc(1px * var(--k));
   text-align:center;
   will-change: opacity, transform;
 }
 .ow-banner-t {
-  font-size: calc(12px * var(--k)); letter-spacing:.08em; font-weight:700;
+  font-size: calc(16px * var(--k)); letter-spacing:.06em; font-weight:700;
   color: var(--ink); text-shadow: var(--sh);
 }
 .ow-banner-s {
   font-family: var(--fd);
-  font-size: calc(21px * var(--k)); letter-spacing:0; font-weight:700;
+  font-size: calc(30px * var(--k)); letter-spacing:0; font-weight:700; line-height:1;
   color: #f6d25e; text-shadow: var(--sh);
 }
 .ow-banner-rule { display:none; }

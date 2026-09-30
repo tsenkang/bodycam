@@ -113,7 +113,8 @@ export class AmmoPanel {
 
     this.punch = Math.max(0, this.punch - dt * 7.5);
     const p = 1 - 0.05 * ease.outQuad(this.punch);
-    setStyle(this.cur, 'transform', `scale(${p.toFixed(3)})`);
+    // 0.82 horizontal: the condensed display cut (see .ow-cx in style.js)
+    setStyle(this.cur, 'transform', `scale(${(p * 0.82).toFixed(3)},${p.toFixed(3)})`);
 
     const frac = ammo / magSize;
     setClass(this.root, 'ow-ammo-low', ammo > 0 && frac <= 0.25);

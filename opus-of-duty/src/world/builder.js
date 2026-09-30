@@ -206,6 +206,12 @@ export class Assembler {
       matrices: [],
       masks: [],
       noPrepass: !!spec.noPrepass,
+      /**
+       * Prototype ids placed with the SAME matrix whenever this one is placed:
+       * the second material of a prop (a crate's steel strapping) without
+       * touching every call site that drops a crate.
+       */
+      companions: spec.companions ?? null,
     });
     return id;
   }
@@ -221,8 +227,17 @@ export class Assembler {
       console.warn(`[world] no prop prototype "${id}"`);
       return this;
     }
-    p.matrices.push(this._x(matrix).clone());
+    const m = this._x(matrix).clone();
+    p.matrices.push(m);
     p.masks.push(masks ? [masks[0], masks[1], masks[2]] : null);
+    if (p.companions) {
+      for (const cid of p.companions) {
+        const cp = this._protos.get(cid);
+        if (!cp) continue;
+        cp.matrices.push(m.clone());
+        cp.masks.push(masks ? [masks[0], masks[1], masks[2]] : null);
+      }
+    }
     return this;
   }
 

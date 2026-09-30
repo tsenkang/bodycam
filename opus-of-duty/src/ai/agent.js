@@ -950,9 +950,22 @@ export class Agent {
     else clip = this.health < 35 ? 'hurtIdle' : 'idle';
     this.clip = clip;
 
+    // Lean out past the cover edge while peeking from a high cover point: the
+    // peek offset is lateral to the cover, so its sign in the actor's own right
+    // axis says which way to lean. Staged actors carry an explicit lean.
+    let lean = 0;
+    if (this.staged) lean = this.staged.lean ?? 0;
+    else if (this.peeking && this.cover && this.peekSide && !this.crouch) {
+      const ox = this.coverPos.x - this.cover.x, oz = this.coverPos.z - this.cover.z;
+      const rx = -Math.cos(this.yaw), rz = Math.sin(this.yaw);
+      const d = ox * rx + oz * rz;
+      lean = Math.abs(d) > 0.05 ? Math.sign(d) * 0.85 : 0;
+    }
+
     const an = this.animator;
     an.setState({
       clip,
+      lean,
       speed: this.speed,
       crouch: this.crouch,
       aimTarget: this.aimTarget,

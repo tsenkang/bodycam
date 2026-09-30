@@ -240,9 +240,17 @@ ${COMMON}
 uniform sampler2D tColor;
 uniform sampler2D tView;
 uniform vec2 uTexel;
+uniform vec4 uAds;   // x ADS blend 0..1, y max blur radius (px), z aspect
 varying vec2 vUv;
 
-vec4 fetchView( vec2 uv ) { return max( texture2D( tView, uv ), vec4( 0.0 ) ); }
+// NaN-safe and firefly-safe fetch. A NaN (a normalised zero vector in some
+// material's normal chain) or a point-lit specular spike under 4x MSAA
+// resolves to a lone white sample; either reads as speckle on the gun.
+vec4 fetchView( vec2 uv ) {
+  vec4 c = texture2D( tView, uv );
+  if ( any( isnan( c ) ) || any( isinf( c ) ) ) return vec4( 0.0 );
+  return max( c, vec4( 0.0 ) );
+}
 // Alpha is part of the edge signal: the silhouette against an empty background
 // is a step in coverage, not in luminance.
 float edgeLuma( vec4 c ) { return owLum( c.rgb ) + c.a; }
@@ -264,6 +272,17 @@ void main() {
   float lmin = min( lm, min( min( lnw, lne ), min( lsw, lse ) ) );
   float lmax = max( lm, max( max( lnw, lne ), max( lsw, lse ) ) );
 
+  // --- firefly clamp --------------------------------------------------------
+  // A pixel more than 3x brighter than the brightest of its four diagonal
+  // neighbours is a sub-pixel specular spike, not detail: fold it back.
+  {
+    float nbMax = max( max( owLum( nw.rgb ), owLum( ne.rgb ) ), max( owLum( sw.rgb ), owLum( se.rgb ) ) );
+    float lc = owLum( m.rgb );
+    float cap = nbMax * 3.0 + 1e-4;
+    if ( lc > cap ) m.rgb *= cap / lc;
+    lm = owLum( m.rgb ) + m.a;
+  }
+
   vec4 v = m;
   if ( lmax - lmin >= max( 0.045, lmax * 0.11 ) ) {
     vec2 dir = vec2(
@@ -282,6 +301,29 @@ void main() {
     v = ( lb < lmin || lb > lmax ) ? a : b;
   }
 
+  // --- ADS: near-weapon defocus ------------------------------------------
+  // With the eye focused through the optic, everything of the weapon outside
+  // the sight picture is inside the near limit and goes soft; the tube, the
+  // mount and the rear of the receiver blur in proportion to how far they sit
+  // from the optical axis (screen centre). Premultiplied RGBA is gathered, so
+  // the silhouette softens against the world too.
+  if ( uAds.x > 0.01 ) {
+    vec2 dc = ( vUv - 0.5 ) * vec2( uAds.z, 1.0 );
+    float rad = uAds.x * uAds.y * smoothstep( 0.10, 0.42, length( dc ) );
+    if ( rad > 0.35 ) {
+      vec4 acc = v;
+      float wsum = 1.0;
+      for ( int i = 0; i < 12; i ++ ) {
+        float fi = float( i );
+        float r = sqrt( ( fi + 0.5 ) / 12.0 ) * rad;
+        float a = fi * 2.39996323;
+        acc += fetchView( vUv + vec2( cos( a ), sin( a ) ) * r * uTexel );
+        wsum += 1.0;
+      }
+      v = acc / wsum;
+    }
+  }
+
   float alpha = clamp( v.a, 0.0, 1.0 );
   gl_FragColor = vec4( world * ( 1.0 - alpha ) + v.rgb, 1.0 );
 }
@@ -292,6 +334,7 @@ export function createViewComposite() {
     tColor: { value: null },
     tView: { value: null },
     uTexel: { value: new THREE.Vector2() },
+    uAds: { value: new THREE.Vector4(0, 6, 16 / 9, 0) },
   });
 }
 

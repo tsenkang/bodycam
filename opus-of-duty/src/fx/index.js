@@ -230,6 +230,7 @@ export class FxSystem {
     this._viewAttached = true;
     this.ctx.viewScene.add(this.viewAdd.mesh);
     this.ctx.viewScene.add(this.viewLit.mesh);
+    this.ctx.viewScene.add(this.shells.viewMesh);
     // The viewmodel scene has its own light rig and never sees ctx.scene's
     // punctual lights, so the muzzle flash needs a mirrored pool in there or the
     // weapon is the one object in frame a flash cannot light. Two lights, added
@@ -320,7 +321,7 @@ export class FxSystem {
         ctx.scene
       );
       if (this._viewAttached) {
-        compile([this.viewAdd.mesh, this.viewLit.mesh], ctx.viewCamera, ctx.viewScene);
+        compile([this.viewAdd.mesh, this.viewLit.mesh, this.shells.viewMesh], ctx.viewCamera, ctx.viewScene);
       }
       // The refraction sprites and the warp pass live in the haze system's own
       // private scenes, which no scene-graph walk from outside can reach.
@@ -1116,6 +1117,33 @@ export class FxSystem {
     this.tracer(this._tmpA, this._tmpB, 280);
   }
 
+  _collectOccluders() {
+    const list = [];
+    this.ctx.scene.traverseVisible((o) => {
+      if (!o.isMesh || o.isSkinnedMesh) return;
+      if (o.name?.startsWith('fx') || o.material?.transparent || o.material?.depthWrite === false) return;
+      const g = o.geometry;
+      if (!g) return;
+      if (!g.boundingSphere) g.computeBoundingSphere();
+      // sky domes / ground slabs swallow everything; the probe already knows the floor
+      if ((g.boundingSphere?.radius ?? 0) * o.matrixWorld.getMaxScaleOnAxis() > 200) return;
+      list.push(o);
+    });
+    return list;
+  }
+
+  _occluded(origin, dir, maxDist, list) {
+    if (!list.length || maxDist <= 0.2) return false;
+    const rc = (this._rc ??= new THREE.Raycaster());
+    rc.set(origin, dir);
+    rc.near = 0.2;
+    rc.far = maxDist;
+    const hits = (this._rcHits ??= []);
+    hits.length = 0;
+    rc.intersectObjects(list, false, hits);
+    return hits.length > 0;
+  }
+
   /** Surface name per probe hit; sized once, reused (see `_findTarget`). */
   _probeSurf = new Array(63).fill('concrete');
   _probeCount = 0;
@@ -1156,6 +1184,12 @@ export class FxSystem {
       // cannot be read at all. Planarity support is what distinguishes "a wall"
       // from "a prop that happens to be 5 m away".
       const probes = this._probes ?? (this._probes = new Float32Array(63 * 8));
+      // Render geometry that has no collider (hung cloth, awnings, signage)
+      // can sit between the camera and the wall the physics probe finds; the
+      // `impacts` shot then walked its whole burst across a plaster wall
+      // hidden behind a hanging rug. Occlusion is checked against what is
+      // actually drawn. Dev path only (debugBurst), never per frame.
+      const occluders = this._collectOccluders();
       let np = 0;
       for (let i = 0; i < 63; i++) {
         const yaw = ((i % 9) - 4) * 0.075;
@@ -1168,6 +1202,7 @@ export class FxSystem {
         // A grazing hit on a thin prop makes a poor showcase.
         const face = -this._tmpB.dot(hit.normal);
         if (d < 1.2 || face < 0.3) continue;
+        if (this._occluded(this._camPos, this._tmpB, d - 0.12, occluders)) continue;
         const b = np * 8;
         probes[b] = hit.point.x;
         probes[b + 1] = hit.point.y;

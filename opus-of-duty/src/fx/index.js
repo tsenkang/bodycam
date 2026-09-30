@@ -893,7 +893,36 @@ export class FxSystem {
    * caught mid-expansion, and one hit two frames old with its flash and sparks
    * still hot — which is what a real combat frame looks like.
    */
-  debugBurst(kind = 'wall') {
+  /**
+   * Stage a scripted burst for the capture harness, then pre-roll it.
+   *
+   * The shot harness pumps only a handful of frames after applying a shot, so a
+   * script that walks a round every 50 ms would land two hits before the
+   * shutter. Pre-roll replays the script over back-dated time instead:
+   * particles and decals are analytic in (now - birth), so events fired at a
+   * past `now` show up at exactly the age they would have had; shells and
+   * lights are CPU-stepped alongside so they agree. Fixed 60 Hz steps, fed by
+   * the fx rng fork: deterministic.
+   */
+  debugBurst(kind = 'wall', preroll) {
+    const res = this._stageBurst(kind);
+    if (!this._script.length) return res;
+    const T = preroll ?? (kind === 'muzzle' ? 0.5 : kind === 'explosion' ? 1.2 : 2.4);
+    const base = this.ctx.time.elapsed;
+    const dt = 1 / 60;
+    const steps = Math.round(T / dt);
+    for (let i = 0; i < steps; i++) {
+      this.now = base - T + i * dt;
+      this._runScript(dt);
+      this.lights.update(dt);
+      this.viewLights?.update(dt);
+      this.shells.update(dt, this.now);
+    }
+    this.now = base;
+    return res;
+  }
+
+  _stageBurst(kind = 'wall') {
     // 'none' stops a previously staged loop. The capture harness applies shots
     // back to back in one session, so a burst staged for `impacts` would
     // otherwise still be walking rounds across a wall during every later shot.

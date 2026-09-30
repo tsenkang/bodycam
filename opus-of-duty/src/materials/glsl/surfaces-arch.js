@@ -72,7 +72,11 @@ void owSurface(vec2 uv, out vec3 alb, out float h, out float rough, out float me
 
   // ---- air pockets / bug holes from the pour ----
   vec4 pores = owWorley(p * 22.0, P * 22.0, 1.0);
-  float pore = smoothstep(0.26, 0.0, pores.x) * step(0.84, pores.w);
+  // Bug holes form where air was trapped against the form: in drifts and
+  // bands, never as an even sprinkle (an even sprinkle reads as polka dots).
+  float poreZone = smoothstep(0.50, 0.66, owFbm01(p * 1.3 + 17.0, P * 1.3, 3, 0.55));
+  float pore = smoothstep(0.20 + 0.10 * pores.z, 0.0, pores.x)
+             * step(mix(0.97, 0.72, poreZone), pores.w);
   h -= pore * 0.055;
   ao -= pore * 0.55;
   rough += pore * 0.10;

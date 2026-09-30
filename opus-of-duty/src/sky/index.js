@@ -251,6 +251,7 @@ export class SkySystem {
       // Sky highlight roll-off: knee in scene radiance, overshoot room above it.
       // Driven off the beam luminance every time the sun moves — see skRolloff.
       uSkyRolloff: { value: new THREE.Vector2(0.30, 1.5) },
+      uSkyGain: { value: 1 },
 
       uStarParams: { value: new THREE.Vector4(0, 0.5, 0, 0) },
       uCelestial: { value: new THREE.Matrix3() },
@@ -784,7 +785,12 @@ export class SkySystem {
     // dimmer than that and the night sky is empty; anything brighter and it
     // reads as a planetarium ceiling. The level tracks the sky, so it dropped by
     // pi with the photometric fix in atmosphere.js instead of being re-eyeballed.
-    s.uStarParams.value.x = 0.07 * nightRamp;
+    // Night sky gain (dome.js). Stars are inside the gained term, so their
+    // level is raised by part of the inverse: a darker dome with the same
+    // points in it is what makes a night sky read as deep rather than grey.
+    const skyGain = THREE.MathUtils.lerp(1, 0.38, nightRamp);
+    s.uSkyGain.value = skyGain;
+    s.uStarParams.value.x = (0.07 * nightRamp) / Math.sqrt(skyGain);
     s.uStarParams.value.y = 0.55;
     s.uStarParams.value.w = 0.16 * nightRamp;
 

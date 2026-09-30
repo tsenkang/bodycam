@@ -29,10 +29,12 @@ export const GRADE_PRESETS = {
   // a touch of contrast, mild highlight desaturation.
   default: {
     slope: [1.0, 0.995, 0.985],
-    offset: [-0.004, -0.002, 0.004],
+    offset: [-0.003, -0.002, 0.001],
     power: [1.0, 1.005, 1.02],
-    shadowTint: [-0.001, 0.006, 0.022],
-    highlightTint: [0.030, 0.014, -0.006],
+    // Neutral-warm (MW2019): a hint of cool in the deepest shadow, not a
+    // blue cast over every shade. 0.022 blue painted every shaded facade.
+    shadowTint: [0.0, 0.004, 0.011],
+    highlightTint: [0.024, 0.012, -0.004],
     // Display-space saturation. It has to be well over unity because AgX's
     // inset/outset pair is a *desaturating* transform by construction and the
     // shoulder takes another chunk out of anything bright: measured on the

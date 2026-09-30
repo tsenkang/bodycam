@@ -160,8 +160,8 @@ export function muzzleFlash(fx, o) {
   // 0.085 -> 0.135 m. At 0.032 m the core was a ~40 px ball at 80 deg FOV: too
   // small to read as burning gas and far too small to be the source of a light
   // that is supposed to wash the handguard.
-  s.size0 = 0.085 * sc;
-  s.size1 = 0.135 * sc;
+  s.size0 = 0.06 * sc;
+  s.size1 = 0.095 * sc;
   s.sizeCurve = 0.35;
   // 50 ms: three frames at 60 Hz. A real flash is ~2 ms, but a sprite that dies
   // inside one frame is a flash the player only ever sees half the time — and
@@ -209,13 +209,19 @@ export function muzzleFlash(fx, o) {
   // 3-4 tongues, re-rolled every shot in count AND in the roll of the whole set,
   // and deliberately unevenly spaced: an evenly spoked set of equal petals is the
   // cartoon starburst this file exists to avoid.
-  const ports = Math.min(4, Math.max(3, prof.lobes + (rng.float() < 0.45 ? 1 : 0)));
+  // Seen from the shooter's eye the bore points almost straight away from the
+  // camera, so a tongue only 23-49 deg off the bore foreshortens to nothing and
+  // the whole flash collapses into a round ball — which is exactly what the
+  // baseline capture showed. A flash hider vents its gas RADIALLY through its
+  // prongs, so the petals leave the crown 55-80 deg off the bore: from behind
+  // the weapon they spread into the lopsided 4-5 point star players know.
+  const ports = Math.min(5, Math.max(4, prof.lobes + 1 + (rng.float() < 0.4 ? 1 : 0)));
   const rollBase = rng.float() * TWO_PI;
   const weak = rng.int(0, ports - 1); // one port always gets less gas
   const big = rng.int(0, ports - 1); // and one always gets the long tongue
   for (let i = 0; i < ports; i++) {
-    const roll = rollBase + (i / ports) * TWO_PI + rng.signed() * 0.55;
-    const pitch = rng.range(0.40, 0.85); // 23-49 degrees off the bore
+    const roll = rollBase + (i / ports) * TWO_PI + rng.signed() * 0.32;
+    const pitch = rng.range(0.95, 1.4); // 55-80 degrees off the bore
     const cp = Math.cos(pitch);
     const sp = Math.sin(pitch);
     const rc = Math.cos(roll) * sp;
@@ -224,15 +230,12 @@ export function muzzleFlash(fx, o) {
     LOBE.y = d.y * cp + BORE.ty * rc + BORE.by * rs;
     LOBE.z = d.z * cp + BORE.tz * rc + BORE.bz * rs;
     const choke =
-      i === weak ? rng.range(0.4, 0.62) : i === big ? rng.range(1.1, 1.35) : rng.range(0.78, 1.0);
+      i === weak ? rng.range(0.45, 0.65) : i === big ? rng.range(1.15, 1.4) : rng.range(0.75, 1.0);
     const push = rng.range(0.6, 2.2) * choke;
     s = resetSpawn();
     s.tile = P.FLASH_LOBE;
-    s.size0 = (0.06 + 0.05 * rng.float()) * sc * choke;
-    // 0.18-0.32 m, skewed: mostly mid-length with the odd long tongue. At the old
-    // 0.10-0.23 the lobes were shorter than the barrel is wide and the whole
-    // flash read as a 40 px ball floating clear of the muzzle.
-    s.size1 = (0.18 + 0.14 * Math.pow(rng.float(), 1.5)) * sc * choke;
+    s.size0 = (0.07 + 0.04 * rng.float()) * sc * choke;
+    s.size1 = (0.17 + 0.12 * Math.pow(rng.float(), 1.5)) * sc * choke;
     // The sprite's root is at its -X edge, so slide the centre out along the
     // petal direction to sit that root exactly on the crown.
     const off = 0.34 * s.size1;
@@ -250,8 +253,8 @@ export function muzzleFlash(fx, o) {
     // Deep orange and an order of magnitude under the core: the core owns the
     // white, the gas around it stays fire-coloured. Only a strong channel
     // *ratio* survives the tone curve as amber rather than as more white.
-    s.r0 = gr; s.g0 = gg; s.b0 = gb; s.i0 = (8 + rng.float() * 6) * gain * choke;
-    s.r1 = tr; s.g1 = tg; s.b1 = tb; s.i1 = 1.6 * gain * choke;
+    s.r0 = gr; s.g0 = gg; s.b0 = gb; s.i0 = (13 + rng.float() * 7) * gain * choke;
+    s.r1 = tr; s.g1 = tg; s.b1 = tb; s.i1 = 2.4 * gain * choke;
     s.alphaCurve = 0.75;
     s.soft = 0.15;
     s.seed = rng.float();

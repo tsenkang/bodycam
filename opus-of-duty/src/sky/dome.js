@@ -53,6 +53,7 @@ uniform vec4 uDisc;               // x sun ang. radius, y moon ang. radius,
 uniform vec3 uGroundAlbedo;
 uniform float uHorizonMurk;       // city haze piled up at eye level
 uniform vec2 uSkyRolloff;         // x knee (scene radiance), y overshoot room
+uniform float uSkyGain;           // night-sky presentation gain (see SkySystem)
 
 float owSkLum( vec3 c ) { return dot( c, vec3( 0.2126, 0.7152, 0.0722 ) ); }
 
@@ -260,6 +261,14 @@ vec3 skSample( vec3 rayDir, int quality ) {
   // few degrees. Scaled by the sky's own brightness so it can never glow.
   float murk = uHorizonMurk * exp( -abs( rayDir.y ) * 26.0 );
   col = mix( col, ambHor * 1.15, clamp( murk, 0.0, 0.85 ) );
+
+  // ---- night presentation gain -------------------------------------------
+  // A moonlit sky stands to the moonlit street exactly as a daylit sky stands
+  // to a sunlit one, so rendered physically a night frame is a dim DAY frame:
+  // bright blue dome, white sunlit-looking cumulus. Film and every shooter
+  // grade night with the sky well under the street's practicals. This pulls
+  // the scattered sky and the decks down after dark (1.0 by day).
+  col *= uSkyGain;
 
   // ---- horizon roll-off ---------------------------------------------------
   col = skRolloff( col );

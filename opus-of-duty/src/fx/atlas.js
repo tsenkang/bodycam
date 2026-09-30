@@ -164,7 +164,9 @@ const PARTICLE_PAINTERS = [
     const swell = Math.pow(u + 0.02, 0.5) * Math.pow(1 - u, 0.7);
     // The tongue leans and wanders instead of running straight down +X.
     const lean = 0.26 * u * u - 0.07 * u + 0.2 * (n.fbm(u * 2.4 + 4.1, 8.3, 3) - 0.5) * u;
-    let w = 0.04 + 1.5 * swell;
+    // a pointed petal, not a fat tongue: at 1.5x the swell every lobe was
+    // nearly round and a set of them fused into one ball
+    let w = 0.035 + 0.9 * swell;
     // Shear only the +Y flank: a smooth pressure face on one side, a shredded
     // shear layer on the other, which is what high-speed film actually shows.
     const shear = n.fbm(u * 4.6 - 3.3, y * 2.2 + 1.9, 4);

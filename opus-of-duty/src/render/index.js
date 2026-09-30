@@ -389,11 +389,14 @@ export class RenderSystem {
       // neutral regardless of surroundings") to a legible cool cast.
       skyFill: 0.32,
       // Warm bounce off the street, onto soffits, undersides and low faces.
-      groundFill: 0.013,
+      // 0.013 -> 0.03. A sunlit sand street (albedo ~0.3) returns ~0.15-0.2 of
+      // the beam onto a down-facing surface; 0.013 left every soffit, awning
+      // underside and balcony slab black. Still well under physical.
+      groundFill: 0.03,
       // ...and the wrap term: the shaded side of the street lit by the sunlit
       // side of it. Both up hard, because this is the "warm kick where a shadow
       // faces a sunlit surface" that was missing entirely.
-      bounceFill: 0.008,
+      bounceFill: 0.014,
       // The PMREM sky cubemap is the single biggest indirect term in the frame
       // (materials ship envMapIntensity 1.6). Scaling its *diffuse* here is the
       // only place the total indirect budget can actually be controlled from.
@@ -1204,7 +1207,9 @@ export class RenderSystem {
     // into something that reads as skylight.
     {
       const l = 0.2126 * hue.x + 0.7152 * hue.y + 0.0722 * hue.z;
-      const k = 1.18;
+      // 1.06: the extra chroma now comes from a warmer ground band instead;
+      // at 1.18 every shaded facade in a desert street went sky-blue.
+      const k = 1.06;
       hue.set(
         Math.max(0, l + (hue.x - l) * k),
         Math.max(0, l + (hue.y - l) * k),

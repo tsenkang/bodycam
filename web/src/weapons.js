@@ -13,6 +13,31 @@ const SIGHT_Y = 0.06;
 const loader = new GLTFLoader();
 const modelCache = {};
 
+// Texturas decodificadas direto dos bytes do modelo (createImageBitmap), sem
+// fetch de "blob:" — a página publicada bloqueia esse tipo de acesso e, sem
+// isso, as armas ficavam sem textura (brancas).
+const WRAP = { 33071: THREE.ClampToEdgeWrapping, 33648: THREE.MirroredRepeatWrapping, 10497: THREE.RepeatWrapping };
+loader.register((parser) => ({
+  name: 'inline_image_decoder',
+  loadTexture(textureIndex) {
+    const json = parser.json, tdef = json.textures[textureIndex];
+    const src = json.images && json.images[tdef.source];
+    if (!src || src.bufferView === undefined) return null;
+    return parser.getDependency('bufferView', src.bufferView).then(async (buf) => {
+      const blob = new Blob([buf], { type: src.mimeType || 'image/png' });
+      const bmp = await createImageBitmap(blob, { imageOrientation: 'none', premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+      const tex = new THREE.Texture(bmp);
+      const smp = (json.samplers || [])[tdef.sampler] || {};
+      tex.wrapS = WRAP[smp.wrapS] ?? THREE.RepeatWrapping;
+      tex.wrapT = WRAP[smp.wrapT] ?? THREE.RepeatWrapping;
+      tex.flipY = false;
+      tex.anisotropy = 8;
+      tex.needsUpdate = true;
+      return tex;
+    });
+  },
+}));
+
 /**
  * Carrega um modelo salvo como glTF JSON com o buffer em base64 (formato que
  * a hospedagem serve). Remonta um .glb na memória e usa o GLTFLoader, sem

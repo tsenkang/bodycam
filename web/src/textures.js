@@ -4,6 +4,8 @@ import * as THREE from 'three';
 import { makeNoise, clamp, smoothstep } from './util.js';
 
 const SIZE = 256;
+// Materiais que aparecem de perto ganham o dobro de resolução.
+const HI_RES = new Set(['asphalt', 'brick', 'pavers', 'sidewalk', 'wood', 'tiles', 'plaster', 'concrete']);
 const cache = {};
 
 // tipo: [metros cobertos pela textura, rugosidade base, metálico, força do relevo]
@@ -98,17 +100,18 @@ function pixel(kind, x, y, a, b) {
 
 function generate(kind) {
   const fbm = makeNoise(kind.length * 977 + kind.charCodeAt(0) * 31);
-  const mk = () => { const c = document.createElement('canvas'); c.width = c.height = SIZE; return c; };
+  const N = HI_RES.has(kind) ? SIZE * 2 : SIZE, k = N / SIZE;
+  const mk = () => { const c = document.createElement('canvas'); c.width = c.height = N; return c; };
   const ca = mk(), ch = mk(), cr = mk();
-  const ia = ca.getContext('2d').createImageData(SIZE, SIZE);
-  const ih = ch.getContext('2d').createImageData(SIZE, SIZE);
-  const ir = cr.getContext('2d').createImageData(SIZE, SIZE);
-  for (let y = 0; y < SIZE; y++) {
-    for (let x = 0; x < SIZE; x++) {
-      const u = x / SIZE, v = y / SIZE;
-      const a = fbm(u, v, 3, 4), b = fbm(u + 0.37, v + 0.71, 16, 3);
-      const p = pixel(kind, x, y, a, b);
-      const i = (y * SIZE + x) * 4;
+  const ia = ca.getContext('2d').createImageData(N, N);
+  const ih = ch.getContext('2d').createImageData(N, N);
+  const ir = cr.getContext('2d').createImageData(N, N);
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      const u = x / N, v = y / N;
+      const a = fbm(u, v, 3, 4), b = fbm(u + 0.37, v + 0.71, 16, 3) * 0.75 + fbm(u + 0.11, v + 0.53, 64, 2) * 0.25;
+      const p = pixel(kind, (x / k) | 0, (y / k) | 0, a, b);
+      const i = (y * N + x) * 4;
       ia.data[i] = clamp(p[0], 0, 1) * 255; ia.data[i + 1] = clamp(p[1], 0, 1) * 255; ia.data[i + 2] = clamp(p[2], 0, 1) * 255; ia.data[i + 3] = 255;
       const h = clamp(p[3], 0, 1) * 255; ih.data[i] = ih.data[i + 1] = ih.data[i + 2] = h; ih.data[i + 3] = 255;
       const r = clamp(p[4] + (b - 0.5) * 0.1, 0.03, 1) * 255; ir.data[i] = ir.data[i + 1] = ir.data[i + 2] = r; ir.data[i + 3] = 255;

@@ -168,17 +168,17 @@ export const LIGHTING = {
   dia: {
     label: 'Dia', sunDir: [-0.45, -0.75, 0.35], sunColor: 0xfff5e6, sunIntensity: 2.6,
     sky: 0x9fb3c8, horizon: 0xb9c0c6, ground: 0x4a4640, hemi: 1.1, fog: 0xb4b9be, fogDensity: 0.006,
-    exposure: 1.0, streetLights: false, interior: 0.8, flashlight: false,
+    exposure: 1.05, streetLights: false, interior: 0.8, flashlight: false, envIntensity: 0.9,
   },
   entardecer: {
     label: 'Entardecer', sunDir: [-0.8, -0.42, -0.3], sunColor: 0xffa46a, sunIntensity: 2.2,
     sky: 0x3b4660, horizon: 0xc4845c, ground: 0x2a2420, hemi: 0.8, fog: 0x8c7468, fogDensity: 0.009,
-    exposure: 1.05, streetLights: true, interior: 1.0, flashlight: false,
+    exposure: 1.15, streetLights: true, interior: 1.0, flashlight: false, envIntensity: 0.7,
   },
   noite: {
     label: 'Noite', sunDir: [0.3, -0.7, 0.4], sunColor: 0x8ca4e0, sunIntensity: 0.25,
     sky: 0x05070d, horizon: 0x141822, ground: 0x050505, hemi: 0.18, fog: 0x0e1016, fogDensity: 0.02,
-    exposure: 1.25, streetLights: true, interior: 1.0, flashlight: true,
+    exposure: 1.4, streetLights: true, interior: 1.0, flashlight: true, envIntensity: 0.25,
   },
 };
 

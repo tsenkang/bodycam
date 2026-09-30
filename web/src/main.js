@@ -20,7 +20,7 @@ const canvas = $('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMapping = THREE.AgXToneMapping;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 // Pós-processamento "bodycam": lente em barril, aberração, vinheta, granulação.
@@ -34,13 +34,14 @@ post.mat = new THREE.ShaderMaterial({
     grain: { value: CAMERA.grain }, chroma: { value: CAMERA.chromatic }, sat: { value: CAMERA.saturation }, aspect: { value: 1 } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
   fragmentShader: `
-    uniform sampler2D tex; uniform float time, distortion, vignette, grain, chroma, sat, aspect; varying vec2 vUv;
+    uniform sampler2D tex, bloom; uniform float time, distortion, vignette, grain, chroma, sat, aspect, bloomStrength; varying vec2 vUv;
     float rnd(vec2 c){ return fract(sin(dot(c, vec2(12.9898,78.233))) * 43758.5453); }
     void main(){
       vec2 c = vUv - 0.5; float r2 = dot(c, c);
       vec2 uv = 0.5 + c * (1.0 + distortion * r2) / (1.0 + distortion * 0.5);
       vec2 ca = c * chroma * (1.0 + r2 * 8.0);
       vec3 col = vec3(texture2D(tex, uv + ca).r, texture2D(tex, uv).g, texture2D(tex, uv - ca).b);
+      col += texture2D(bloom, uv).rgb * bloomStrength;
       float l = dot(col, vec3(0.299, 0.587, 0.114)); col = mix(vec3(l), col, sat);
       col *= 1.0 - vignette * smoothstep(0.08, 0.55, r2 * 1.6);
       col += (rnd(vUv * vec2(1931.0, 1117.0) + fract(time * 7.13)) - 0.5) * grain;
@@ -50,7 +51,30 @@ post.mat = new THREE.ShaderMaterial({
     }`,
   depthTest: false, depthWrite: false,
 });
-post.scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), post.mat));
+post.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), post.mat);
+post.scene.add(post.quad);
+
+// Bloom (brilho em volta das luzes): extrai o que passa de um limiar e
+// desfoca em meia/quarta resolução. Tudo antes do tone mapping (HDR).
+const FS_VERT = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
+post.bright = new THREE.ShaderMaterial({
+  uniforms: { tex: { value: null }, threshold: { value: 1.0 } }, vertexShader: FS_VERT, depthTest: false, depthWrite: false,
+  fragmentShader: 'uniform sampler2D tex; uniform float threshold; varying vec2 vUv; void main(){ vec3 c = texture2D(tex, vUv).rgb; float l = max(max(c.r, c.g), c.b); gl_FragColor = vec4(c * max(l - threshold, 0.0) / max(l, 1e-4), 1.0); }',
+});
+post.blur = new THREE.ShaderMaterial({
+  uniforms: { tex: { value: null }, dir: { value: new THREE.Vector2() } }, vertexShader: FS_VERT, depthTest: false, depthWrite: false,
+  fragmentShader: `uniform sampler2D tex; uniform vec2 dir; varying vec2 vUv;
+    void main(){ vec3 c = texture2D(tex, vUv).rgb * 0.227;
+      c += (texture2D(tex, vUv + dir * 1.385).rgb + texture2D(tex, vUv - dir * 1.385).rgb) * 0.316;
+      c += (texture2D(tex, vUv + dir * 3.231).rgb + texture2D(tex, vUv - dir * 3.231).rgb) * 0.070;
+      gl_FragColor = vec4(c, 1.0); }`,
+});
+const halfOpts = { type: THREE.HalfFloatType, depthBuffer: false };
+post.rtA = new THREE.WebGLRenderTarget(1, 1, halfOpts);
+post.rtB = new THREE.WebGLRenderTarget(1, 1, halfOpts);
+post.mat.uniforms.bloom = { value: null };
+post.mat.uniforms.bloomStrength = { value: 0.6 };
+post.pass = (mat, target) => { post.quad.material = mat; renderer.setRenderTarget(target); renderer.render(post.scene, post.cam); };
 
 // ---------------------------------------------------------------- estado global
 const keys = { _pressed: {} };
@@ -98,7 +122,7 @@ class Game {
     this.scene.fog = new THREE.FogExp2(L.fog, L.fogDensity);
     renderer.toneMappingExposure = L.exposure;
     renderer.shadowMap.enabled = q !== 'baixa';
-    const hemi = new THREE.HemisphereLight(L.sky, L.ground, L.hemi);
+    const hemi = new THREE.HemisphereLight(L.sky, L.ground, L.hemi * 0.55);
     hemi.color.lerp(new THREE.Color(L.horizon), 0.5);
     this.scene.add(hemi);
     const sun = new THREE.DirectionalLight(L.sunColor, L.sunIntensity);
@@ -116,6 +140,21 @@ class Game {
       vertexShader: 'varying vec3 p; void main(){ p = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
       fragmentShader: 'uniform vec3 top, hor; varying vec3 p;\nvoid main(){ float h = clamp(p.y * 1.6, 0.0, 1.0); gl_FragColor = vec4(mix(hor, top, pow(h, 0.6)), 1.0);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}' });
     const sky = new THREE.Mesh(new THREE.SphereGeometry(300, 24, 12), skyMat); sky.renderOrder = -1; this.scene.add(sky);
+    // Mapa de ambiente (reflexos do céu em metais, vidros e poças). Gerado
+    // uma vez a partir do mesmo céu + sol, via PMREM.
+    const envScene = new THREE.Scene();
+    envScene.add(new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), skyMat.clone()));
+    const ground = new THREE.Mesh(new THREE.CircleGeometry(49, 32), new THREE.MeshBasicMaterial({ color: new THREE.Color(L.ground).multiplyScalar(0.6) }));
+    ground.rotation.x = -Math.PI / 2; ground.position.y = -2; envScene.add(ground);
+    const sunDisc = new THREE.Mesh(new THREE.SphereGeometry(3, 16, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(L.sunColor).multiplyScalar(L.sunIntensity * 6) }));
+    sunDisc.position.copy(d.clone().multiplyScalar(-40)); envScene.add(sunDisc);
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    this.envMap = pmrem.fromScene(envScene, 0.02).texture;
+    pmrem.dispose();
+    this.scene.environment = this.envMap;
+    this.scene.environmentIntensity = L.envIntensity;
+    this.vmScene.environment = this.envMap;
+    this.vmScene.environmentIntensity = Math.max(0.45, L.envIntensity * 1.2);
     // Luz da arma em 1ª pessoa (cena separada).
     this.vmScene.add(new THREE.HemisphereLight(L.sky, L.ground, Math.max(0.5, L.hemi)));
     const vmSun = new THREE.DirectionalLight(L.sunColor, Math.max(0.6, L.sunIntensity * 0.6)); vmSun.position.set(-1, 2, 1); this.vmScene.add(vmSun);
@@ -279,9 +318,15 @@ class Game {
     renderer.render(this.vmScene, this.vmCamera);
     renderer.autoClear = true;
     if (CAMERA.postfx) {
-      renderer.setRenderTarget(null);
-      post.mat.uniforms.tex.value = post.rt.texture; post.mat.uniforms.time.value = time;
-      renderer.render(post.scene, post.cam);
+      const bw = Math.max(1, w >> 2), bh = Math.max(1, h >> 2);
+      if (post.rtA.width !== bw || post.rtA.height !== bh) { post.rtA.setSize(bw, bh); post.rtB.setSize(bw, bh); }
+      post.bright.uniforms.tex.value = post.rt.texture; post.pass(post.bright, post.rtA);
+      for (let i = 0; i < 2; i++) {
+        post.blur.uniforms.tex.value = post.rtA.texture; post.blur.uniforms.dir.value.set((1 + i) / bw, 0); post.pass(post.blur, post.rtB);
+        post.blur.uniforms.tex.value = post.rtB.texture; post.blur.uniforms.dir.value.set(0, (1 + i) / bh); post.pass(post.blur, post.rtA);
+      }
+      post.mat.uniforms.tex.value = post.rt.texture; post.mat.uniforms.bloom.value = post.rtA.texture; post.mat.uniforms.time.value = time;
+      post.pass(post.mat, null);
     }
   }
 

@@ -27,8 +27,8 @@ export class World {
     this.m = 1;                // espelho: 1 = Oeste, -1 = Leste
     this.lighting = LIGHTING[SETTINGS.time];
     this.lampLights = 0;
-    this.maxLampLights = SETTINGS.quality === 'baixa' ? 0 : SETTINGS.quality === 'media' ? 8 : 14;
-    this.maxInteriorLights = SETTINGS.quality === 'baixa' ? 4 : 12;
+    this.maxLampLights = SETTINGS.quality === 'baixa' ? 0 : SETTINGS.quality === 'media' ? 6 : 12;
+    this.maxInteriorLights = SETTINGS.quality === 'baixa' ? 3 : SETTINGS.quality === 'media' ? 8 : 12;
     this.interiorLights = 0;
   }
 

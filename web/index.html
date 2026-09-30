@@ -101,10 +101,12 @@ button.primary { background: var(--rec); border-color: var(--rec); color: #fff; 
 .keys kbd { color: var(--ink); }
 .note { font-size: 13px; color: var(--amber); }
 #loading .bar { height: 3px; background: #ffffff1f; } #loading .bar i { display: block; height: 100%; width: 0; background: var(--rec); transition: width .2s; }
+#errbox { position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 20; margin: 0; padding: 12px 14px; background: #2a0d0b; border: 1px solid var(--rec); color: #ffd7d2; font: 13px/1.5 var(--mono); white-space: pre-wrap; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
 <canvas id="game" aria-label="Jogo em primeira pessoa"></canvas>
+<pre id="errbox" hidden></pre>
 
 <div class="hud" id="hud" hidden>
   <div id="vignette"></div>

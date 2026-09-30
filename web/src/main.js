@@ -16,8 +16,28 @@ import { initAudio, play, startAmbient, stopAmbient } from './audio.js';
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');
 
+// Mostra qualquer erro na tela (para você me dizer exatamente o que houve).
+function showError(msg) {
+  const el = $('errbox');
+  if (!el) return;
+  el.hidden = false;
+  el.textContent = 'Erro: ' + String(msg).slice(0, 400) + '\nSe o jogo não abrir, tente Qualidade: Baixa. Mande um print desta mensagem.';
+}
+addEventListener('error', (e) => showError(e.message || e.error));
+addEventListener('unhandledrejection', (e) => showError(e.reason && (e.reason.message || e.reason)));
+
 // ---------------------------------------------------------------- renderer
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+} catch (e) {
+  showError('seu navegador não conseguiu iniciar o WebGL (' + (e.message || e) + '). Ative a aceleração de hardware.');
+  throw e;
+}
+renderer.debug.onShaderError = (gl, program, vs, fs) => {
+  showError('a placa de vídeo recusou um shader (' + (gl.getProgramInfoLog(program) || 'sem detalhes').slice(0, 200) + ').');
+};
+canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); showError('a placa de vídeo perdeu o contexto WebGL (memória insuficiente?).'); });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.AgXToneMapping;
@@ -471,6 +491,9 @@ function showPause(title, sub, canResume = true) {
 }
 
 async function startGame() {
+  try { await startGameInner(); } catch (e) { console.error(e); showError(e.message || e); }
+}
+async function startGameInner() {
   initAudio();
   $('menu').hidden = true; $('pause').hidden = true; $('loading').hidden = false;
   if (game) { game.dispose(); game = null; }

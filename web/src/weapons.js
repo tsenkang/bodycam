@@ -17,6 +17,22 @@ const modelCache = {};
 // fetch de "blob:" — a página publicada bloqueia esse tipo de acesso e, sem
 // isso, as armas ficavam sem textura (brancas).
 const WRAP = { 33071: THREE.ClampToEdgeWrapping, 33648: THREE.MirroredRepeatWrapping, 10497: THREE.RepeatWrapping };
+/** Decodifica uma imagem com fallbacks (Chrome, Firefox e Safari diferem). */
+async function decodeImage(blob) {
+  if (typeof createImageBitmap === 'function') {
+    try { return await createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' }); } catch {}
+    try { return await createImageBitmap(blob); } catch {}
+  }
+  // Último recurso: <img> com URL blob: (imagens blob: são permitidas).
+  const url = URL.createObjectURL(blob);
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    return img;
+  } finally { setTimeout(() => URL.revokeObjectURL(url), 1000); }
+}
+
 loader.register((parser) => ({
   name: 'inline_image_decoder',
   loadTexture(textureIndex) {
@@ -25,8 +41,7 @@ loader.register((parser) => ({
     if (!src || src.bufferView === undefined) return null;
     return parser.getDependency('bufferView', src.bufferView).then(async (buf) => {
       const blob = new Blob([buf], { type: src.mimeType || 'image/png' });
-      const bmp = await createImageBitmap(blob, { imageOrientation: 'none', premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
-      const tex = new THREE.Texture(bmp);
+      const tex = new THREE.Texture(await decodeImage(blob));
       const smp = (json.samplers || [])[tdef.sampler] || {};
       tex.wrapS = WRAP[smp.wrapS] ?? THREE.RepeatWrapping;
       tex.wrapT = WRAP[smp.wrapT] ?? THREE.RepeatWrapping;

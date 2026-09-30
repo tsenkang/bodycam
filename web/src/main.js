@@ -4,15 +4,15 @@
 //  tiros, efeitos, HUD, menus e entrada.
 // ============================================================================
 import * as THREE from 'three';
-import { CAMERA, MATCH, SETTINGS, LIGHTING, BOT, BOT_DIFFICULTY, BOT_NAMES, DAMAGE_MULT, WEAPONS, PLAYER, WEAPON_ORDER } from './config.js';
-import { clamp, lerp, rand, pick, spreadDir, rayBox, DEG } from './util.js';
-import { World } from './world.js';
-import { NavGrid } from './nav.js';
-import { Player } from './player.js';
-import { Bot, setClock } from './bots.js';
-import { preloadModels } from './weapons.js';
-import { loadSoldiers } from './soldier.js';
-import { initAudio, play, startAmbient, stopAmbient } from './audio.js';
+import { CAMERA, MATCH, SETTINGS, LIGHTING, BOT, BOT_DIFFICULTY, BOT_NAMES, DAMAGE_MULT, WEAPONS, PLAYER, WEAPON_ORDER } from './config.js?v=7';
+import { clamp, lerp, rand, pick, spreadDir, rayBox, DEG } from './util.js?v=7';
+import { World } from './world.js?v=7';
+import { NavGrid } from './nav.js?v=7';
+import { Player } from './player.js?v=7';
+import { Bot, setClock } from './bots.js?v=7';
+import { preloadModels } from './weapons.js?v=7';
+import { loadSoldiers } from './soldier.js?v=7';
+import { initAudio, play, startAmbient, stopAmbient } from './audio.js?v=7';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');

@@ -1,7 +1,7 @@
 // Texturas procedurais (canvas) — mesmo espírito de map/map_materials.gd.
 // Cada material tem cor, relevo (bumpMap) e rugosidade variável.
 import * as THREE from 'three';
-import { makeNoise, clamp, smoothstep } from './util.js';
+import { makeNoise, clamp, smoothstep } from './util.js?v=7';
 
 const SIZE = 256;
 // Materiais que aparecem de perto ganham o dobro de resolução.

@@ -3,11 +3,11 @@
 //  armas (WeaponManager/Inventory), vida e interação. Port do projeto Godot.
 // ============================================================================
 import * as THREE from 'three';
-import { CAMERA, MOVE, PLAYER, WEAPONS, LIGHTING, SETTINGS } from './config.js';
-import { clamp, lerp, damp, moveToward, DEG, rand } from './util.js';
-import { moveCharacter } from './physics.js';
-import { Weapon } from './weapons.js';
-import { play, setListener } from './audio.js';
+import { CAMERA, MOVE, PLAYER, WEAPONS, LIGHTING, SETTINGS } from './config.js?v=7';
+import { clamp, lerp, damp, moveToward, DEG, rand } from './util.js?v=7';
+import { moveCharacter } from './physics.js?v=7';
+import { Weapon } from './weapons.js?v=7';
+import { play, setListener } from './audio.js?v=7';
 
 export class Player {
   constructor(game) {

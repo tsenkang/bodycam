@@ -7,10 +7,10 @@
 //  material (poucas chamadas de desenho).
 // ============================================================================
 import * as THREE from 'three';
-import { mergeGeometries } from '../vendor/addons/utils/BufferGeometryUtils.js';
-import { material, plain, emissive, boxGeometry } from './textures.js';
-import { rayBox, rand, pick } from './util.js';
-import { LIGHTING, SETTINGS } from './config.js';
+import { mergeGeometries } from '../vendor/addons/utils/BufferGeometryUtils.js?v=7';
+import { material, plain, emissive, boxGeometry } from './textures.js?v=7';
+import { rayBox, rand, pick } from './util.js?v=7';
+import { LIGHTING, SETTINGS } from './config.js?v=7';
 
 const WALL_T = 0.3;
 

@@ -60,8 +60,11 @@ Each has a `doc` string that says what it is judging.
 The bar is a modern Call of Duty (MW2019 → Black Ops 6) frame at the same
 framing. A harsh critic reviews your work **blind**: shown only your frame, it
 must decide whether the frame is a real CoD capture or an imitation, then list
-every tell. The network here blocks image hosts, so no real CoD frames are
-available on disk. The critic judges from detailed knowledge of those games.
+every tell. After that it compares side by side against **real CoD frames in
+`shots/refs/`** (see `shots/refs/README.md` for which reference suits which
+shot) and says which one looks better. Look at those references yourself
+before you start: they are the target. Don't copy their branding, names or
+logos.
 
 A pass means the critic can't tell, or scores the shot at 8/10 or higher, with
 no frame-ruining defects. Keep going until you get there, or until you can

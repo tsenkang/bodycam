@@ -162,6 +162,14 @@ button.primary { background: var(--rec); border-color: var(--rec); color: #fff; 
   </div>
 </div>
 
+<div class="screen" id="ready" hidden>
+  <div class="card">
+    <h1>PRONTO<span>·</span></h1>
+    <p>O mapa e as armas estão carregados. Clique para começar: o mouse fica preso na tela para mirar (Esc solta).</p>
+    <button class="primary" id="begin">CLIQUE PARA COMEÇAR</button>
+  </div>
+</div>
+
 <div class="screen" id="loading" hidden>
   <div class="card">
     <h1>CARREGANDO<span>·</span></h1>
@@ -171,4 +179,14 @@ button.primary { background: var(--rec); border-color: var(--rec); color: #fff; 
 </div>
 
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
-<script type="module" src="./src/main.js"></script>
+<script type="module" src="./src/main.js" onerror="window.__bodycamLoadFailed = true"></script>
+<script>
+  // Aviso caso o script do jogo não carregue (navegador antigo ou bloqueio).
+  setTimeout(function () {
+    if (window.__bodycam) return;
+    var b = document.getElementById('errbox');
+    b.hidden = false;
+    b.textContent = 'Erro: o script do jogo não carregou' + (window.__bodycamLoadFailed ? ' (arquivo bloqueado)' : '') +
+      '. Use um navegador atualizado (Chrome, Edge ou Firefox recentes) e recarregue a página.';
+  }, 6000);
+</script>

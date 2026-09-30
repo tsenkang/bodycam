@@ -512,10 +512,20 @@ async function startGameInner() {
   onResize();
   // compila shaders antes do primeiro quadro
   try { renderer.compile(game.scene, game.camera); } catch {}
-  $('loading').hidden = true; $('hud').hidden = false;
-  startAmbient();
-  lockPointer();
+  $('loading').hidden = true;
+  game.waiting = true;           // espera o clique para começar
+  $('ready').hidden = false;
+  $('begin').focus();
 }
+
+// Começa a partida dentro do clique (os navegadores só travam o mouse
+// durante um gesto do usuário). Se não der para travar, joga mesmo assim.
+$('begin').onclick = () => {
+  $('ready').hidden = true; $('hud').hidden = false;
+  if (game) game.waiting = false;
+  initAudio(); startAmbient();
+  lockPointer();
+};
 
 $('play').onclick = startGame;
 $('restart').onclick = startGame;
@@ -523,8 +533,11 @@ $('tomenu').onclick = () => { if (game) { game.dispose(); game = null; } $('paus
 $('resume').onclick = () => { $('pause').hidden = true; lockPointer(); };
 
 document.addEventListener('pointerlockchange', () => {
-  if (document.pointerLockElement) lockSettle = 2;
-  if (!document.pointerLockElement && game && game.running && $('loading').hidden) showPause('PAUSADO', 'Clique em continuar para voltar ao jogo.');
+  if (document.pointerLockElement) { lockSettle = 2; return; }
+  if (game && game.running && !game.waiting && $('loading').hidden) showPause('PAUSADO', 'Clique em continuar para voltar ao jogo.');
+});
+document.addEventListener('pointerlockerror', () => {
+  if (game && !game.waiting) $('msg').textContent = 'Clique na tela para prender o mouse';
 });
 
 // ---------------------------------------------------------------- entrada
@@ -544,7 +557,7 @@ addEventListener('keyup', (e) => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) if (k !== '_pressed') keys[k] = false; mouse.left = mouse.right = false; });
 canvas.addEventListener('mousedown', (e) => {
   if (!game) return;
-  if (!document.pointerLockElement) { lockPointer(); return; }
+  if (!document.pointerLockElement) lockPointer();
   if (e.button === 0) { mouse.left = true; mouse._pressedLeft = true; }
   if (e.button === 2) mouse.right = true;
 });
@@ -553,7 +566,12 @@ canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 // Ignora o "salto" que alguns navegadores enviam logo após travar o mouse.
 let lockSettle = 0;
 addEventListener('mousemove', (e) => {
-  if (!game || document.pointerLockElement !== canvas) return;
+  if (!game || game.waiting) return;
+  if (document.pointerLockElement !== canvas) {
+    // Sem mouse travado: mira arrastando com o botão pressionado.
+    if (e.buttons && e.target === canvas) game.player.look(e.movementX, e.movementY);
+    return;
+  }
   if (lockSettle > 0) { lockSettle--; return; }
   if (Math.abs(e.movementX) > 400 || Math.abs(e.movementY) > 400) return;
   game.player.look(e.movementX, e.movementY);
@@ -573,7 +591,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   if (!game) return;
-  const paused = !$('pause').hidden && game.running;
+  const paused = (!$('pause').hidden && game.running) || game.waiting;
   if (!paused) game.update(dt);
   game.render(now / 1000);
 }

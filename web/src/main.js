@@ -4,36 +4,57 @@
 //  tiros, efeitos, HUD, menus e entrada.
 // ============================================================================
 import * as THREE from 'three';
-import { CAMERA, MATCH, SETTINGS, LIGHTING, BOT, BOT_DIFFICULTY, BOT_NAMES, DAMAGE_MULT, WEAPONS, PLAYER, WEAPON_ORDER } from './config.js?v=7';
-import { clamp, lerp, rand, pick, spreadDir, rayBox, DEG } from './util.js?v=7';
-import { World } from './world.js?v=7';
-import { NavGrid } from './nav.js?v=7';
-import { Player } from './player.js?v=7';
-import { Bot, setClock } from './bots.js?v=7';
-import { preloadModels } from './weapons.js?v=7';
-import { loadSoldiers } from './soldier.js?v=7';
-import { initAudio, play, startAmbient, stopAmbient } from './audio.js?v=7';
+import { CAMERA, MATCH, SETTINGS, LIGHTING, BOT, BOT_DIFFICULTY, BOT_NAMES, DAMAGE_MULT, WEAPONS, PLAYER, WEAPON_ORDER } from './config.js?v=8';
+import { clamp, lerp, rand, pick, spreadDir, rayBox, DEG } from './util.js?v=8';
+import { World } from './world.js?v=8';
+import { NavGrid } from './nav.js?v=8';
+import { Player } from './player.js?v=8';
+import { Bot, setClock } from './bots.js?v=8';
+import { preloadModels } from './weapons.js?v=8';
+import { loadSoldiers } from './soldier.js?v=8';
+import { initAudio, play, startAmbient, stopAmbient } from './audio.js?v=8';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');
 
 // Mostra qualquer erro na tela (para você me dizer exatamente o que houve).
-function showError(msg) {
+let fatalShown = false;
+function showError(msg, fatal = false) {
   const el = $('errbox');
-  if (!el) return;
+  if (!el || fatalShown) return;
+  fatalShown = fatal;
   el.hidden = false;
-  el.textContent = 'Erro: ' + String(msg).slice(0, 400) + '\nSe o jogo não abrir, tente Qualidade: Baixa. Mande um print desta mensagem.';
+  el.textContent = 'Erro: ' + String(msg).slice(0, 1200) + (fatal ? '' : '\nSe o jogo não abrir, tente Qualidade: Baixa. Mande um print desta mensagem.');
 }
 addEventListener('error', (e) => showError(e.message || e.error));
 addEventListener('unhandledrejection', (e) => showError(e.reason && (e.reason.message || e.reason)));
 
 // ---------------------------------------------------------------- renderer
-let renderer;
-try {
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-} catch (e) {
-  showError('seu navegador não conseguiu iniciar o WebGL (' + (e.message || e) + '). Ative a aceleração de hardware.');
-  throw e;
+let renderer, liteGPU = false;
+// Tenta criar o WebGL com opções cada vez mais leves (alguns navegadores e
+// placas recusam antialias ou o modo de alto desempenho).
+const GL_ATTEMPTS = [
+  { antialias: true, powerPreference: 'high-performance' },
+  { antialias: false, powerPreference: 'high-performance' },
+  { antialias: false, powerPreference: 'default', stencil: false },
+  { antialias: false, powerPreference: 'low-power', stencil: false, precision: 'mediump' },
+];
+let glError = null;
+for (let i = 0; i < GL_ATTEMPTS.length && !renderer; i++) {
+  try { renderer = new THREE.WebGLRenderer({ canvas, failIfMajorPerformanceCaveat: false, ...GL_ATTEMPTS[i] }); liteGPU = i > 0; }
+  catch (e) { glError = e; console.warn('WebGL tentativa', i + 1, 'falhou:', e && e.message); }
+}
+if (!renderer) {
+  const probe = document.createElement('canvas');
+  const has2 = !!probe.getContext('webgl2'), has1 = !!document.createElement('canvas').getContext('webgl');
+  const why = has2 ? 'o WebGL2 existe, mas foi recusado agora (feche outras abas com jogos/3D e recarregue)'
+    : has1 ? 'seu navegador só tem WebGL 1; o jogo precisa de WebGL 2 (atualize o navegador ou use Chrome/Edge)'
+    : 'o WebGL está desligado ou bloqueado neste navegador';
+  showError('não foi possível iniciar a placa de vídeo (WebGL): ' + why + '.\n' +
+    'Como resolver: 1) Chrome/Edge: Configurações → Sistema → ative "Usar aceleração de hardware" e reinicie o navegador. ' +
+    '2) Confira em chrome://gpu se "WebGL2" está "Hardware accelerated". 3) Atualize o driver de vídeo. 4) Feche outras abas pesadas.' +
+    '\n(detalhe: ' + ((glError && glError.message) || glError) + ')', true);
+  throw glError || new Error('WebGL indisponível');
 }
 renderer.debug.onShaderError = (gl, program, vs, fs) => {
   showError('a placa de vídeo recusou um shader (' + (gl.getProgramInfoLog(program) || 'sem detalhes').slice(0, 200) + ').');
@@ -46,7 +67,7 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 // Pós-processamento "bodycam": lente em barril, aberração, vinheta, granulação.
 const post = {
-  rt: new THREE.WebGLRenderTarget(1, 1, { samples: 4, type: THREE.HalfFloatType }),
+  rt: new THREE.WebGLRenderTarget(1, 1, { samples: liteGPU ? 0 : 4, type: THREE.HalfFloatType }),
   scene: new THREE.Scene(),
   cam: new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1),
 };

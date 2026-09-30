@@ -4,11 +4,11 @@
 //  cartucho), dispersão, recuo, mira, sacar/guardar e animação procedural.
 // ============================================================================
 import * as THREE from 'three';
-import { clone as cloneSkinned } from '../vendor/addons/utils/SkeletonUtils.js?v=7';
-import { GLTFLoader } from '../vendor/addons/loaders/GLTFLoader.js?v=7';
-import { WEAPONS, CAMERA, MOVE } from './config.js?v=7';
-import { clamp, lerp, damp, moveToward, rand, DEG, smoothstep } from './util.js?v=7';
-import { play } from './audio.js?v=7';
+import { clone as cloneSkinned } from '../vendor/addons/utils/SkeletonUtils.js?v=8';
+import { GLTFLoader } from '../vendor/addons/loaders/GLTFLoader.js?v=8';
+import { WEAPONS, CAMERA, MOVE } from './config.js?v=8';
+import { clamp, lerp, damp, moveToward, rand, DEG, smoothstep } from './util.js?v=8';
+import { play } from './audio.js?v=8';
 
 const SIGHT_Y = 0.06;
 const loader = new GLTFLoader();

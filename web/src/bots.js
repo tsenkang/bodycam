@@ -7,12 +7,12 @@
 //  A dificuldade muda reação, precisão, detecção, cobertura e flanco — nunca o dano.
 // ============================================================================
 import * as THREE from 'three';
-import { BOT, BOT_DIFFICULTY, WEAPONS, PLAYER } from './config.js?v=7';
-import { clamp, lerp, rand, randInt, pick, DEG, angleDiff, rotateToward, moveToward } from './util.js?v=7';
-import { moveCharacter } from './physics.js?v=7';
-import { play } from './audio.js?v=7';
-import { createSoldier, CROUCH_DROP } from './soldier.js?v=7';
-import { buildWorldGun } from './weapons.js?v=7';
+import { BOT, BOT_DIFFICULTY, WEAPONS, PLAYER } from './config.js?v=8';
+import { clamp, lerp, rand, randInt, pick, DEG, angleDiff, rotateToward, moveToward } from './util.js?v=8';
+import { moveCharacter } from './physics.js?v=8';
+import { play } from './audio.js?v=8';
+import { createSoldier, CROUCH_DROP } from './soldier.js?v=8';
+import { buildWorldGun } from './weapons.js?v=8';
 
 const TEAM_COLORS = [0x3366bf, 0xb8332b];
 // Relógio do jogo (para durante a pausa). Atualizado pelo Game a cada passo.

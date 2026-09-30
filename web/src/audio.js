@@ -1,5 +1,5 @@
 // Áudio 100% gerado por código (WebAudio). Sem arquivos externos.
-import { rand } from './util.js?v=7';
+import { rand } from './util.js?v=8';
 
 let ctx = null, master = null, sfx = null, ambientGain = null;
 const buffers = {};

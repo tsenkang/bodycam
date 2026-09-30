@@ -187,8 +187,8 @@ button.primary { background: var(--rec); border-color: var(--rec); color: #fff; 
     else if (e && e.message) window.__bodycamErrors.push(e.message + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : ''));
   }, true);
 </script>
-<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js?v=7" } }</script>
-<script type="module" src="./src/main.js?v=7" onerror="window.__bodycamLoadFailed = true"></script>
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js?v=8" } }</script>
+<script type="module" src="./src/main.js?v=8" onerror="window.__bodycamLoadFailed = true"></script>
 <script>
   // Aviso caso o script do jogo não carregue. Espera até 25 s (internet lenta)
   // e mostra a causa real quando houver.
@@ -197,6 +197,7 @@ button.primary { background: var(--rec); border-color: var(--rec); color: #fff; 
     var errs = window.__bodycamErrors;
     if (!errs.length && !window.__bodycamLoadFailed && t < 25) return setTimeout(function () { check(t + 1); }, 1000);
     var b = document.getElementById('errbox');
+    if (!b.hidden) return;   // o jogo já mostrou um erro mais detalhado
     b.hidden = false;
     b.textContent = 'Erro: o script do jogo não carregou.\n' + (errs.length ? 'Causa: ' + errs.slice(0, 3).join(' | ') + '\n' : '') +
       'Tente recarregar a página com Ctrl+Shift+R (limpa o cache). Use Chrome, Edge ou Firefox atualizados.';

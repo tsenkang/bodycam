@@ -7,8 +7,8 @@
 //  inimigos = camuflagem deserto + braçadeira vermelha.
 // ============================================================================
 import * as THREE from 'three';
-import { clone as cloneSkinned } from '../vendor/addons/utils/SkeletonUtils.js?v=7';
-import { loadModelFile } from './weapons.js?v=7';
+import { clone as cloneSkinned } from '../vendor/addons/utils/SkeletonUtils.js?v=8';
+import { loadModelFile } from './weapons.js?v=8';
 
 const HEIGHT = 1.8;               // altura final do soldado (m)
 export const CROUCH_DROP = 0.33;  // quanto o quadril desce agachado (m)

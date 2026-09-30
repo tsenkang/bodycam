@@ -1,7 +1,7 @@
 import { el, setText, setStyle, clamp, Pool, mmss } from './util.js';
 
-const SPAN_DEG = 120; // degrees visible across the strip
-const STRIP_W = 470; // css px at k=1, must match .ow-compass width
+const SPAN_DEG = 150; // degrees visible across the strip
+const STRIP_W = 560; // css px at k=1, must match .ow-compass width
 const PPD = STRIP_W / SPAN_DEG;
 const CARD = { 0: 'N', 45: 'NE', 90: 'E', 135: 'SE', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' };
 
@@ -19,6 +19,8 @@ export class Compass {
     this.strip = el('div', 'ow-compass-strip', this.root);
     el('div', 'ow-compass-base', this.root);
     el('div', 'ow-compass-caret', this.root);
+    this.hdgWrap = el('div', 'ow-compass-hdg', parent);
+    this.hdg = el('span', null, this.hdgWrap, '0');
 
     for (let a = 0; a < 720; a += 5) {
       const t = el('div', 'ow-tick' + (a % 15 === 0 ? ' maj' : ''), this.strip);
@@ -26,6 +28,9 @@ export class Compass {
       const c = CARD[a % 360];
       if (c) {
         const l = el('div', 'ow-tick-l' + (c.length > 1 ? ' sub' : ''), this.strip, c);
+        l.style.left = `calc(${(a * PPD).toFixed(2)}px * var(--k))`;
+      } else if (a % 15 === 0) {
+        const l = el('div', 'ow-tick-l num', this.strip, String(a % 360));
         l.style.left = `calc(${(a * PPD).toFixed(2)}px * var(--k))`;
       }
     }
@@ -52,6 +57,7 @@ export class Compass {
     this._heading = h;
     const x = STRIP_W * 0.5 * k - (h + 360) * PPD * k;
     setStyle(this.strip, 'transform', `translateX(${x.toFixed(2)}px)`);
+    setText(this.hdg, Math.round(h) % 360);
 
     const half = STRIP_W * 0.5 * k;
     const items = this.objPool.items;
@@ -89,25 +95,42 @@ export class Compass {
 
   dispose() {
     this.root.remove();
+    this.hdgWrap.remove();
   }
 }
 
-/** Slim scoreline under the compass — sells "match in progress" in one line. */
+/**
+ * Team score widget, tucked under the minimap: one row per team, the score in
+ * a tinted chip and a progress rule toward the limit, with the mode and the
+ * round clock on a line of their own.
+ */
 export class MatchBar {
   constructor(parent) {
-    this.root = el('div', 'ow-match', parent);
-    this.us = el('b', 'us', this.root, '43');
-    el('div', 'sep', this.root);
-    this.mode = el('div', null, this.root, 'TDM');
-    this.clock = el('div', 'clock', this.root, '4:12');
-    el('div', 'sep', this.root);
-    this.them = el('b', 'them', this.root, '38');
+    this.root = el('div', 'ow-score', parent);
+    const mk = (cls) => {
+      const r = el('div', 'ow-sc-row ' + cls, this.root);
+      const n = el('b', null, r, '0');
+      const bar = el('div', 'ow-sc-bar', r);
+      const fill = el('i', null, bar);
+      return { n, fill };
+    };
+    this.us = mk('us');
+    this.them = mk('them');
+    const meta = el('div', 'ow-sc-meta', this.root);
+    this.mode = el('span', null, meta, 'TDM');
+    this.clock = el('span', 'clock', meta, '4:12');
+    this.limit = 75;
   }
 
   update(s) {
-    setText(this.us, s.scoreUs ?? 0);
-    setText(this.them, s.scoreThem ?? 0);
-    setText(this.mode, s.mode ?? 'TDM');
+    const lim = s.scoreLimit ?? this.limit;
+    const a = s.scoreUs ?? 0;
+    const b = s.scoreThem ?? 0;
+    setText(this.us.n, a);
+    setText(this.them.n, b);
+    setStyle(this.us.fill, 'transform', `scaleX(${clamp(a / lim, 0, 1).toFixed(3)})`);
+    setStyle(this.them.fill, 'transform', `scaleX(${clamp(b / lim, 0, 1).toFixed(3)})`);
+    setText(this.mode, s.modeName ?? (s.mode === 'TDM' ? 'TEAM DEATHMATCH' : s.mode ?? ''));
     setText(this.clock, mmss(s.timeLeft ?? 0));
   }
 

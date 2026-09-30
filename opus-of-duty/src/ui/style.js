@@ -24,7 +24,7 @@ const CSS = `
 .ow-hud {
   --k: 1;
   --u: calc(4px * var(--k));
-  --pad: calc(var(--u) * 6.5);
+  --pad: calc(var(--u) * 7.5);
 
   --ink:   rgba(238,244,247,.95);
   --ink-2: rgba(214,227,234,.60);
@@ -40,7 +40,7 @@ const CSS = `
   --enemy: #ff7a63;
   --ok:    #a8e86a;
 
-  --sh: 0 1px 2px rgba(0,0,0,.92), 0 0 calc(10px * var(--k)) rgba(0,0,0,.45);
+  --sh: 0 calc(1px * var(--k)) calc(2px * var(--k)) rgba(0,0,0,.55), 0 0 calc(7px * var(--k)) rgba(0,0,0,.28);
   --sh-hard: 0 1px 1px rgba(0,0,0,.95);
 
   /* Symmetric synthesized outlines. An offset drop-shadow is a web-overlay
@@ -76,7 +76,7 @@ const CSS = `
   font-family: var(--ff);
   font-weight: 600;
   color: var(--ink);
-  letter-spacing: .06em;
+  letter-spacing: .03em;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1, "lnum" 1;
   -webkit-font-smoothing: antialiased;
@@ -163,330 +163,237 @@ const CSS = `
 }
 
 /* ====================================================== vitals (bottom left)
-   The most important number on the screen, so it gets the mirror position to
-   the ammo block: bottom-left of the safe area, labelled, with a numeric
-   readout and a genuinely dark track so the empty part of the bar is legible
-   over sunlit gravel. Armour is a visually distinct second row — thinner,
-   cyan, plate-segmented — so it can never be mistaken for health. */
+   Armour plates over a slim health bar, flush to the safe margin. No labels:
+   the shape is the label. The numeral sits at the bar's right end. */
 .ow-vitals {
-  position:absolute; left:var(--pad); bottom:var(--pad);
-  width: calc(196px * var(--k));
+  position:absolute; left:var(--pad); bottom:calc(var(--pad) + 2px * var(--k));
+  width: calc(236px * var(--k));
 }
-.ow-vt-head {
-  display:flex; align-items:baseline; justify-content:space-between;
-  margin-bottom: calc(var(--u) * 1.1);
-}
-.ow-vt-lbl {
-  font-size: calc(9.5px * var(--k)); letter-spacing:.24em; color: var(--ink-2);
-  text-shadow: var(--sh-o1);
-}
+.ow-vt-row { display:flex; align-items:center; gap: calc(8px * var(--k)); }
 .ow-vt-num {
-  font-family: var(--fd); font-size: calc(26px * var(--k)); font-weight:700;
-  letter-spacing:.02em; line-height:.85; color: var(--ink);
-  text-shadow: var(--o2), 0 0 calc(12px * var(--k)) rgba(0,0,0,.5);
+  font-family: var(--fd); font-size: calc(17px * var(--k)); font-weight:700;
+  letter-spacing:0; line-height:1; color: var(--ink);
+  min-width: calc(28px * var(--k)); text-align:right;
+  text-shadow: var(--sh);
+  transform-origin: right center;
   will-change: color, transform;
 }
-.ow-vt-num i {
-  font-style:normal; font-family: var(--ff); font-size: calc(11px * var(--k));
-  color: var(--ink-3); letter-spacing:.1em; margin-left: calc(2px * var(--k));
-}
-/* health track: dark well + hairline, five 20 HP segments */
+.ow-vt-num i { display:none; }
 .ow-vt-track {
-  position:relative; height: calc(9px * var(--k));
-  background: rgba(5,9,12,.72);
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,.55), 0 0 0 1px rgba(216,232,240,.16),
-              0 calc(1px * var(--k)) calc(4px * var(--k)) rgba(0,0,0,.5);
+  position:relative; flex:1; height: calc(6px * var(--k));
+  background: rgba(10,14,17,.42);
+  box-shadow: 0 0 calc(3px * var(--k)) rgba(0,0,0,.35);
   overflow:hidden;
 }
 .ow-vt-track > i {
   position:absolute; left:0; top:0; bottom:0; width:100%;
   transform-origin:left center;
-  background: linear-gradient(to bottom, #fbfdfc 0%, #e1e7e4 46%, #b3bcb9 100%);
+  background: rgba(244,247,248,.94);
   will-change: transform;
 }
-.ow-vt-track > u {
-  position:absolute; left:0; right:0; top:0; bottom:0;
-  background-image: repeating-linear-gradient(to right,
-    rgba(0,0,0,0) 0, rgba(0,0,0,0) calc(20% - 1px),
-    rgba(4,8,11,.85) calc(20% - 1px), rgba(4,8,11,.85) 20%);
-}
-.ow-vitals.low .ow-vt-track > i { background: linear-gradient(to bottom, #ffd98a, #f2a01c); }
-.ow-vitals.low .ow-vt-num { color: var(--amber); }
-.ow-vitals.crit .ow-vt-track > i { background: linear-gradient(to bottom, #ff8b7a, #e02414); }
-.ow-vitals.crit .ow-vt-num { color: var(--red); }
+.ow-vitals.low .ow-vt-track > i { background: #f3c14b; }
+.ow-vitals.low .ow-vt-num { color: #f7cf6a; }
+.ow-vitals.crit .ow-vt-track > i { background: #f0402f; }
+.ow-vitals.crit .ow-vt-num { color: #ff5a48; }
 
-/* armour: thinner, cyan, plate-segmented, its own label */
-.ow-armour {
-  display:flex; align-items:center; gap: calc(var(--u) * 1.4);
-  margin-top: calc(var(--u) * 1.5);
-}
-.ow-armour .ow-vt-lbl { color: rgba(150,206,238,.7); }
-.ow-arm-plates { display:flex; gap: calc(var(--u) * .8); flex:1; }
+.ow-armour { margin-bottom: calc(4px * var(--k)); padding-right: calc(36px * var(--k)); }
+.ow-arm-plates { display:flex; gap: calc(3px * var(--k)); }
 .ow-plate {
-  flex:1; height: calc(5px * var(--k));
-  background: rgba(5,9,12,.7);
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,.5), 0 0 0 1px rgba(121,190,230,.18);
+  flex:1; height: calc(4px * var(--k));
+  background: rgba(10,14,17,.42);
   position:relative; overflow:hidden;
+  box-shadow: 0 0 calc(3px * var(--k)) rgba(0,0,0,.3);
 }
 .ow-plate i {
   position:absolute; left:0; top:0; bottom:0; width:100%;
-  background: linear-gradient(to bottom, #bde9ff, #3ba6e2);
+  background: #8ec9ee;
   transform-origin: left center;
 }
 
 /* ================================================================== ammo
-   The whole block is ONE column of fixed width (--ammo-w) pinned to the right
-   margin, so every row shares the same left edge and no row can ever grow
-   sideways into another. Rows are explicit grids with an 8px gutter; the
-   equipment counts get their own row above the weapon name rather than sharing
-   the head row, which is what used to collide. */
+   Bottom right. Equipment column | hairline | name over count + reserve. */
 .ow-ammo {
   position:absolute; right:var(--pad); bottom:var(--pad);
-  --ammo-w: calc(168px * var(--k));
-  --gut: calc(8px * var(--k));
-  width: var(--ammo-w);
-  text-align:right; line-height:1;
+  display:flex; align-items:flex-end; gap: calc(12px * var(--k));
+  line-height:1;
 }
-.ow-ammo-head {
-  display:grid; grid-auto-flow:column; grid-auto-columns:max-content;
-  justify-content:end; align-items:center;
-  column-gap: var(--gut); margin-bottom:calc(var(--u) * 1.1);
-}
+.ow-ammo-main { display:flex; flex-direction:column; align-items:flex-end; }
 .ow-ammo-name {
-  font-size: calc(12.5px * var(--k)); letter-spacing:.22em;
-  color: var(--ink); text-shadow: var(--sh-o1);
-  white-space:nowrap; overflow:hidden; text-overflow:clip;
-  max-width: calc(var(--ammo-w) - 52px * var(--k));
+  font-size: calc(14px * var(--k)); font-weight:600; letter-spacing:.05em;
+  color: var(--ink); text-shadow: var(--sh); white-space:nowrap;
+  margin-bottom: calc(2px * var(--k));
 }
-.ow-ammo-mode {
-  font-size: calc(9.5px * var(--k)); letter-spacing:.2em; color: var(--ink-2);
-  border:1px solid var(--hair); padding: calc(1.5px * var(--k)) calc(4px * var(--k));
-  background: rgba(6,10,13,.34);
-  text-shadow: var(--sh-hard); white-space:nowrap;
-}
-.ow-ammo-row {
-  display:grid; grid-auto-flow:column; grid-auto-columns:max-content;
-  justify-content:end; align-items:baseline;
-  column-gap: calc(var(--gut) * .55);
-}
+.ow-ammo-row { display:flex; align-items:flex-end; gap: calc(9px * var(--k)); }
 .ow-ammo-cur {
   font-family: var(--fd);
-  font-size: calc(56px * var(--k)); font-weight:700; letter-spacing:.02em;
-  color: var(--ink); text-shadow: var(--o2), 0 0 calc(16px * var(--k)) rgba(0,0,0,.55);
+  font-size: calc(50px * var(--k)); font-weight:700; letter-spacing:-.01em;
+  line-height:.8; color: var(--ink);
+  text-shadow: 0 calc(1px * var(--k)) calc(2px * var(--k)) rgba(0,0,0,.55), 0 0 calc(12px * var(--k)) rgba(0,0,0,.28);
+  transform-origin: right bottom;
   will-change: color, transform;
 }
-.ow-ammo-sep { font-size: calc(20px * var(--k)); color: var(--ink-3); font-weight:400;
-  text-shadow: var(--sh-o1); }
-.ow-ammo-res { font-family: var(--fd); font-size: calc(24px * var(--k)); color: var(--ink-2);
-  text-shadow: var(--sh-o1); }
-.ow-ammo-low .ow-ammo-cur { color: var(--amber); }
-.ow-ammo-empty .ow-ammo-cur { color: var(--red); }
-
-.ow-mag {
-  display:flex; justify-content:flex-end; gap: calc(1.6px * var(--k));
-  margin-top: calc(var(--u) * 1.1);
-}
-.ow-mag b {
-  display:block; width: calc(2.6px * var(--k)); height: calc(10px * var(--k));
-  background: var(--ink); box-shadow: 0 0 0 1px rgba(4,8,11,.75);
-}
-/* spent rounds read as an empty *socket*, not a pale ghost: a dark well is the
-   only thing that survives gravel at this size */
-.ow-mag b.off { background: rgba(6,10,13,.62); box-shadow: 0 0 0 1px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,255,255,.07); }
-.ow-mag b.warn { background: var(--amber); }
+.ow-ammo-side { display:flex; flex-direction:column; align-items:flex-start; gap: calc(5px * var(--k));
+  padding-bottom: calc(1px * var(--k)); }
+.ow-ammo-res { font-family: var(--fd); font-size: calc(20px * var(--k)); font-weight:700; line-height:.8;
+  color: var(--ink-2); text-shadow: var(--sh); }
+.ow-ammo-mode { display:flex; align-items:center; gap: calc(4px * var(--k));
+  font-size: calc(10px * var(--k)); font-weight:600; letter-spacing:.08em; color: var(--ink-2); text-shadow: var(--sh); }
+.ow-ammo-mode svg { width: calc(12px * var(--k)); height: calc(9px * var(--k)); fill: var(--ink); display:block;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,.6)); }
+.ow-ammo-low .ow-ammo-cur { color: #f7cf6a; }
+.ow-ammo-empty .ow-ammo-cur { color: #ff5a48; }
+.ow-ammo-rule { width:1px; align-self:stretch; margin: calc(2px * var(--k)) 0;
+  background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,.28) 30%, rgba(255,255,255,.28) 70%, rgba(255,255,255,0)); }
 
 .ow-reload {
-  margin-top: calc(var(--u) * 1.6);
-  font-size: calc(10.5px * var(--k)); letter-spacing:.28em; color: var(--amber);
-  text-shadow: var(--sh-o1);
+  margin-top: calc(6px * var(--k));
+  font-size: calc(11px * var(--k)); font-weight:700; letter-spacing:.1em; color: #f7cf6a;
+  text-shadow: var(--sh);
 }
 .ow-reload-bar {
-  margin-top: calc(var(--u) * .8); margin-left:auto; margin-right:0;
-  width: calc(86px * var(--k)); height: calc(2.5px * var(--k));
-  background: rgba(6,10,13,.7); box-shadow: 0 0 0 1px rgba(0,0,0,.4);
+  margin-top: calc(3px * var(--k));
+  width: calc(72px * var(--k)); height: calc(2px * var(--k));
+  background: rgba(10,14,17,.45);
 }
-.ow-reload-bar i { display:block; height:100%; width:0; background: var(--amber); transform-origin:left; }
+.ow-reload-bar i { display:block; height:100%; width:100%; background: #f7cf6a; transform-origin:left; transform:scaleX(0); }
 
-/* equipment: its own row, in flow, above the weapon name */
-.ow-equip {
-  display:grid; grid-auto-flow:column; grid-auto-columns:max-content;
-  justify-content:end; align-items:center;
-  column-gap: calc(var(--gut) * 2); margin-bottom: calc(var(--u) * 1.4);
-}
-.ow-slot {
-  display:grid; grid-auto-flow:column; grid-auto-columns:max-content;
-  align-items:center; column-gap: var(--gut); opacity:.9;
-}
-.ow-slot svg { width: calc(13px * var(--k)); height: calc(16.5px * var(--k)); display:block;
-  filter: drop-shadow(0 0 calc(2px * var(--k)) rgba(0,0,0,.95)); }
-.ow-slot span { font-size: calc(11px * var(--k)); color: var(--ink-2); text-shadow: var(--sh-o1);
-  min-width: calc(7px * var(--k)); text-align:left; }
-.ow-slot.empty { opacity:.34; }
+.ow-equip { display:flex; flex-direction:column; gap: calc(7px * var(--k)); padding-bottom: calc(1px * var(--k)); }
+.ow-slot { display:flex; align-items:center; gap: calc(6px * var(--k)); }
+.ow-slot svg { width: calc(13px * var(--k)); height: calc(16px * var(--k)); display:block;
+  filter: drop-shadow(0 1px 1.5px rgba(0,0,0,.6)); }
+.ow-slot span { font-family: var(--fd); font-size: calc(14px * var(--k)); font-weight:700; color: var(--ink);
+  text-shadow: var(--sh); min-width: calc(8px * var(--k)); }
+.ow-slot.empty { opacity:.35; }
 
-/* ============================================================== killfeed */
+/* ============================================================== killfeed
+   Lower left, stacked upward from just above the vitals. */
 .ow-killfeed {
-  position:absolute; right:var(--pad); top:calc(var(--pad) + var(--u) * 2);
-  display:flex; flex-direction:column; align-items:flex-end;
-  gap: calc(var(--u) * 1.1);
+  position:absolute; left:var(--pad); bottom:calc(var(--pad) + 44px * var(--k));
+  display:flex; flex-direction:column; align-items:flex-start;
+  gap: calc(3px * var(--k));
+  text-transform:none;
 }
-/* Rows sit in the top right, which in daylight is sky: the scrim has to be
-   dark and dense enough to matter (58%), feathered only at the far end so it
-   dissolves instead of terminating in a rectangle. */
 .ow-kf-row {
   position:relative;
-  display:flex; align-items:center; gap: calc(var(--u) * 1.6);
-  font-size: calc(13.5px * var(--k)); letter-spacing:.09em;
-  padding: calc(var(--u) * .8) calc(var(--u) * 1.5);
-  border-right: calc(2px * var(--k)) solid rgba(255,255,255,.18);
-  text-shadow: var(--sh-o1);
+  display:flex; align-items:center; gap: calc(7px * var(--k));
+  font-size: calc(14px * var(--k)); font-weight:600; letter-spacing:.01em;
+  padding: calc(3px * var(--k)) calc(26px * var(--k)) calc(3px * var(--k)) calc(7px * var(--k));
+  background: linear-gradient(to right, rgba(8,11,14,.46) 0%, rgba(8,11,14,.34) 60%, rgba(8,11,14,0) 100%);
+  text-shadow: 0 1px 1px rgba(0,0,0,.55);
   will-change: transform, opacity;
 }
-.ow-kf-row::before {
-  content:''; position:absolute; inset:0; z-index:-1;
-  background: rgba(5,9,12,.58);
-  -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,0) 0%, #000 22%, #000 100%);
-          mask-image: linear-gradient(to right, rgba(0,0,0,0) 0%, #000 22%, #000 100%);
-}
-.ow-kf-row.mine::before { background: rgba(26,17,3,.66); }
-.ow-kf-row.mine { border-right-color: var(--amber); }
-.ow-kf-a { color: var(--friend); }
-.ow-kf-v { color: var(--enemy); }
-.ow-kf-row.mine .ow-kf-a { color: #fff; }
-.ow-kf-w { display:flex; align-items:center; gap:calc(var(--u) * .8); opacity:.9; }
-.ow-kf-w svg { width: calc(31px * var(--k)); height: calc(12px * var(--k)); display:block;
-  filter: drop-shadow(0 1px 1px rgba(0,0,0,.9)); }
+.ow-kf-row.mine { background: linear-gradient(to right, rgba(40,32,12,.55) 0%, rgba(30,24,9,.38) 60%, rgba(30,24,9,0) 100%); }
+.ow-kf-a { color: #7fc4ff; }
+.ow-kf-v { color: #ff6a55; }
+.ow-kf-row.mine .ow-kf-a { color: #f5d46b; }
+.ow-kf-w { display:flex; align-items:center; gap:calc(4px * var(--k)); }
+.ow-kf-w svg { width: calc(34px * var(--k)); height: calc(13px * var(--k)); display:block;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,.6)); }
 .ow-kf-hs svg { width: calc(12px * var(--k)); height: calc(12px * var(--k)); display:block;
-  filter: drop-shadow(0 1px 1px rgba(0,0,0,.9)); }
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,.6)); }
 
-/* =============================================================== compass */
+/* =============================================================== compass
+   Top centre: a bare tape, ticks every 5 deg, bearings every 15, the heading
+   in a small readout under the centre notch. No box behind it. */
 .ow-compass {
-  position:absolute; left:50%; top:calc(var(--pad) * .7);
-  width: calc(470px * var(--k)); height: calc(41px * var(--k));
+  position:absolute; left:50%; top:calc(var(--pad) * .55);
+  width: calc(560px * var(--k)); height: calc(34px * var(--k));
   transform: translateX(-50%);
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 16%, #000 84%, transparent);
-          mask-image: linear-gradient(to right, transparent, #000 16%, #000 84%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent);
+          mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent);
   overflow:hidden;
 }
-/* Scrim: 45% dark behind the tape, feathered horizontally over the outer 20%
-   at each end so it dissolves rather than terminating in a rectangle, and
-   rolled off at the very top and bottom edge. The previous 23-29% version was
-   too weak to do anything at all against blown cloud — grey cardinals on white
-   sky, unreadable. The glyphs additionally carry a symmetric dark outline. */
-.ow-compass::before {
-  content:''; position:absolute; inset:0;
-  background: linear-gradient(to bottom,
-    rgba(3,6,9,0) 0%, rgba(3,6,9,.45) 20%, rgba(3,6,9,.45) 66%,
-    rgba(3,6,9,.20) 88%, rgba(3,6,9,0) 100%);
-  -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,0) 0%, #000 20%, #000 80%, rgba(0,0,0,0) 100%);
-          mask-image: linear-gradient(to right, rgba(0,0,0,0) 0%, #000 20%, #000 80%, rgba(0,0,0,0) 100%);
-}
-/* NO will-change:transform HERE — deliberate, do not "optimise" it back.
-   It promoted the strip to its own composited layer, and a composited layer is
-   rasterised ONCE at whatever sub-pixel raster translation its transform happened
-   to have at the moment the compositor first rastered it; later transform changes
-   only move the cached texture. That moment is wall-clock bound, so the anti-
-   aliasing of all 144 ticks and the cardinal labels depended on how long boot took
-   — the single remaining reason enabling shader pre-warm shifted pixels after the
-   capture harness was made frame-deterministic (~0.06% of pixels, up to 70/255,
-   confined to this strip). Unpromoted, the strip is repainted from its current
-   transform every frame, which is a pure function of heading. The paint is a
-   470x41 css-px band; the hint was not buying anything measurable. */
+/* NO will-change:transform on the strip — rasterisation must be a pure
+   function of heading for deterministic captures. */
 .ow-compass-strip { position:absolute; left:0; top:0; height:100%; }
 .ow-tick {
-  position:absolute; top: calc(19px * var(--k));
-  width:1px; background: rgba(255,255,255,.7);
+  position:absolute; top: calc(20px * var(--k));
+  width:1px; background: rgba(255,255,255,.55);
   height: calc(4px * var(--k));
-  box-shadow: 0 0 0 1px rgba(4,8,11,.6), 0 0 calc(2px * var(--k)) rgba(0,0,0,.9);
+  box-shadow: 0 0 calc(2px * var(--k)) rgba(0,0,0,.6);
 }
-.ow-tick.maj { height: calc(7.5px * var(--k)); width: calc(1.5px * var(--k)); background: rgba(255,255,255,.95); }
+.ow-tick.maj { height: calc(7px * var(--k)); top: calc(18px * var(--k)); background: rgba(255,255,255,.85); }
 .ow-tick-l {
   position:absolute; top: calc(1px * var(--k)); transform: translateX(-50%);
-  font-size: calc(13.5px * var(--k)); letter-spacing:.1em; font-weight:700;
-  color: #fff; text-shadow: var(--sh-o1);
+  font-size: calc(15px * var(--k)); letter-spacing:0; font-weight:700;
+  color: #fff; text-shadow: var(--sh);
 }
-.ow-tick-l.sub { font-size: calc(10px * var(--k)); font-weight:700; color: rgba(233,243,249,.9);
-  top: calc(3.5px * var(--k)); }
-.ow-compass-base {
-  position:absolute; left:0; right:0; top: calc(18px * var(--k)); height:1px;
-  background: linear-gradient(to right, transparent, rgba(255,255,255,.4), transparent);
-  box-shadow: 0 1px 0 rgba(4,8,11,.5);
-}
+.ow-tick-l.sub { font-size: calc(12px * var(--k)); top: calc(3px * var(--k)); color: rgba(240,244,246,.92); }
+.ow-tick-l.num { font-size: calc(10.5px * var(--k)); font-weight:600; top: calc(5px * var(--k)); color: rgba(230,236,240,.72); }
+.ow-compass-base { display:none; }
 .ow-compass-caret {
-  position:absolute; left:50%; top:calc(12.5px * var(--k)); transform:translateX(-50%);
+  position:absolute; left:50%; top:calc(27px * var(--k)); transform:translateX(-50%);
   width:0; height:0;
-  border-left: calc(4.5px * var(--k)) solid transparent;
-  border-right: calc(4.5px * var(--k)) solid transparent;
-  border-top: calc(5.5px * var(--k)) solid var(--amber);
-  filter: drop-shadow(0 1px 2px rgba(0,0,0,.95));
+  border-left: calc(4px * var(--k)) solid transparent;
+  border-right: calc(4px * var(--k)) solid transparent;
+  border-bottom: calc(5px * var(--k)) solid #fff;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,.6));
+}
+.ow-compass-hdg {
+  position:absolute; left:50%; top:calc(var(--pad) * .55 + 35px * var(--k));
+  transform: translateX(-50%);
+  font-family: var(--fd); font-size: calc(12px * var(--k)); font-weight:700;
+  color: var(--ink); text-shadow: var(--sh);
+  padding: calc(1px * var(--k)) calc(5px * var(--k));
+  background: rgba(8,11,14,.34);
+  min-width: calc(30px * var(--k)); text-align:center;
 }
 .ow-compass-obj {
-  position:absolute; top: calc(28px * var(--k)); transform:translateX(-50%);
-  font-size: calc(9.5px * var(--k)); letter-spacing:.06em;
-  width: calc(13px * var(--k)); height: calc(13px * var(--k));
+  position:absolute; top: calc(1px * var(--k)); transform:translateX(-50%);
+  font-size: calc(10px * var(--k)); font-weight:700;
+  width: calc(15px * var(--k)); height: calc(15px * var(--k));
   display:flex; align-items:center; justify-content:center;
-  color:#08161c; background: var(--cyan);
-  box-shadow: 0 1px 2px rgba(0,0,0,.8);
+  color:#fff; background: rgba(40,130,210,.9);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.7), 0 1px 2px rgba(0,0,0,.6);
   will-change: transform;
 }
 
-/* ============================================================= match bar */
-.ow-match {
-  position:absolute; left:50%; top:calc(var(--pad) * .7 + 45px * var(--k));
-  transform: translateX(-50%);
-  display:flex; align-items:center; gap: calc(var(--u) * 2.5);
-  font-size: calc(11px * var(--k)); letter-spacing:.18em;
-  color: var(--ink-2); text-shadow: var(--sh-o1);
+/* ============================================================= score
+   Under the minimap. */
+.ow-score {
+  position:absolute; left:var(--pad); top:calc(var(--pad) + 238px * var(--k) + 8px * var(--k));
+  width: calc(238px * var(--k));
+  display:grid; grid-template-columns: 1fr auto; column-gap: calc(8px * var(--k)); row-gap: calc(3px * var(--k));
 }
-.ow-match b { font-family: var(--fd); font-size: calc(19px * var(--k)); font-weight:700;
-  letter-spacing:.04em; }
-.ow-match .us { color: var(--friend); }
-.ow-match .them { color: var(--enemy); }
-.ow-match .clock { color: var(--ink); font-variant-numeric: tabular-nums; }
-.ow-match .sep { width:1px; height: calc(11px * var(--k)); background: var(--hair); }
+.ow-sc-row { grid-column:1; display:flex; align-items:center; gap: calc(6px * var(--k)); }
+.ow-sc-row b {
+  font-family: var(--fd); font-size: calc(13px * var(--k)); font-weight:700; line-height:1;
+  min-width: calc(28px * var(--k)); text-align:center;
+  padding: calc(2px * var(--k)) calc(3px * var(--k));
+  color:#fff; text-shadow: 0 1px 1px rgba(0,0,0,.4);
+}
+.ow-sc-row.us b { background: rgba(38,120,196,.82); }
+.ow-sc-row.them b { background: rgba(196,52,38,.82); }
+.ow-sc-bar { flex:1; height: calc(3px * var(--k)); background: rgba(10,14,17,.4); }
+.ow-sc-bar i { display:block; height:100%; width:100%; transform-origin:left; }
+.ow-sc-row.us .ow-sc-bar i { background:#5fb2ff; }
+.ow-sc-row.them .ow-sc-bar i { background:#ff5a44; }
+.ow-sc-meta {
+  grid-column:2; grid-row:1 / span 2;
+  display:flex; flex-direction:column; align-items:flex-end; justify-content:center; gap: calc(2px * var(--k));
+  font-size: calc(9.5px * var(--k)); font-weight:600; letter-spacing:.06em; color: var(--ink-2); text-shadow: var(--sh);
+}
+.ow-sc-meta .clock { font-family: var(--fd); font-size: calc(15px * var(--k)); font-weight:700; color: var(--ink); letter-spacing:0; }
+.ow-match { display:none; }
 
 /* =============================================================== minimap */
 .ow-minimap {
   position:absolute; left:var(--pad); top:var(--pad);
-  width: calc(178px * var(--k)); height: calc(178px * var(--k));
+  width: calc(238px * var(--k)); height: calc(238px * var(--k));
 }
-/* scrim — a soft dark plate a few px larger than the widget so the map sits on
-   the frame instead of floating on top of it. Behind the canvas, so it only
-   reads in the margin, under the corner brackets and the N / zone labels. */
-.ow-minimap::before {
-  content:''; position:absolute;
-  inset: calc(-7px * var(--k));
-  border-radius: calc(10px * var(--k));
-  background: rgba(4,8,11,.07);
-  box-shadow: 0 0 calc(16px * var(--k)) calc(6px * var(--k)) rgba(4,8,11,.05);
-  pointer-events:none;
-}
-/* The panel used to be the darkest thing in a frame whose sky tops out at 236,
-   which pulled the eye straight into the corner. Its plate now sits in the
-   mid-lows (see minimap.js) and the drop shadow is lighter to match. */
 .ow-minimap canvas {
   position:absolute; inset:0; width:100%; height:100%; display:block;
-  border-radius: calc(4px * var(--k));
-  box-shadow: inset 0 0 0 1px rgba(196,220,238,.16), 0 calc(2px * var(--k)) calc(10px * var(--k)) rgba(0,0,0,.3);
+  border-radius: calc(3px * var(--k));
+  opacity: .93;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.14), 0 calc(1px * var(--k)) calc(6px * var(--k)) rgba(0,0,0,.35);
 }
-.ow-mm-corner { position:absolute; width:calc(9px * var(--k)); height:calc(9px * var(--k)); }
-.ow-mm-corner::before, .ow-mm-corner::after { content:''; position:absolute; background:rgba(255,255,255,.32); }
-.ow-mm-corner::before { width:100%; height:1px; }
-.ow-mm-corner::after { width:1px; height:100%; }
-.ow-mm-corner.tl { left:calc(-1px * var(--k)); top:calc(-1px * var(--k)); }
-.ow-mm-corner.tr { right:calc(-1px * var(--k)); top:calc(-1px * var(--k)); }
-.ow-mm-corner.tr::before { right:0; } .ow-mm-corner.tr::after { right:0; }
-.ow-mm-corner.bl { left:calc(-1px * var(--k)); bottom:calc(-1px * var(--k)); }
-.ow-mm-corner.bl::before { bottom:0; }
-.ow-mm-corner.br { right:calc(-1px * var(--k)); bottom:calc(-1px * var(--k)); }
-.ow-mm-corner.br::before { bottom:0; right:0; } .ow-mm-corner.br::after { right:0; }
+.ow-mm-corner { display:none; }
 .ow-mm-n {
-  position:absolute; left:50%; top:calc(-13px * var(--k)); transform:translateX(-50%);
-  font-size: calc(9.5px * var(--k)); letter-spacing:.2em; color:var(--ink-2); text-shadow:var(--sh);
+  position:absolute; left:50%; top:calc(3px * var(--k)); transform:translateX(-50%);
+  font-size: calc(10px * var(--k)); font-weight:700; color: var(--ink); text-shadow: var(--sh);
 }
-.ow-mm-tag {
-  position:absolute; left:0; top:calc(100% + var(--u)); display:flex; gap:calc(var(--u)*1.5);
-  font-size: calc(9.5px * var(--k)); letter-spacing:.2em; color:var(--ink-3); text-shadow:var(--sh);
-}
+.ow-mm-tag { display:none; }
 
 /* ========================================================= world markers */
 .ow-mk {
@@ -541,61 +448,43 @@ const CSS = `
 
 /* ================================================================ prompt */
 .ow-prompt {
-  position:absolute; left:50%; top:58%;
+  position:absolute; left:50%; top:66%;
   transform: translate(-50%,-50%);
-  display:flex; align-items:center; gap: calc(var(--u) * 2);
+  display:flex; align-items:center; gap: calc(8px * var(--k));
+  text-transform:none;
   will-change: opacity, transform;
 }
 .ow-key {
   min-width: calc(22px * var(--k)); height: calc(22px * var(--k));
-  padding: 0 calc(var(--u) * 1.2);
+  padding: 0 calc(5px * var(--k));
   display:flex; align-items:center; justify-content:center;
-  font-size: calc(11px * var(--k)); letter-spacing:.06em;
-  border: 1px solid rgba(255,255,255,.55); border-radius: calc(2px * var(--k));
-  background: rgba(8,11,14,.42);
-  box-shadow: 0 1px 3px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.14);
-  text-shadow: var(--sh-hard);
+  font-size: calc(12px * var(--k)); font-weight:700; color:#101315;
+  background: rgba(240,243,245,.94); border-radius: calc(3px * var(--k));
+  box-shadow: 0 1px 3px rgba(0,0,0,.45);
 }
-.ow-prompt-txt { font-size: calc(12px * var(--k)); letter-spacing:.2em; text-shadow: var(--sh); }
-.ow-prompt-sub { font-size: calc(9.5px * var(--k)); letter-spacing:.2em; color:var(--ink-2); }
+.ow-prompt-txt { font-size: calc(14px * var(--k)); font-weight:600; letter-spacing:.01em; text-shadow: var(--sh); }
+.ow-prompt-sub { display:none !important; }
 .ow-prompt-arc { position:absolute; left:calc(-6px * var(--k)); top:50%; }
 
-/* ================================================================ banner */
+/* ================================================================ banner
+   Score popup under the reticle: "+100" over the event name. */
 .ow-banner {
-  position:absolute; left:50%; top:31%;
+  position:absolute; left:50%; top:57.5%;
   transform: translate(-50%,-50%);
+  display:flex; flex-direction:column-reverse; align-items:center; gap: calc(1px * var(--k));
   text-align:center;
-  /* wide side padding on purpose: the scrim's outer 20% is a feather, so the
-     band has to be substantially wider than the type for the type to sit on
-     the solid part of it */
-  padding: calc(var(--u) * 4) calc(var(--u) * 30);
   will-change: opacity, transform;
 }
-/* A soft radial haze over a blown sky does nothing except add milk: at 62% in
-   the middle and 0 at the edge, its average density is far too low to seat white
-   type on a 236-luma cloud. This is a flat 60% dark band, feathered across the
-   outer 20% at each end (and rolled off top/bottom so it is a band, not a box). */
-.ow-banner::before {
-  content:''; position:absolute; inset:0; z-index:-1;
-  background: linear-gradient(to bottom,
-    rgba(4,7,10,0) 0%, rgba(4,7,10,.60) 20%, rgba(4,7,10,.60) 80%, rgba(4,7,10,0) 100%);
-  -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,0) 0%, #000 20%, #000 80%, rgba(0,0,0,0) 100%);
-          mask-image: linear-gradient(to right, rgba(0,0,0,0) 0%, #000 20%, #000 80%, rgba(0,0,0,0) 100%);
-}
 .ow-banner-t {
-  font-family: var(--fd);
-  font-size: calc(30px * var(--k)); letter-spacing:.3em; font-weight:700;
-  text-shadow: var(--sh-o2);
+  font-size: calc(12px * var(--k)); letter-spacing:.08em; font-weight:700;
+  color: var(--ink); text-shadow: var(--sh);
 }
 .ow-banner-s {
-  margin-top: calc(var(--u) * 1.4);
-  font-size: calc(12px * var(--k)); letter-spacing:.3em; color: var(--amber); font-weight:700;
-  text-shadow: var(--sh-o1);
+  font-family: var(--fd);
+  font-size: calc(21px * var(--k)); letter-spacing:0; font-weight:700;
+  color: #f6d25e; text-shadow: var(--sh);
 }
-.ow-banner-rule {
-  margin: calc(var(--u) * 1.4) auto 0; width: calc(120px * var(--k)); height:1px;
-  background: linear-gradient(to right, transparent, rgba(255,255,255,.5), transparent);
-}
+.ow-banner-rule { display:none; }
 
 /* ================================================================== menu */
 .ow-menu {

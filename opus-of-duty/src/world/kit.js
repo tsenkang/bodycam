@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Rng } from '../core/rng.js';
 import {
   chamferBox,
   plainBox,
@@ -740,35 +741,153 @@ export function balcony(A, pm, x, y, w, rng, opts = {}) {
 
 // ================================================================= parapet ==
 /** Roof edge wall with a coping course and scupper gaps. */
+/**
+ * Roof parapet.
+ *
+ * A parapet built as one straight box per side is the ruler-straight roofline
+ * that gives a procedural town away against the sky. A real one is laid in
+ * runs: each run a couple of centimetres off its neighbour, the coping cast in
+ * short lengths that have shifted, the odd stretch knocked down to a stump of
+ * block, and — on almost every flat roof in the region — the reinforcing bars
+ * of the next storey that was never built, sticking up out of the column lines.
+ *
+ * The level `rng` is drawn exactly as the old single-box version drew it (one
+ * `range` per side) so the rest of the level layout does not re-roll; all the
+ * new variation comes from a local stream keyed to the roof's position.
+ */
 export function parapet(A, key, cx, cz, w, d, y, rng, opts = {}) {
   const h = opts.h ?? 0.72;
   const t = opts.t ?? 0.24;
   const box = BOX(A);
+  const copingKey = opts.copingKey ?? 'concrete';
+  const lr = new Rng((Math.round((cx + 512) * 613 + (cz + 512) * 4099 + y * 97) >>> 0) ^ 0x5bd1e995);
+  const rebar = A.cache('rebar:stub', () => tubeY(0.0075, 1, { radial: 4 }));
+  // [centre x, centre z, along-axis is X?, length, depth]
   const sides = [
-    [cx, cz - d / 2 + t / 2, w, t],
-    [cx, cz + d / 2 - t / 2, w, t],
-    [cx - w / 2 + t / 2, cz, t, d],
-    [cx + w / 2 - t / 2, cz, t, d],
+    [cx, cz - d / 2 + t / 2, true, w],
+    [cx, cz + d / 2 - t / 2, true, w],
+    [cx - w / 2 + t / 2, cz, false, d - t * 2],
+    [cx + w / 2 - t / 2, cz, false, d - t * 2],
   ];
-  const pmI = IDENT;
+
+  const starterBars = (px, pz, top) => {
+    // a column stub under the bars on about half of them
+    if (lr.float() < 0.5) {
+      const sh = lr.range(0.08, 0.34);
+      A.add(copingKey, BOX(A), LL(IDENT, px, top + sh / 2, pz, lr.range(-0.05, 0.05), 0.3, sh, 0.3), {
+        masks: [0.85, 0.5, 0.2],
+      });
+      top += sh;
+    }
+    const bh = lr.range(0.22, 0.75);
+    for (let k = 0; k < 4; k++) {
+      const ox = (k & 1 ? 1 : -1) * 0.085 + lr.range(-0.01, 0.01);
+      const oz = (k & 2 ? 1 : -1) * 0.085 + lr.range(-0.01, 0.01);
+      // bars are bent by whoever tried to use them as a handhold
+      const bend = lr.float() < 0.3 ? lr.range(0.2, 0.7) : lr.range(0, 0.09);
+      A.add(
+        'metal_rust',
+        rebar,
+        LL(IDENT, px + ox, top - 0.05, pz + oz, lr.range(0, 6.28), 1, bh * lr.range(0.8, 1.1), 1, bend, 0),
+        { masks: [0.6, 0.5, 0.1] }
+      );
+    }
+  };
+
   for (let i = 0; i < sides.length; i++) {
-    const [sx, sz, sw, sd] = sides[i];
-    const jitter = rng.range(-0.05, 0.05);
-    pmI.identity();
-    A.add(
-      key,
-      box,
-      LL(pmI, sx, y + (h + jitter) / 2, sz, 0, sw, h + jitter, sd),
-      { masks: [0.5, 0.4, 0.15] }
-    );
-    // coping: a slightly wider, weathered cap
-    A.add(
-      opts.copingKey ?? 'concrete',
-      BOX_SOFT(A),
-      LL(pmI, sx, y + h + jitter + 0.045, sz, 0, sw + 0.09, 0.09, sd + 0.09),
-      { masks: [0.75, 0.3, 0.1] }
-    );
-    A.box('concrete', sx, y + (h + 0.1) / 2, sz, sw, h + 0.1, sd);
+    const [sx, sz, alongX, L0] = sides[i];
+    rng.range(-0.05, 0.05); // keep the level stream in step with the old parapet
+    // cut the side into runs of 1.3-3.4 m
+    const cuts = [0];
+    while (cuts[cuts.length - 1] < L0 - 1.3) {
+      cuts.push(Math.min(L0, cuts[cuts.length - 1] + lr.range(1.3, 3.4)));
+    }
+    if (L0 - cuts[cuts.length - 1] < 0.8 && cuts.length > 1) cuts.pop();
+    cuts.push(L0);
+    for (let s = 0; s < cuts.length - 1; s++) {
+      const a = cuts[s];
+      const b = cuts[s + 1];
+      const len = b - a;
+      const mid = -L0 / 2 + (a + b) / 2;
+      const px = alongX ? sx + mid : sx;
+      const pz = alongX ? sz : sz + mid;
+      const inner = s > 0 && s < cuts.length - 2;
+      const r = lr.float();
+      let sh = h + lr.range(-0.045, 0.045);
+      let coping = lr.float() > 0.12;
+      let broken = false;
+      if (inner && r < 0.13) {
+        // knocked down to a stump: no coping, a ragged top of block
+        broken = true;
+        sh = lr.range(0.18, 0.42);
+        coping = false;
+      } else if (r > 0.9) {
+        // a raised run: somebody built the parapet up a course higher here
+        sh += lr.range(0.18, 0.4);
+      }
+      const segW = alongX ? len : t;
+      const segD = alongX ? t : len;
+      A.add(key, box, LL(IDENT, px, y + sh / 2, pz, 0, segW, sh, segD), {
+        masks: [0.55, 0.45, 0.15],
+      });
+      if (coping) {
+        const cOff = lr.range(-0.012, 0.012);
+        const cy = y + sh + 0.045 + lr.range(-0.008, 0.01);
+        A.add(
+          copingKey,
+          BOX_SOFT(A),
+          LL(
+            IDENT,
+            px + (alongX ? 0 : cOff),
+            cy,
+            pz + (alongX ? cOff : 0),
+            lr.range(-0.006, 0.006),
+            segW + (alongX ? -0.012 : 0.09),
+            0.09,
+            segD + (alongX ? 0.09 : -0.012),
+            0,
+            lr.range(-0.008, 0.008)
+          ),
+          { masks: [0.8, 0.35, 0.1] }
+        );
+      } else {
+        // bare block course: a ragged line of loose blocks along the top
+        const n = Math.max(1, Math.floor(len / 0.42));
+        for (let k = 0; k < n; k++) {
+          if (lr.float() < (broken ? 0.45 : 0.15)) continue;
+          const u = -len / 2 + (k + 0.5) * (len / n);
+          const bh = lr.range(0.1, 0.21);
+          A.add(
+            copingKey,
+            BOX(A),
+            LL(
+              IDENT,
+              px + (alongX ? u : lr.range(-0.02, 0.02)),
+              y + sh + bh / 2 - 0.01,
+              pz + (alongX ? lr.range(-0.02, 0.02) : u),
+              lr.range(-0.05, 0.05),
+              alongX ? 0.4 : t * 0.9,
+              bh,
+              alongX ? t * 0.9 : 0.4,
+              lr.range(-0.04, 0.04),
+              lr.range(-0.04, 0.04)
+            ),
+            { masks: [0.9, 0.55, 0.2] }
+          );
+        }
+      }
+      A.box('concrete', px, y + (sh + 0.1) / 2, pz, segW, sh + 0.1, segD);
+      // starter bars on the column lines: every run end has a chance
+      if (lr.float() < 0.38) {
+        const e = alongX ? [sx - L0 / 2 + b, sz] : [sx, sz - L0 / 2 + b];
+        starterBars(e[0], e[1], y + sh + (coping ? 0.09 : 0));
+      }
+    }
+    // the corners are always column lines
+    if (i < 2 && lr.float() < 0.55) {
+      const sgn = lr.float() < 0.5 ? -1 : 1;
+      starterBars(sx + sgn * (L0 / 2 - t / 2), sz, y + h + 0.09);
+    }
   }
   return y + h;
 }

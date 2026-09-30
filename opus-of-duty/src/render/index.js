@@ -25,9 +25,6 @@ const QUALITY_LEVEL = { low: 0, medium: 1, high: 2, ultra: 3 };
  */
 const PRACTICAL_RANGE = 30;
 
-// Full-daylight key intensity (SUN_ILLUMINANCE_TOP through a clear atmosphere).
-// Only used to normalise the viewmodel rig, never to light anything.
-const REF_DAYLIGHT = 4.6;
 
 /**
  * OVERWATCH renderer.
@@ -97,9 +94,10 @@ const REF_DAYLIGHT = 4.6;
  *                             aoIntensity, contactLength, contactStrength,
  *                             shadowStrength, sunSoftness,
  *                             exposureKey, autoExposure, skyFill, groundFill,
- *                             bounceFill, viewKeyScale/Max/Gamma,
- *                             viewFillRatio, viewRimRatio, viewHemiRatio,
- *                             viewFillOcclusion, dofMaxCoc, dofNearRatio,
+ *                             bounceFill, viewSkyOcclusion,
+ *                             viewGroundOcclusion, viewEnvOcclusion,
+ *                             viewEnvIndoor, viewPracticalFill,
+ *                             dofMaxCoc, dofNearRatio,
  *                             dofFocusMin/Max, dofFarStart, dofFarRange,
  *                             dofNearScale
  *
@@ -258,40 +256,20 @@ export class RenderSystem {
     this.sunDirView = new THREE.Vector3(0, 1, 0);
 
     // ---- viewmodel light rig ---------------------------------------------
-    // The weapon lives in its own scene. Handing it one copy of the world sun
-    // means that whenever the sun is behind the gun the camera-facing side gets
-    // nothing, and weapon albedos are physically correct (anodised aluminium is
-    // 0.026 linear) so it goes to a black silhouette. It gets a real 3-point
-    // rig instead, with every direction fixed in VIEW space so the weapon reads
-    // identically at any world sun azimuth — which is what every shipped FPS
-    // does, and the reason their guns are always legible.
-    this.viewSun = new THREE.DirectionalLight(0xffe8c4, 2.0);
+    // See VIEWMODEL LIGHTING CONTRACT at _updateViewRig, and
+    // shots/look/CONTRACT.md. One light: the world key itself — same colour,
+    // same intensity, same WORLD direction, shadowed by the same cascades.
+    // Everything else the weapon receives is the world's own indirect model
+    // (sky band, ground band, sun bounce, IBL) evaluated at the camera.
+    this.viewSun = new THREE.DirectionalLight(0xffe8c4, 0);
     this.viewSun.name = 'ow-viewmodel-key';
-    this.viewKeyFill = new THREE.DirectionalLight(0x9ec4ff, 0.6);
-    this.viewKeyFill.name = 'ow-viewmodel-fill';
-    this.viewRim = new THREE.DirectionalLight(0xffd7a8, 1.0);
-    this.viewRim.name = 'ow-viewmodel-rim';
-    this.viewFill = new THREE.HemisphereLight(0x8fb6ff, 0x36302a, 0.35);
-    // Warm bounce off the ground/street, arriving from BELOW. Without it, any
-    // part of the weapon or hands that sits in the gun's own cast shadow — the
-    // support glove under the handguard is the worst case — is lit by nothing
-    // but the cool sky fill, so a warm glove albedo still renders blue. A real
-    // street throws a stop of warm light back up; this is that term.
-    this.viewBounce = new THREE.DirectionalLight(0xffb87a, 0.5);
-    this.viewBounce.name = 'ow-viewmodel-bounce';
-    // View-space directions the light arrives FROM: key upper-front-left,
-    // fill lower-front-right, rim from behind to catch the top edges of the
-    // receiver, rail and optic body, bounce from below-front.
-    this._viewKeyDir = new THREE.Vector3(-0.45, 0.75, 0.55).normalize();
-    this._viewFillDir = new THREE.Vector3(0.6, -0.15, 0.5).normalize();
-    this._viewRimDir = new THREE.Vector3(0.2, 0.35, -0.9).normalize();
-    this._viewBounceDir = new THREE.Vector3(-0.2, -0.86, 0.47).normalize();
+    this.viewSun.castShadow = false;
+    ctx.viewScene.add(this.viewSun, this.viewSun.target);
     this._tmpV3c = new THREE.Vector3();
-    for (const l of [this.viewSun, this.viewKeyFill, this.viewRim, this.viewBounce]) {
-      l.castShadow = false;
-      ctx.viewScene.add(l, l.target);
-    }
-    ctx.viewScene.add(this.viewFill);
+    this._viewFillSky = new THREE.Vector3();
+    this._viewFillGnd = new THREE.Vector3();
+    this._viewIndoor = 0;
+    this._viewEnvIntensity = 0.5;
     // The frame loop skips the viewmodel pass when nothing but our own rig is
     // in there; remember how many children that is.
     this._viewRigChildren = ctx.viewScene.children.length;
@@ -437,22 +415,22 @@ export class RenderSystem {
       // them buys most of both, and it is applied here rather than at the
       // source because the balance is a lighting decision, not an art one.
       practicalGain: 0.55,
-      // Sky the viewmodel can actually see, past the shooter's own body.
-      viewFillOcclusion: 0.45,
-      // Viewmodel 3-point rig. The key is scaled off the scene's own light
-      // level (see _updateViewRig); fill, rim and hemisphere are ratios of it.
-      viewKeyScale: 0.55,
-      viewKeyMax: 2.6,
-      viewFillRatio: 0.3,
-      viewRimRatio: 0.5,
-      // 0.35 hemisphere against a ~2.2 daylight key, expressed as a ratio so it
-      // follows the time of day instead of blowing the gun out at night.
-      viewHemiRatio: 0.16,
-      // Warm ground bounce from below. Sized to lift the glove out of the
-      // handguard's cast shadow without competing with the key: at 0.34 of the
-      // key it is ~1.5 stops down, which is about what a sand street returns.
-      viewBounceRatio: 0.34,
-      viewKeyGamma: 0.65,
+      // ---- viewmodel (see VIEWMODEL LIGHTING CONTRACT, _updateViewRig) -----
+      // Fraction of the world's sky band a shouldered weapon receives: the
+      // shooter's head, shoulders and chest take the rest of the upper dome.
+      viewSkyOcclusion: 0.6,
+      // Fraction of the ground band (street bounce from below): the body
+      // blocks little of the lower-front hemisphere the gun and glove face.
+      viewGroundOcclusion: 0.8,
+      // viewScene.environmentIntensity — IBL (specular + diffuse) occlusion
+      // for the weapon, outdoors. The world draws at 1.0 with GTAO on top.
+      viewEnvOcclusion: 0.5,
+      // ...scaled toward this indoors, where the room hides the sky.
+      viewEnvIndoor: 0.3,
+      // Irradiance from nearby practicals (room bulbs, street lamps) at the
+      // camera, re-applied to the weapon as an isotropic fill: the average
+      // cosine a small held object presents to a point source.
+      viewPracticalFill: 0.5,
       shadowStrength: 1.0,
       sunSoftness: 0.024,
     };
@@ -464,6 +442,8 @@ export class RenderSystem {
     // in the harness log rather than something to guess at from the PNG.
     this._probeExposure = ctx.config.deterministic === true;
     this.debugView = new URLSearchParams(location.search).get('rview') || null;
+    this.debugWhite = /[?&]rwhite=1/.test(location.search);
+    this._whiteMat = null;
     this._debugPass = null;
 
     // `?owNoCascadeCull=1` puts every caster back into every cascade. Kept as
@@ -841,6 +821,63 @@ export class RenderSystem {
     return { cols, rows, cells: res };
   }
 
+  /**
+   * Diagnostic: luminance percentiles of a whole HDR target, scene radiance
+   * units. `alphaMin` > 0 keeps only pixels whose alpha clears it (the
+   * viewmodel target is cleared to transparent, so this isolates the gun);
+   * `lumMin` drops pixels at or below it (a hidden sky reads 0). Stalls the
+   * pipeline — never called from a frame.
+   */
+  _targetStats(rt, alphaMin, lumMin) {
+    if (!rt) return null;
+    const W = this.screenSize.width;
+    const H = this.screenSize.height;
+    const half = rt.texture.type === THREE.HalfFloatType;
+    const buf = half ? new Uint16Array(W * H * 4) : new Float32Array(W * H * 4);
+    this.renderer.readRenderTargetPixels(rt, 0, 0, W, H, buf);
+    const dec = half ? THREE.DataUtils.fromHalfFloat : (v) => v;
+    const lum = [];
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    for (let i = 0; i < W * H; i++) {
+      const a = dec(buf[i * 4 + 3]);
+      if (alphaMin > 0 && a < alphaMin) continue;
+      const cr = dec(buf[i * 4]);
+      const cg = dec(buf[i * 4 + 1]);
+      const cb = dec(buf[i * 4 + 2]);
+      const l = 0.2126 * cr + 0.7152 * cg + 0.0722 * cb;
+      if (!(l > lumMin)) continue;
+      lum.push(l);
+      r += cr;
+      g += cg;
+      b += cb;
+    }
+    const n = lum.length;
+    if (!n) return { n: 0 };
+    lum.sort((x, y) => x - y);
+    const p = (q) => lum[Math.min(n - 1, Math.floor(q * n))];
+    return {
+      n,
+      mean: { r: r / n, g: g / n, b: b / n },
+      p10: p(0.1),
+      p25: p(0.25),
+      p50: p(0.5),
+      p75: p(0.75),
+      p90: p(0.9),
+    };
+  }
+
+  /** Diagnostic: stats over the opaque viewmodel pixels. */
+  probeViewStats() {
+    return this._targetStats(this.viewRt, 0.98, 0);
+  }
+
+  /** Diagnostic: stats over the world HDR buffer (pixels above `lumMin`). */
+  probeWorldStats(lumMin = 1e-6) {
+    return this._targetStats(this.hdrRt, 0, lumMin);
+  }
+
   _applySettings() {
     const s = this.settings;
     const cu = this.composite.uniforms;
@@ -1024,58 +1061,107 @@ export class RenderSystem {
   }
 
   /**
-   * Point the viewmodel's 3-point rig. Directions are authored in VIEW space
-   * and rotated into the viewmodel scene every frame, so the weapon's key/fill/
-   * rim separation is invariant to where the world sun happens to be.
+   * ==========================================================================
+   *  VIEWMODEL LIGHTING CONTRACT  (also: shots/look/CONTRACT.md)
+   * ==========================================================================
+   * The weapon and hands are lit by THE WORLD'S LIGHT, evaluated at the
+   * camera, and by nothing else. There is no view-space studio rig any more.
+   *
+   *   key       the world key (sun or moon): same colour, same intensity, same
+   *             WORLD direction, shadowed by the same cascades whenever the
+   *             view camera coincides with the world camera. Step into a
+   *             building's shadow and the gun goes into shadow with you.
+   *   sky band  the world's owSkyFill x viewSkyOcclusion (0.6), gated by the
+   *             same normal test the world uses.
+   *   ground    the world's owGroundFill (+ its anti-sun wrap) x
+   *             viewGroundOcclusion (0.8).
+   *   indoors   the camera is tested against the same interior volumes the
+   *             world's indirect gate uses; the sky/ground bands fall to the
+   *             same interior floor (owIndirect.y) the room's own walls get.
+   *   lamps     practicals within range add their irradiance at the camera
+   *             (I * attenuation(d)) x viewPracticalFill as an isotropic fill,
+   *             because the world's point lights live in the other scene.
+   *   IBL       the world PMREM, diffuse budget identical to the world
+   *             (owIndirect.x); viewScene.environmentIntensity = 0.5 outdoors
+   *             -> 0.3 indoors (body/room occlusion of the sky). RENDER OWNS
+   *             viewScene.environmentIntensity and rewrites it every frame.
+   *   no AO / SSR / contact shadows: those are world screen-space buffers and
+   *             meaningless at the weapon's pixels.
+   *
+   * Consequence: irradiance per unit albedo on the weapon is the world's, so
+   * weapon albedos must be PHYSICAL — the same numbers a wall of the same
+   * material would use (anodised/parkerised 0.03-0.05, black polymer
+   * 0.04-0.06, FDE/coyote 0.15-0.30, glove fabric 0.10-0.25, skin 0.25-0.45).
+   * Sunlit daylight: ~5-8 units of irradiance on sun-facing faces, ~0.6-1.2
+   * on faces the sun cannot see (see CONTRACT.md for the measured table).
+   * ==========================================================================
    */
   _updateViewRig(viewCamera) {
     const s = this.settings;
-    // Reference light level for the rig. It has to include the ambient, not just
-    // the key: at night the key IS the moon at 0.075, and a rig with an absolute
-    // floor would put a glowing white rifle in a moonlit street. Everything in
-    // the rig — hemisphere included — is a ratio of this, so autoexposure keeps
-    // the weapon at a constant relative brightness at every time of day.
-    const ref = Math.max(this.activeSun.intensity, this._ambLevel / 0.15);
-    // Sub-linear in the scene level: the meter is exposure-locked after dark, so
-    // a rig that tracked the light exactly would put the weapon back in
-    // silhouette at night. Every shipped shooter biases the viewmodel up in the
-    // dark; gamma 0.65 is that bias, and it is a no-op in full daylight.
-    const shaped = REF_DAYLIGHT * Math.pow(Math.min(ref / REF_DAYLIGHT, 1), s.viewKeyGamma);
-    const keyI = Math.min(shaped * s.viewKeyScale, s.viewKeyMax);
-    this.viewSun.color.copy(this.activeSun.color);
-    this.viewSun.intensity = keyI;
+    const sun = this.activeSun;
+    this.viewSun.color.copy(sun.color);
+    this.viewSun.intensity = sun.visible === false ? 0 : sun.intensity;
+    // World direction, parked around the view camera.
+    this.viewSun.target.position.setFromMatrixPosition(viewCamera.matrixWorld);
+    this.viewSun.position.copy(this.viewSun.target.position).addScaledVector(this.sunDir, 4);
+    this.viewSun.updateMatrixWorld(true);
+    this.viewSun.target.updateMatrixWorld(true);
 
-    // Fill takes the cool sky hue, rim the warm key hue, so the gun sits in the
-    // same light as the street rather than looking like a studio render.
-    const h = this._fillHue;
-    this.viewKeyFill.color.setRGB(h.x, h.y, h.z);
-    this.viewKeyFill.intensity = keyI * s.viewFillRatio;
-    const sc = this.activeSun.color;
-    this.viewRim.color.setRGB(sc.r, sc.g * 0.94, sc.b * 0.82);
-    this.viewRim.intensity = keyI * s.viewRimRatio;
-    this.viewFill.intensity = keyI * s.viewHemiRatio;
-
-    // Warm bounce takes the ground-bounce hue the world's own lower fill band
-    // uses (_updateBounceFill writes it into _fillHue2), so the gun and gloves
-    // pick up the same sand-off-the-street colour the buildings do.
-    const g = this._fillHue2;
-    if (Math.max(g.x, g.y, g.z) > 1e-5) {
-      this.viewBounce.color.setRGB(g.x, g.y * 0.86, g.z * 0.62);
+    // Interior test at the camera: the same depth-inside-footprint gate the
+    // shader runs per fragment (materialpatch.js owInteriorGate).
+    const cam = this._tmpV3c.setFromMatrixPosition(viewCamera.matrixWorld);
+    const u = this.patcher.uniforms;
+    let indoor = 0;
+    const n = u.owIndirect.value.z;
+    if (n > 0.5) {
+      const xf = u.owRoomXf.value;
+      const lx = cam.x * xf.x + cam.z * xf.y + xf.z;
+      const lz = -cam.x * xf.y + cam.z * xf.x + xf.w;
+      for (let i = 0; i < n; i++) {
+        const r = this.patcher.rooms[i];
+        const ry = this.patcher.roomsY[i];
+        const d = Math.min(
+          Math.min(r.z - Math.abs(lx - r.x), r.w - Math.abs(lz - r.y)),
+          Math.min(cam.y - ry.x, ry.y - cam.y)
+        );
+        indoor = Math.max(indoor, THREE.MathUtils.smoothstep(d, 0.06, 0.3));
+      }
     }
-    this.viewBounce.intensity = keyI * s.viewBounceRatio;
+    this._viewIndoor = indoor;
+    const gate = THREE.MathUtils.lerp(1, u.owIndirect.value.y, indoor);
 
-    this._placeViewLight(this.viewSun, this._viewKeyDir, viewCamera);
-    this._placeViewLight(this.viewKeyFill, this._viewFillDir, viewCamera);
-    this._placeViewLight(this.viewRim, this._viewRimDir, viewCamera);
-    this._placeViewLight(this.viewBounce, this._viewBounceDir, viewCamera);
-  }
+    const sky = this._viewFillSky.copy(u.owSkyFill.value).multiplyScalar(s.viewSkyOcclusion * gate);
+    const gnd = this._viewFillGnd.copy(u.owGroundFill.value).multiplyScalar(s.viewGroundOcclusion * gate);
 
-  _placeViewLight(light, dirView, viewCamera) {
-    const d = this._tmpV3c.copy(dirView).transformDirection(viewCamera.matrixWorld);
-    light.target.position.setFromMatrixPosition(viewCamera.matrixWorld);
-    light.position.copy(light.target.position).addScaledVector(d, 4);
-    light.updateMatrixWorld(true);
-    light.target.updateMatrixWorld(true);
+    // Practicals: irradiance at the camera, three's own distance falloff.
+    let pr = 0;
+    let pg = 0;
+    let pb = 0;
+    for (let i = 0; i < this.lights.length; i++) {
+      const e = this.lights[i];
+      const l = e.light;
+      if (e.range > PRACTICAL_RANGE || !l.visible || !(l.isPointLight || l.isSpotLight)) continue;
+      const I = l.intensity;
+      if (I <= 0) continue;
+      const d = Math.max(0.25, l.getWorldPosition(this._tmpV3b).distanceTo(cam));
+      let att = 1 / Math.max(Math.pow(d, l.decay ?? 2), 0.01);
+      if (l.distance > 0) {
+        const t = Math.min(1, Math.max(0, 1 - Math.pow(d / l.distance, 4)));
+        att *= t * t;
+      }
+      const E = I * att * s.viewPracticalFill;
+      pr += l.color.r * E;
+      pg += l.color.g * E;
+      pb += l.color.b * E;
+    }
+    sky.x += pr;
+    sky.y += pg;
+    sky.z += pb;
+    gnd.x += pr;
+    gnd.y += pg;
+    gnd.z += pb;
+
+    this._viewEnvIntensity = THREE.MathUtils.lerp(s.viewEnvOcclusion, s.viewEnvIndoor, indoor);
   }
 
   /**
@@ -1279,9 +1365,9 @@ export class RenderSystem {
     this._syncSun(camera);
     this._updateRooms();
     this._updateBounceFill();
-    this._updateViewRig(viewCamera);
     this._camPos.setFromMatrixPosition(camera.matrixWorld);
     this._cullLights(this._camPos);
+    this._updateViewRig(viewCamera);
     this._adsT = this._readAds();
 
     if (ctx.scene.environment !== this.envMap) {
@@ -1373,7 +1459,21 @@ export class RenderSystem {
     this.csm.uniforms.owSunDirView.value.copy(this.sunDirView);
     renderer.setRenderTarget(this.hdrRt);
     renderer.clear(true, true, false);
+    // `debugWhite` (diagnostic, ?rwhite=1): every surface in BOTH scenes draws
+    // as albedo-1 Lambert with no specular, so the HDR buffers hold
+    // irradiance / pi per unit albedo — the number the viewmodel contract is
+    // written in. The sky dome is hidden so it reads 0.
+    const white = this.debugWhite ? this._getWhiteMaterial() : null;
+    const dome = white ? this.ctx.peek('sky')?.dome?.mesh : null;
+    if (white) {
+      scene.overrideMaterial = white;
+      if (dome) dome.visible = false;
+    }
     renderer.render(scene, camera);
+    if (white) {
+      scene.overrideMaterial = null;
+      if (dome) dome.visible = true;
+    }
 
     // ---- 9. viewmodel into its OWN colour+depth target --------------------
     // NOT into the world buffer: see the header note. The gbuffer is left
@@ -1386,29 +1486,32 @@ export class RenderSystem {
       this._tmpV3.setFromMatrixPosition(viewCamera.matrixWorld);
       const coherent = this._tmpV3.distanceToSquared(this._camPos) < 0.25;
       const prevStrength = this.csm.uniforms.owCsmParams.value.x;
-      const prevFeat = feat.y;
+      const fAo = feat.x;
+      const fContact = feat.y;
+      const fSsr = feat.z;
       if (!coherent) this.csm.uniforms.owCsmParams.value.x = 0;
-      feat.y = 0; // contact shadows are a world-space buffer; not for the gun
+      // AO, contact shadows and SSR are WORLD screen-space buffers: at the
+      // weapon's pixels they describe the wall behind it. Never for the gun.
+      feat.x = 0;
+      feat.y = 0;
+      feat.z = 0;
       this.csm.uniforms.owSunDirView.value
         .copy(this.sunDir)
         .transformDirection(viewCamera.matrixWorldInverse)
         .normalize();
 
-      // A weapon at the shoulder sees maybe half the sky — the shooter's own
-      // head, chest and arms take the rest — so the hemispheric fill is
-      // occluded for the viewmodel exactly the way its envMapIntensity is.
-      // Without this the gun floats in more indirect light than the street.
+      // The world's own sky/ground bands, occluded by the shooter's body and
+      // gated for interiors at the CAMERA (see _updateViewRig). The per-
+      // fragment interior gate is switched off because it has been applied.
       const uSky = this.patcher.uniforms.owSkyFill.value;
       const uGnd = this.patcher.uniforms.owGroundFill.value;
       this._fillSkySave.copy(uSky);
       this._fillGroundSave.copy(uGnd);
-      uSky.multiplyScalar(this.settings.viewFillOcclusion);
-      uGnd.multiplyScalar(this.settings.viewFillOcclusion);
-      // The interior gate is a WORLD-space volume test and the viewmodel's
-      // world position is the camera's, so standing in a shop would drop the
-      // weapon's whole indirect term at once. The gun has its own rig; skip it.
+      uSky.copy(this._viewFillSky);
+      uGnd.copy(this._viewFillGnd);
       const roomN = this.patcher.uniforms.owIndirect.value.z;
       this.patcher.uniforms.owIndirect.value.z = 0;
+      viewScene.environmentIntensity = this._viewEnvIntensity;
 
       // Still walked every frame — that is where new weapon/hand materials get
       // the shadow/AO/fill injection. It just no longer feeds the gbuffer.
@@ -1419,11 +1522,15 @@ export class RenderSystem {
       // turns partially covered edge pixels into premultiplied fractional alpha.
       renderer.setClearColor(0x000000, 0);
       renderer.clear(true, true, false);
+      if (white) viewScene.overrideMaterial = white;
       renderer.render(viewScene, viewCamera);
+      if (white) viewScene.overrideMaterial = null;
       renderer.setClearColor(0x000000, 1);
 
       this.csm.uniforms.owCsmParams.value.x = prevStrength;
-      feat.y = prevFeat;
+      feat.x = fAo;
+      feat.y = fContact;
+      feat.z = fSsr;
       uSky.copy(this._fillSkySave);
       uGnd.copy(this._fillGroundSave);
       this.patcher.uniforms.owIndirect.value.z = roomN;
@@ -1622,6 +1729,20 @@ export class RenderSystem {
     );
   }
 
+  _getWhiteMaterial() {
+    if (!this._whiteMat) {
+      this._whiteMat = new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        roughness: 1,
+        metalness: 0,
+        specularIntensity: 0,
+      });
+      this._whiteMat.name = 'ow-debug-white';
+      this.patcher.patch(this._whiteMat);
+    }
+    return this._whiteMat;
+  }
+
   _collectViewScene(viewScene) {
     viewScene.traverseVisible(this._visitView);
   }
@@ -1690,6 +1811,7 @@ export class RenderSystem {
       this.probe.dispose();
     }
     this._debugPass?.dispose();
+    this._whiteMat?.dispose();
     this.patcher.dispose();
     this.renderer.dispose();
   }

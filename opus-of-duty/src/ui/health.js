@@ -35,23 +35,20 @@ export class HealthFx {
 
     // ---- vitals widget ----------------------------------------------------
     this.vitals = el('div', 'ow-vitals', chrome);
-    const head = el('div', 'ow-vt-head', this.vitals);
-    el('div', 'ow-vt-lbl', head, 'Health');
-    this.hpNum = el('div', 'ow-vt-num', head);
-    this.hpVal = el('span', null, this.hpNum, '100');
-    this.hpMax = el('i', null, this.hpNum, '/100');
-    const track = el('div', 'ow-vt-track', this.vitals);
-    this.hpFill = el('i', null, track);
-    el('u', null, track); // segment dividers, drawn over the fill
-
+    // armour plates sit on top of the health bar, flush with its left edge
     this.armour = el('div', 'ow-armour', this.vitals);
-    el('div', 'ow-vt-lbl', this.armour, 'Armour');
     const plates = el('div', 'ow-arm-plates', this.armour);
     this.plates = new Array(3);
     for (let i = 0; i < 3; i++) {
       const p = el('div', 'ow-plate', plates);
       this.plates[i] = el('i', null, p);
     }
+    const row = el('div', 'ow-vt-row', this.vitals);
+    const track = el('div', 'ow-vt-track', row);
+    this.hpFill = el('i', null, track);
+    this.hpNum = el('div', 'ow-vt-num', row);
+    this.hpVal = el('span', null, this.hpNum, '100');
+    this.hpMax = el('i', null, this.hpNum, '');
 
     this.hpShown = 1;
     this._lastHp = -1;
@@ -145,7 +142,6 @@ export class HealthFx {
     if (shownHp !== this._lastHp) {
       this._lastHp = shownHp;
       setText(this.hpVal, shownHp);
-      setText(this.hpMax, '/' + Math.round(maxH));
     }
     setClass(this.vitals, 'low', h <= 0.55 && h > 0.28);
     setClass(this.vitals, 'crit', h <= 0.28);

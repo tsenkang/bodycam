@@ -19,7 +19,7 @@ import {
   LL,
   worldOf,
 } from './kit.js';
-import { chamferBox, clothGeometry, fbm3, patchGeometry, runoffStreak } from './util.js';
+import { chamferBox, clothGeometry, fbm3, patchGeometry, runoffStreak, wallPanel } from './util.js';
 import { furnishRoom } from './interiors.js';
 
 /**
@@ -84,6 +84,12 @@ const sideLen = (spec, side) => (side === 0 || side === 2 ? spec.w : spec.d);
  * below — the standard Mediterranean/Levantine form, and the thing that lets
  * afternoon sun down onto the street instead of walling it into shade.
  */
+/** Which painted interior finish a building's rooms get. */
+function interiorKey(spec) {
+  const h = Math.abs(Math.round(spec.x * 7 + spec.z * 13)) % 2;
+  return h ? 'plaster_interior_b' : 'plaster_interior';
+}
+
 function floorSpec(spec, f) {
   const sb = spec.setback;
   if (!sb || f < sb.from) return spec;
@@ -453,6 +459,32 @@ function buildFacade(A, rng, spec, info, ctx) {
     },
   });
 
+  // ---- interior finish ----------------------------------------------------
+  // The inner face of an enterable building's shell gets a painted lining: a
+  // few-millimetre skin with the same openings, carrying the dado / distemper
+  // finish. Bare exterior render on the inside of a room is what made the
+  // interior read as a cardboard box. Skipped where the wall top or an opening
+  // is ragged — those shapes come from the level rng and cannot be repeated.
+  const ragged = openings.some((o) => o.ragged) || (spec.ruin && isTop);
+  if (spec.enterable && !ragged) {
+    const lw = len - t * 2 - 0.004;
+    // an opening that runs into the side wall is clipped to the lining
+    const lh = openings.map((o) => {
+      const x0 = Math.max(o.x - o.w / 2, -lw / 2 + 0.03);
+      const x1 = Math.min(o.x + o.w / 2, lw / 2 - 0.03);
+      const y1 = Math.min(o.y + o.h / 2, h - 0.06);
+      const y0 = o.y - o.h / 2;
+      return { ...o, x: (x0 + x1) / 2, w: x1 - x0, y: (y0 + y1) / 2, h: y1 - y0 };
+    }).filter((o) => o.w > 0.1 && o.h > 0.1);
+    const lining = wallPanel(lw, h - 0.02, 0.012, lh, {
+      bevel: 0.003,
+      curveSegments: 7,
+    });
+    A.addOnce(interiorKey(spec), lining, LL(pm, 0, 0.005, t - 0.006, 0, 1, 1, 1), {
+      masks: [0.25, 0.3, 0.1],
+    });
+  }
+
   for (const fn of deco) fn();
 
   // ---- rain runoff below every opening and ledge --------------------------
@@ -676,7 +708,7 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
           w: len,
           h: fh,
           t: it,
-          key: 'plaster_white',
+          key: interiorKey(spec),
           openings: holes,
           rng,
           warp: 0.012,

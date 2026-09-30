@@ -1,106 +1,120 @@
 import * as THREE from 'three';
-import { box, blob, latheZ, rodZ, dome, extrude, roundRect, ring, mergeAll } from './geometry.js';
+import { latheZ, rodZ, mergeAll, box } from './geometry.js';
+import { loft, foldField, makeFolds } from './anatomy.js';
 
 /**
  * First-person arms.
  *
  * Two bones per arm, solved analytically from the hand (which is the thing the
  * animation drives — the hands are welded to the weapon, the elbows follow).
- * That is the same order of operations a real animator uses and it means the
- * hands can never slide off the grip.
  *
- * Anatomy is deliberate: a hand is 190 mm wrist-to-fingertip and 88 mm across
- * the knuckles, the fingers taper and *separate*, the knuckles are lumps, the
- * glove has a padded back, a palm patch, seams down the finger sides and a
- * velcro wrist strap, and the sleeve is a tapered tube with real fold rings and
- * a rolled cuff. That list is the difference between a hand and a grey sausage.
+ * Every surface on the limb is a smooth closed LOFT (see anatomy.js), never a
+ * box or a lathe: a hand assembled from chamfered blocks reads as a stack of
+ * slabs however well it is posed, because every silhouette edge is either
+ * dead straight or a perfect circle. The parts are:
+ *
+ *   glove    palm shell with a real transverse arch, thenar and hypothenar
+ *            swell, a wrist taper; fingers as tapered capsules whose rounded
+ *            ends overlap at every joint so a curled finger stays one surface.
+ *   armour   a moulded four-lobed TPR knuckle guard, split back-of-hand pads,
+ *            proximal/middle phalanx pads, a leather palm patch, fingertip
+ *            grip pads and stitched seams down the finger flanks.
+ *   cuff     neoprene glove cuff with a hook-and-loop strap and pull tab. It
+ *            belongs to the FOREARM bone, not the hand: a wrist bends at the
+ *            wrist, and a cuff parented to the hand swings out of the sleeve.
+ *   sleeve   combat-shirt sleeve with an anatomical taper (the forearm is
+ *            widest a quarter of the way down, over the brachioradialis, and
+ *            flattens toward the wrist) and oblique, partial cloth folds that
+ *            bunch at the hem and inside the elbow.
+ *   watch    left wrist, over the glove cuff: a resin-cased field watch.
  *
  * Hand-local space: -Z along the fingers, +Y out of the back of the hand,
- * +X toward the thumb (a right hand; the left is mirrored).
+ * +X toward the thumb (authored as a left hand; the right is mirrored).
  */
 
 /**
- * Humerus and forearm+wrist lengths, in metres.
- *
- * A large adult is 300 / 272 mm, and those were the values here. They do not
- * work, and no viewmodel in the genre uses them: once the weapon is far enough
- * from the eye for the magazine and the muzzle to be in frame at all (300 mm —
- * see defs.js), the support hand is 515 mm downrange of a shoulder that has to
- * stay BEHIND the eye, and 572 mm of arm reaches that at 99.5% extension. The
- * two-bone solve then clamps, the elbow locks dead straight, and the arm reads
- * as a broomstick with the hand sliding off the handguard.
- *
- * The obvious alternative — blading the shoulder forward — was measured and is
- * worse: at shoulderZ -0.075 the 89 mm forearm sleeve crosses the frame
- * diagonally and occludes the barrel and muzzle outright, which is exactly what
- * the warning in viewmodel.js predicted.
- *
- * So the bones are cheated 10% long (330 / 300, reach 630 mm). That takes the
- * same target to 91% extension, which leaves a visible elbow bend, and it pushes
- * the elbow FURTHER out of frame rather than into it, because a longer chain
- * between fixed endpoints bends more.
+ * Humerus and forearm+wrist lengths, in metres. Cheated ~10% long, as every
+ * viewmodel does, so the hand reaches a weapon held far enough out for the
+ * magazine and muzzle to be in frame without locking the elbow straight.
  */
 const L_UPPER = 0.33;
 const L_FORE = 0.3;
 
 /* -------------------------------------------------------------------------- */
-/*  geometry                                                                  */
+/*  hand geometry                                                             */
 /* -------------------------------------------------------------------------- */
 
-/** One finger segment: a tapered, chamfered capsule with a joint crease. */
-function segment(len, r0, r1) {
-  const g = latheZ(
+/**
+ * One finger segment: a tapered capsule, wider than deep, fuller on the palmar
+ * side (the finger pad), with domed ends that sit on the joint centres so two
+ * segments flexed against each other still read as one finger.
+ */
+function segment(len, r0, r1, distal = false) {
+  const mid = (r0 + r1) * 0.5;
+  return loft(
     [
-      [0, 0],
-      [0, r0 * 0.86],
-      [r0 * 0.5, r0],
-      [len * 0.42, r0 * 0.99],
-      [len * 0.55, r1 * 1.04],
-      [len - r1 * 0.7, r1],
-      [len - r1 * 0.2, r1 * 0.8],
-      [len, r1 * 0.35],
-      [len, 0],
+      { t: 0, z: 0, w: r0, hT: r0 * 0.82, hB: r0 * 0.9, n: 2.3 },
+      { t: 0.5, z: -len * 0.5, w: mid * 1.02, hT: mid * 0.8, hB: mid * 0.97, n: 2.3 },
+      {
+        t: 1,
+        z: -len,
+        w: r1,
+        hT: r1 * (distal ? 0.7 : 0.82),
+        hB: r1 * (distal ? 0.95 : 0.9),
+        y: distal ? -r1 * 0.08 : 0,
+        n: 2.3,
+      },
     ],
-    12
+    { rings: 8, seg: 18, capStart: r0 * 0.8, capEnd: distal ? r1 * 1.2 : r1 * 0.82, capRings: 5 }
   );
-  g.scale(1, 0.88, 1); // fingers are wider than they are deep
-  g.rotateY(Math.PI); // extend along -Z
-  return g;
 }
 
-/** Padded segment cover on the dorsal side (glove reinforcement). */
+/** Moulded TPR pad on the dorsal side of a phalanx. */
 function segmentPad(len, r) {
-  const g = blob(r * 1.55, r * 0.55, len * 0.78, r * 0.25, 2);
-  g.translate(0, r * 0.78, -len * 0.46);
-  return g;
+  return loft(
+    [
+      { t: 0, z: -len * 0.18, y: r * 0.66, w: r * 0.62, hT: r * 0.26, hB: r * 0.12, n: 2.6 },
+      { t: 0.5, z: -len * 0.45, y: r * 0.7, w: r * 0.72, hT: r * 0.3, hB: r * 0.12, n: 2.6 },
+      { t: 1, z: -len * 0.74, y: r * 0.66, w: r * 0.6, hT: r * 0.25, hB: r * 0.12, n: 2.6 },
+    ],
+    { rings: 4, seg: 14, capStart: r * 0.18, capEnd: r * 0.18, capRings: 3 }
+  );
+}
+
+/** Palmar grip pad on a fingertip. */
+function tipPad(len, r) {
+  return loft(
+    [
+      { t: 0, z: -len * 0.15, y: -r * 0.66, w: r * 0.7, hT: r * 0.12, hB: r * 0.3, n: 2.4 },
+      { t: 1, z: -len * 0.85, y: -r * 0.6, w: r * 0.62, hT: r * 0.12, hB: r * 0.28, n: 2.4 },
+    ],
+    { rings: 3, seg: 12, capStart: r * 0.2, capEnd: r * 0.35, capRings: 3 }
+  );
 }
 
 /**
- * Stitched seam down the OUTBOARD side of a finger segment.
- *
- * A glove is sewn from a palm panel and a dorsal panel, and the seam between
- * them runs down the side of every finger. It matters far out of proportion to
- * its size: at 40 px across the whole hand the four fingers merge into one
- * paddle, and the only thing that still separates them is a light line at each
- * boundary. A 1.5 mm strip at 1.4x the shell albedo (see `glove_seam` in
- * materials.js) survives to about 3 px, which is one pixel of separation per
- * finger — enough.
- *
- * @param {number} sx  +1 outboard on the thumb side, -1 on the little-finger side
+ * Stitched seam down the flank of a finger segment: a 1 mm proud bead. At the
+ * distances the hands sit these are the lines that keep four fingers from
+ * merging into one paddle.
  */
 function segmentSeam(len, r0, r1, sx) {
-  const g = box(0.0015, (r0 + r1) * 0.34, len * 0.86, 0.0003, 1);
-  // The finger capsule is scaled to 0.88 in Y, so its side wall sits at r in X.
-  g.translate(sx * (r0 + r1) * 0.49, r0 * 0.1, -len * 0.47);
-  return g;
+  const rm = (r0 + r1) * 0.5;
+  return loft(
+    [
+      { t: 0, z: -len * 0.06, x: sx * r0 * 0.97, y: r0 * 0.12, w: 0.0007, hT: r0 * 0.34, hB: r0 * 0.34 },
+      { t: 0.5, z: -len * 0.5, x: sx * rm * 0.99, y: rm * 0.12, w: 0.0007, hT: rm * 0.34, hB: rm * 0.34 },
+      { t: 1, z: -len * 0.94, x: sx * r1 * 0.97, y: r1 * 0.12, w: 0.0007, hT: r1 * 0.34, hB: r1 * 0.34 },
+    ],
+    { rings: 4, seg: 8 }
+  );
 }
 
 /**
- * Build one finger as three nested groups so it can curl.
+ * Build one finger as three nested joints so it can curl.
  * @returns {{root: THREE.Object3D, joints: THREE.Object3D[]}}
  */
 function buildFinger(materials, spec) {
-  const { lengths, radii, curl, seamSide } = spec;
+  const { lengths, radii, curl } = spec;
   const root = new THREE.Object3D();
   const joints = [];
   let parent = root;
@@ -108,34 +122,20 @@ function buildFinger(materials, spec) {
     const j = new THREE.Object3D();
     j.rotation.x = -curl[i];
     parent.add(j);
-    const geo = mergeAll([segment(lengths[i], radii[i], radii[i + 1])]);
-    const mesh = new THREE.Mesh(geo, materials.glove);
-    mesh.castShadow = false;
-    mesh.receiveShadow = true;
-    j.add(mesh);
-    // Sewn seams down BOTH flanks. One seam per finger leaves three boundaries
-    // out of five unmarked; seaming both sides puts a light line at every
-    // boundary, which is the whole point of the exercise. Two segments only —
-    // the distal phalanx is 22 mm long and a seam on it is sub-pixel.
+    j.add(new THREE.Mesh(segment(lengths[i], radii[i], radii[i + 1], i === 2), materials.glove));
     if (i < 2) {
-      const seams = mergeAll(
-        (seamSide ?? 0) === 0
-          ? [
-              segmentSeam(lengths[i], radii[i], radii[i + 1], 1),
-              segmentSeam(lengths[i], radii[i], radii[i + 1], -1),
-            ]
-          : [segmentSeam(lengths[i], radii[i], radii[i + 1], seamSide)]
+      j.add(
+        new THREE.Mesh(
+          mergeAll([
+            segmentSeam(lengths[i], radii[i], radii[i + 1], 1),
+            segmentSeam(lengths[i], radii[i], radii[i + 1], -1),
+          ]),
+          materials.seam ?? materials.glove
+        )
       );
-      j.add(new THREE.Mesh(seams, materials.seam ?? materials.glove));
-    }
-    if (i < 2) {
-      const pad = new THREE.Mesh(segmentPad(lengths[i], radii[i]), materials.pad);
-      j.add(pad);
+      j.add(new THREE.Mesh(segmentPad(lengths[i], radii[i] * (i === 0 ? 1 : 0.92)), materials.pad));
     } else {
-      // fingertip grip patch on the palm side
-      const tip = blob(radii[i] * 1.5, radii[i] * 0.5, lengths[i] * 0.7, radii[i] * 0.2, 2);
-      tip.translate(0, -radii[i] * 0.72, -lengths[i] * 0.45);
-      j.add(new THREE.Mesh(tip, materials.pad));
+      j.add(new THREE.Mesh(tipPad(lengths[i], radii[i]), materials.pad));
     }
     const next = new THREE.Object3D();
     next.position.z = -lengths[i];
@@ -147,182 +147,287 @@ function buildFinger(materials, spec) {
 }
 
 /**
- * Glove: palm, thumb web, knuckle plate, wrist strap.
- * Fingers are added as children so they can be posed per-weapon.
+ * Glove: palm shell, knuckle guard, back-of-hand pads, palm patch.
+ * Fingers and the thumb are added as children by the Arm so they can be posed.
  */
 function buildGlove(materials, opts = {}) {
-  const scale = opts.scale ?? 1;
-  const w = 0.088 * scale;
-  const h = 0.032 * scale;
-  const palmLen = 0.098 * scale;
+  const s = opts.scale ?? 1;
   const root = new THREE.Object3D();
 
-  const shell = [];
   /**
-   * Palm. Built as two overlapping blocks rather than one, because a single
-   * 88 x 98 mm slab is exactly what the support hand presents to the camera in a
-   * C-clamp and it reads as a brick. A hand is ~88 mm across the knuckles and
-   * ~72 mm across the wrist, so the taper is real and it is the difference
-   * between a hand silhouette and a paddle.
+   * Palm shell. The superellipse exponent climbs from 2.2 at the wrist to 2.8
+   * at the knuckles: the wrist is round, the metacarpal row is a flattened arch.
+   * The thumb side (+X) is fuller than the little-finger side through the
+   * thenar, and the palmar half is deeper than the dorsal half everywhere.
    */
-  const palm = blob(w, h, palmLen * 0.62, 0.012 * scale, 3);
-  palm.translate(0, 0, -palmLen * 0.66);
-  shell.push(palm);
-  const palmRear = blob(w * 0.83, h * 0.96, palmLen * 0.52, 0.012 * scale, 3);
-  palmRear.translate(0, -h * 0.01, -palmLen * 0.26);
-  shell.push(palmRear);
-  // Thenar (thumb muscle) and the heel of the hand.
-  const thenar = blob(w * 0.42, h * 0.92, palmLen * 0.6, 0.014 * scale, 3);
-  thenar.translate(w * 0.3, -h * 0.06, -palmLen * 0.3);
-  shell.push(thenar);
-  const heel = blob(w * 0.92, h * 0.86, 0.03 * scale, 0.012 * scale, 3);
-  heel.translate(0, -h * 0.04, -0.012 * scale);
-  shell.push(heel);
-  // Knuckle lumps.
-  for (let i = 0; i < 4; i++) {
-    const x = w * (0.34 - i * 0.225);
-    const k = dome(0.0072 * scale, 10, 0.62);
-    k.rotateX(-Math.PI / 2);
-    k.translate(x, h * 0.42, -palmLen * 0.94);
-    shell.push(k);
-  }
-  const glove = new THREE.Mesh(mergeAll(shell), materials.glove);
-  root.add(glove);
+  const palm = loft(
+    [
+      { t: 0, z: 0.008 * s, y: -0.001 * s, w: 0.028 * s, wL: 0.028 * s, hT: 0.0145 * s, hB: 0.016 * s, n: 2.2 },
+      { t: 0.2, z: -0.013 * s, x: 0.002 * s, w: 0.036 * s, wL: 0.033 * s, hT: 0.015 * s, hB: 0.0205 * s, n: 2.3 },
+      { t: 0.5, z: -0.045 * s, x: 0.001 * s, w: 0.0415 * s, wL: 0.04 * s, hT: 0.0138 * s, hB: 0.0185 * s, n: 2.6 },
+      { t: 0.8, z: -0.074 * s, w: 0.0445 * s, wL: 0.0435 * s, hT: 0.0128 * s, hB: 0.0162 * s, n: 2.8 },
+      { t: 1, z: -0.093 * s, y: -0.001 * s, w: 0.0445 * s, wL: 0.0432 * s, hT: 0.0122 * s, hB: 0.0142 * s, n: 2.8 },
+    ],
+    { rings: 20, seg: 36, capStart: 0.004 * s, capEnd: 0.0105 * s, capRings: 6 }
+  );
+  root.add(new THREE.Mesh(palm, materials.glove));
 
-  /**
-   * Dorsal armour. This used to be ONE 81 x 41 mm slab across the knuckles plus a
-   * second across the back, and since the support hand presents its dorsal side
-   * straight at the camera that is precisely what the critique saw: "detached grey
-   * slabs". A real glove's knuckle guard is four separate moulded caps with
-   * flex gaps between them, and those three gaps are the entire read — they give
-   * the silhouette four lobes instead of one rectangle.
-   */
-  /**
-   * COVERAGE BUDGET: the caps plus everything else on the dorsum must not exceed
-   * 55% of the back of the hand.
-   *
-   * The previous set was four caps at 19.6% x 40% of the palm footprint (= 31%),
-   * a back panel at 72% x 30% (= 22%) and three tendon ridges — call it 57%, and
-   * because they all sat at the same height (h*0.45-0.48) with the same material
-   * they merged into ONE continuous shelf across the whole dorsum. That shelf is
-   * the "stack of slabs" read, and no amount of retinting fixes it: what the eye
-   * is objecting to is that the back of the hand has no soft glove left on it.
-   *
-   * Now: four caps at 17% x 30% (= 20.4%) over the knuckles only, and one small
-   * metacarpal panel at 44% x 22% (= 9.7%) with a clear 12% gap of bare shell
-   * between it and the caps. Total 30% — well inside budget, and there is
-   * visibly more glove than armour. The tendon ridges are gone entirely; the
-   * shell's own knuckle lumps already break that surface up, and the ridges were
-   * the thing bridging the caps into the panel.
-   */
   const pads = [];
-  for (let i = 0; i < 4; i++) {
-    const x = w * (0.335 - i * 0.223);
-    const cap = blob(w * 0.17, h * 0.3, palmLen * 0.3, 0.005 * scale, 3);
-    // outboard caps sit slightly lower, following the knuckle arch
-    const drop = Math.abs(i - 1.5) > 1 ? h * 0.055 : 0;
-    cap.translate(x, h * 0.46 - drop, -palmLen * 0.82);
-    pads.push(cap);
+  /**
+   * Knuckle guard: ONE moulded part with four lobes over the metacarpal heads
+   * and flex valleys between them, following the knuckle arch. Lofted across
+   * the hand (along X) and turned into place.
+   */
+  const KX = [-0.0298, -0.0104, 0.0102, 0.0298];
+  const kkeys = [];
+  const xs = [-0.041, -0.0298, -0.02, -0.0104, 0, 0.0102, 0.02, 0.0298, 0.04];
+  for (let i = 0; i < xs.length; i++) {
+    const x = xs[i];
+    const lobe = KX.some((k) => Math.abs(k - x) < 1e-4);
+    const end = i === 0 || i === xs.length - 1;
+    // arch: the palm's dorsal surface at the knuckle row, minus a millimetre
+    const u = Math.min(0.98, Math.abs(x) / 0.0445);
+    const top = 0.0126 * Math.pow(1 - Math.pow(u, 2.8), 1 / 2.8);
+    kkeys.push({
+      t: i / (xs.length - 1),
+      z: x * s,
+      y: (top - 0.0012) * s,
+      w: (end ? 0.0068 : lobe ? 0.0102 : 0.0078) * s,
+      hT: (end ? 0.0022 : lobe ? 0.0048 : 0.0029) * s,
+      hB: 0.0028 * s,
+      n: 2.4,
+    });
   }
-  const backPanel = blob(w * 0.44, h * 0.17, palmLen * 0.22, 0.005 * scale, 3);
-  backPanel.translate(0, h * 0.44, -palmLen * 0.4);
-  pads.push(backPanel);
-  // Palm grip patch.
-  const patch = blob(w * 0.82, h * 0.18, palmLen * 0.66, 0.006 * scale, 3);
-  patch.translate(0, -h * 0.52, -palmLen * 0.48);
-  pads.push(patch);
+  const guard = loft(kkeys, { rings: 40, seg: 16, capStart: 0.003 * s, capEnd: 0.003 * s, capRings: 3 });
+  guard.rotateY(Math.PI / 2); // loft z -> hand x
+  guard.translate(0, 0, -0.087 * s);
+  pads.push(guard);
+
+  // Back-of-hand pads: two panels with a flex gap between them.
+  for (const [za, zb] of [
+    [-0.024, -0.046],
+    [-0.051, -0.071],
+  ]) {
+    const zm = (za + zb) * 0.5;
+    const topAt = (z) => (z > -0.045 ? 0.0145 : 0.0135);
+    pads.push(
+      loft(
+        [
+          { t: 0, z: za * s, y: (topAt(za) - 0.0014) * s, w: 0.019 * s, hT: 0.0028 * s, hB: 0.0015 * s, n: 3 },
+          { t: 0.5, z: zm * s, y: (topAt(zm) - 0.0012) * s, w: 0.0215 * s, hT: 0.0032 * s, hB: 0.0015 * s, n: 3 },
+          { t: 1, z: zb * s, y: (topAt(zb) - 0.0016) * s, w: 0.022 * s, hT: 0.0028 * s, hB: 0.0015 * s, n: 3 },
+        ],
+        { rings: 6, seg: 18, capStart: 0.0025 * s, capEnd: 0.0025 * s, capRings: 3 }
+      )
+    );
+  }
+  // Leather palm patch, following the palmar surface.
+  pads.push(
+    loft(
+      [
+        { t: 0, z: -0.018 * s, x: 0.001 * s, y: -0.0188 * s, w: 0.03 * s, hT: 0.0014 * s, hB: 0.0024 * s, n: 3 },
+        { t: 0.5, z: -0.05 * s, y: -0.0168 * s, w: 0.037 * s, hT: 0.0014 * s, hB: 0.0026 * s, n: 3 },
+        { t: 1, z: -0.083 * s, y: -0.0142 * s, w: 0.038 * s, hT: 0.0014 * s, hB: 0.0022 * s, n: 3 },
+      ],
+      { rings: 8, seg: 20, capStart: 0.003 * s, capEnd: 0.003 * s, capRings: 3 }
+    )
+  );
   root.add(new THREE.Mesh(mergeAll(pads), materials.pad));
 
-  // Seams down the sides of the hand.
+  // Seams: down both edges of the hand where the palm and back panels meet.
   const seams = [];
   for (const sx of [-1, 1]) {
-    const s = box(0.0016 * scale, h * 0.5, palmLen * 0.8, 0.0004, 1);
-    s.translate(sx * w * 0.5, 0, -palmLen * 0.5);
-    seams.push(s);
+    seams.push(
+      loft(
+        [
+          { t: 0, z: -0.006 * s, x: sx * 0.03 * s, y: 0.0005 * s, w: 0.0008 * s, hT: 0.0035 * s, hB: 0.0035 * s },
+          { t: 0.5, z: -0.045 * s, x: sx * 0.0405 * s, y: 0.001 * s, w: 0.0008 * s, hT: 0.004 * s, hB: 0.004 * s },
+          { t: 1, z: -0.086 * s, x: sx * 0.0445 * s, y: 0.0 * s, w: 0.0008 * s, hT: 0.0035 * s, hB: 0.0035 * s },
+        ],
+        { rings: 8, seg: 8 }
+      )
+    );
   }
-  root.add(new THREE.Mesh(mergeAll(seams), materials.pad));
-
-  // Wrist cuff + strap + a small steel keeper.
-  const cuff = latheZ(
-    [
-      [0, w * 0.44],
-      [0.004 * scale, w * 0.47],
-      [0.03 * scale, w * 0.46],
-      [0.034 * scale, w * 0.42],
-    ],
-    16
-  );
-  cuff.scale(1, 0.82, 1);
-  const cuffMesh = new THREE.Mesh(cuff, materials.glove);
-  cuffMesh.position.z = 0.004 * scale;
-  root.add(cuffMesh);
-  const strap = latheZ(
-    [
-      [0, w * 0.47],
-      [0.0022, w * 0.5],
-      [0.009 * scale, w * 0.5],
-      [0.0112 * scale, w * 0.47],
-    ],
-    16
-  );
-  strap.scale(1, 0.82, 1);
-  const strapMesh = new THREE.Mesh(strap, materials.pad);
-  strapMesh.position.z = 0.02 * scale;
-  root.add(strapMesh);
-
+  root.add(new THREE.Mesh(mergeAll(seams), materials.seam ?? materials.pad));
   return root;
 }
 
 /**
- * Thumb: two segments on the +X side, angled across the grip.
- *
- * THE PROXIMAL SEGMENT IS THE METACARPAL AS WELL AS THE PROXIMAL PHALANX, and
- * that is why it is 50 mm rather than 38.
- *
- * MEASURED: with a 38 + 30 mm thumb the C-clamp solve (Arm.fitToCylinder) left
- * the tip 13.2 mm clear of the handguard no matter how the base was aimed —
- * scanning abduction alone, then abduction AND rotation in a 21 x 15 grid, moved
- * it by 1 mm. It is not an aiming problem, it is a reach problem: the thumb root
- * sits at the heel of the palm, the palm on a C-clamp stands 29 mm off a 54 mm
- * tube (unavoidable — a 98 mm palm tangent to a 27 mm radius diverges), and 68 mm
- * of thumb simply does not get there.
- *
- * A real hand does not have that problem because the thumb column starts at the
- * CARPOMETACARPAL joint, deep in the wrist, and the visible thumb from the web to
- * the tip is 75-85 mm. This rig has no metacarpal segment at all, so the proximal
- * one absorbs it: 50 + 32 = 82 mm, which reaches with 10 mm of flexion in hand.
+ * Glove cuff, strap and (optionally) a watch — in FOREARM bone space, at the
+ * wrist end. `len` is the forearm length; the wrist sits at z = -len.
+ * @param {number} radialSign  +1 if bone +X is the thumb side
+ */
+function buildCuff(materials, len, s, opts = {}) {
+  const root = new THREE.Object3D();
+  const zw = -len;
+  // neoprene cuff: from the wrist back 70 mm, slightly flared at the open end
+  const cuff = loft(
+    [
+      { t: 0, z: zw + 0.004 * s, w: 0.0295 * s, hT: 0.0158 * s, hB: 0.0172 * s, n: 2.2 },
+      { t: 0.35, z: zw + 0.026 * s, w: 0.0322 * s, hT: 0.0195 * s, hB: 0.0205 * s, n: 2.2 },
+      { t: 1, z: zw + 0.072 * s, w: 0.0345 * s, hT: 0.0228 * s, hB: 0.0238 * s, n: 2.2 },
+    ],
+    {
+      rings: 18,
+      seg: 32,
+      capStart: 0.004 * s,
+      capEnd: 0.002 * s,
+      disp: foldField(makeFolds(7, [{ count: 3, from: 0.1, to: 0.6, amp: 0.035, width: 0.07, tilt: 0.05, arc: 3.4 }]), 0.008, 3),
+    }
+  );
+  root.add(new THREE.Mesh(cuff, materials.glove));
+
+  // hook-and-loop strap round the cuff plus its pull tab
+  const strapZ0 = zw + (opts.watch ? 0.046 : 0.03) * s;
+  const strapZ1 = strapZ0 + 0.02 * s;
+  const tS = (strapZ0 - zw) / (0.072 * s);
+  const wAt = (t) => 0.0322 + (0.0345 - 0.0322) * Math.max(0, (t - 0.35) / 0.65);
+  const hAt = (t) => 0.0195 + (0.0228 - 0.0195) * Math.max(0, (t - 0.35) / 0.65);
+  const pad = [];
+  pad.push(
+    loft(
+      [
+        { t: 0, z: strapZ0, w: (wAt(tS) + 0.0022) * s, hT: (hAt(tS) + 0.0022) * s, hB: (hAt(tS) + 0.0032) * s, n: 2.2 },
+        { t: 1, z: strapZ1, w: (wAt(tS + 0.28) + 0.0022) * s, hT: (hAt(tS + 0.28) + 0.0022) * s, hB: (hAt(tS + 0.28) + 0.0032) * s, n: 2.2 },
+      ],
+      { rings: 3, seg: 32, capStart: 0.0015 * s, capEnd: 0.0015 * s, capRings: 3 }
+    )
+  );
+  // pull tab, on the ulnar-dorsal side
+  const tab = box(0.016 * s, 0.004 * s, 0.022 * s, 0.0018 * s, 2);
+  tab.rotateZ(-0.9 * (opts.radialSign ?? 1));
+  tab.translate(-(opts.radialSign ?? 1) * 0.029 * s, 0.017 * s, (strapZ0 + strapZ1) * 0.5);
+  pad.push(tab);
+  root.add(new THREE.Mesh(mergeAll(pad), materials.pad));
+
+  if (opts.watch && materials.watch) root.add(buildWatch(materials, zw + 0.022 * s, s, opts.radialSign ?? 1));
+  return root;
+}
+
+/**
+ * A resin-cased field watch, face on the back of the wrist rolled 25 degrees
+ * toward the thumb so it faces the shooter over a C-clamp.
+ */
+function buildWatch(materials, zc, s, radialSign) {
+  const g = new THREE.Object3D();
+  // strap: a band hugging the cuff (cuff half-axes at this z are ~32 x 20 mm)
+  const strap = loft(
+    [
+      { t: 0, z: zc - 0.011 * s, w: 0.0336 * s, hT: 0.0212 * s, hB: 0.0222 * s, n: 2.2 },
+      { t: 1, z: zc + 0.011 * s, w: 0.0346 * s, hT: 0.0226 * s, hB: 0.0234 * s, n: 2.2 },
+    ],
+    { rings: 3, seg: 36, capStart: 0.0014 * s, capEnd: 0.0014 * s, capRings: 3 }
+  );
+  g.add(new THREE.Mesh(strap, materials.strap ?? materials.pad));
+
+  const head = new THREE.Object3D();
+  // case: 44 x 42 mm, 13 mm tall, with lugs; axis +Y out of the wrist
+  const parts = [];
+  const caseG = loft(
+    [
+      { t: 0, z: -0.0215 * s, y: 0.0045 * s, w: 0.0165 * s, hT: 0.004 * s, hB: 0.0035 * s, n: 3.2 },
+      { t: 0.5, z: 0, y: 0.0055 * s, w: 0.0212 * s, hT: 0.0062 * s, hB: 0.0045 * s, n: 3.2 },
+      { t: 1, z: 0.0215 * s, y: 0.0045 * s, w: 0.0165 * s, hT: 0.004 * s, hB: 0.0035 * s, n: 3.2 },
+    ],
+    { rings: 10, seg: 28, capStart: 0.003 * s, capEnd: 0.003 * s, capRings: 3 }
+  );
+  parts.push(caseG);
+  // bezel: a knurled ring standing on the case
+  const bezel = latheZ(
+    [
+      [0, 0.0128 * s],
+      [0, 0.0182 * s],
+      [0.0012 * s, 0.0192 * s],
+      [0.0034 * s, 0.0186 * s],
+      [0.0038 * s, 0.0165 * s],
+      [0.0032 * s, 0.0128 * s],
+    ],
+    40
+  );
+  bezel.rotateX(-Math.PI / 2);
+  bezel.translate(0, 0.0105 * s, 0);
+  parts.push(bezel);
+  // crown and pushers on the side
+  for (const [dz, r] of [
+    [0, 0.0026],
+    [-0.009, 0.0019],
+    [0.009, 0.0019],
+  ]) {
+    const c = rodZ(r * s, r * s, 0.004 * s, 12, 0.0005 * s);
+    c.rotateY(Math.PI / 2);
+    c.translate(0.0228 * s, 0.0068 * s, dz * s);
+    parts.push(c);
+  }
+  head.add(new THREE.Mesh(mergeAll(parts), materials.watch));
+  // dial: recessed, under the bezel
+  const dial = rodZ(0.0132 * s, 0.0132 * s, 0.001 * s, 32, 0.0002 * s);
+  dial.rotateX(-Math.PI / 2);
+  dial.translate(0, 0.0112 * s, 0);
+  const hands = [];
+  const hand1 = box(0.0009 * s, 0.0004 * s, 0.009 * s, 0.0001, 1);
+  hand1.translate(0, 0.0122 * s, -0.004 * s);
+  hands.push(hand1);
+  const hand2 = box(0.0009 * s, 0.0004 * s, 0.0065 * s, 0.0001, 1);
+  hand2.translate(0, 0, -0.003 * s);
+  hand2.rotateY(1.9);
+  hand2.translate(0, 0.0124 * s, 0);
+  hands.push(hand2);
+  for (let i = 0; i < 12; i++) {
+    const m = box(0.0008 * s, 0.0003 * s, (i % 3 === 0 ? 0.0026 : 0.0014) * s, 0.0001, 1);
+    m.translate(0, 0.0119 * s, -0.0115 * s);
+    m.rotateY((i / 12) * Math.PI * 2);
+    hands.push(m);
+  }
+  head.add(new THREE.Mesh(dial, materials.watchFace ?? materials.watch));
+  if (materials.seam) head.add(new THREE.Mesh(mergeAll(hands), materials.seam));
+  // seat on the dorsal surface, rolled toward the thumb
+  head.position.set(0, 0.0196 * s, zc);
+  const roll = -0.42 * radialSign;
+  const pivot = new THREE.Object3D();
+  pivot.rotation.z = roll;
+  pivot.position.set(0, 0, 0);
+  head.position.set(0, 0.0205 * s, zc);
+  pivot.add(head);
+  g.add(pivot);
+  return g;
+}
+
+/**
+ * Thumb: two segments on the +X side, angled across the grip. The proximal
+ * segment stands in for the metacarpal as well as the proximal phalanx (50 mm),
+ * and carries the thenar swell that blends it into the palm.
  */
 function buildThumb(materials, scale = 1, spec = THUMB) {
+  const s = scale;
   const root = new THREE.Object3D();
   const j1 = new THREE.Object3D();
   root.add(j1);
-  const s1 = new THREE.Mesh(segment(spec.l0 * scale, spec.r0 * scale, spec.r1 * scale), materials.glove);
-  j1.add(s1);
-  j1.add(new THREE.Mesh(segmentPad(spec.l0 * scale, spec.r0 * scale), materials.pad));
-  // Seams down both flanks, as on the fingers — the thumb is the widest single
-  // digit on screen in the support grip and a bare capsule reads as a sausage.
+  const l0 = spec.l0 * s;
+  const l1 = spec.l1 * s;
+  const seg1 = loft(
+    [
+      { t: 0, z: 0.004 * s, y: -0.002 * s, w: spec.r0 * 1.45 * s, hT: spec.r0 * 1.05 * s, hB: spec.r0 * 1.35 * s, n: 2.2 },
+      { t: 0.45, z: -l0 * 0.45, y: -0.001 * s, w: spec.r0 * 1.12 * s, hT: spec.r0 * 0.84 * s, hB: spec.r0 * 1.02 * s, n: 2.3 },
+      { t: 1, z: -l0, w: spec.r1 * s, hT: spec.r1 * 0.82 * s, hB: spec.r1 * 0.9 * s, n: 2.3 },
+    ],
+    { rings: 10, seg: 20, capStart: spec.r0 * 1.1 * s, capEnd: spec.r1 * 0.82 * s, capRings: 5 }
+  );
+  j1.add(new THREE.Mesh(seg1, materials.glove));
+  j1.add(new THREE.Mesh(segmentPad(l0 * 0.8, spec.r1 * s).translate(0, 0, -l0 * 0.28), materials.pad));
   j1.add(
     new THREE.Mesh(
       mergeAll([
-        segmentSeam(spec.l0 * scale, spec.r0 * scale, spec.r1 * scale, 1),
-        segmentSeam(spec.l0 * scale, spec.r0 * scale, spec.r1 * scale, -1),
+        segmentSeam(l0, spec.r0 * s, spec.r1 * s, 1),
+        segmentSeam(l0, spec.r0 * s, spec.r1 * s, -1),
       ]),
       materials.seam ?? materials.glove
     )
   );
   const j2 = new THREE.Object3D();
-  j2.position.z = -spec.l0 * scale;
+  j2.position.z = -l0;
   j1.add(j2);
-  const s2 = new THREE.Mesh(segment(spec.l1 * scale, spec.r1 * scale, spec.r2 * scale), materials.glove);
-  j2.add(s2);
-  // Grip patch on the PALMAR side of the pad, matching the fingers, and a small
-  // dorsal nail plate.
-  const pad = blob(spec.r2 * 1.6 * scale, spec.r2 * 0.55 * scale, spec.l1 * 0.66 * scale, 0.0012, 2);
-  pad.translate(0, -spec.r2 * 0.78 * scale, -spec.l1 * 0.45 * scale);
-  j2.add(new THREE.Mesh(pad, materials.pad));
-  const nail = blob(0.011 * scale, 0.0035 * scale, 0.016 * scale, 0.0012, 2);
-  nail.translate(0, spec.r2 * scale, -0.016 * scale);
-  j2.add(new THREE.Mesh(nail, materials.pad));
+  j2.add(new THREE.Mesh(segment(l1, spec.r1 * s, spec.r2 * s, true), materials.glove));
+  j2.add(new THREE.Mesh(tipPad(l1, spec.r2 * s * 1.15), materials.pad));
   return { root, joints: [j1, j2] };
 }
 
@@ -330,132 +435,63 @@ function buildThumb(materials, scale = 1, spec = THUMB) {
 const THUMB = { l0: 0.05, l1: 0.032, r0: 0.0115, r1: 0.0102, r2: 0.0078 };
 
 /**
- * Tapered sleeve with fold rings, an elbow pad and a rolled cuff.
- * Both ends are CLOSED — an open lathe reads as a length of pipe, which is
- * exactly the "grey sausage" failure this rig has to avoid.
+ * Sleeve over one bone. Bone space: the joint at z=0, the limb along -Z.
+ *
+ *   kind 'upper'  shoulder -> elbow. Mostly off screen; a fuller tube with a
+ *                 domed elbow and compression folds on the inside of the bend.
+ *   kind 'fore'   elbow -> wrist. The part the camera sees. Widest over the
+ *                 brachioradialis a quarter of the way down, flattening to an
+ *                 oval at the wrist, ending in a hemmed cuff 45 mm short of the
+ *                 wrist so the glove cuff shows, with the fabric bunched in
+ *                 oblique partial folds above it.
  */
-function buildSleeve(material, len, r0, r1, opts = {}) {
-  const parts = [];
-  /**
-   * SEGMENT COUNT. The support forearm's closest approach to the eye is ~0.38 m
-   * and it is ~120 px wide, so a 20-gon puts a facet sagitta of 0.7 px on the
-   * silhouette — countable, and countable facets are exactly what the critique
-   * measured. 32 takes it to 0.28 px, under the AA threshold.
-   */
-  const SEG = 32;
-  /**
-   * The shell profile is no longer a smooth cone. A sleeved forearm has three
-   * things a cone does not: the fabric is loose so it bells slightly behind the
-   * elbow, it is pulled tight over the muscle belly a third of the way down, and
-   * it bunches again at the cuff. Those three inflections are what make the
-   * silhouette read as cloth over a limb rather than as pipe.
-   */
-  const shell = latheZ(
-    [
-      [0, 0],
-      [0, r0 * 0.55],
-      [-0.004, r0 * 0.82],
-      [-0.006, r0 * 0.98],
-      [0.004, r0],
-      [len * 0.16, r0 * 1.03],
-      [len * 0.34, r0 * 0.9],
-      [len * 0.52, (r0 + r1) * 0.5],
-      [len * 0.72, r1 * 1.1],
-      [len - 0.016, r1 * 1.0],
-      [len - 0.005, r1 * 1.07],
-      [len, r1 * 0.98],
-      [len + 0.003, r1 * 0.8],
-      [len + 0.004, 0],
-    ],
-    SEG
-  );
-  parts.push(shell);
-  // Joint mass at the far end so the two bones read as one limb.
-  const joint = latheZ(
-    [
-      [len - r1 * 1.1, 0],
-      [len - r1 * 0.9, r1 * 0.75],
-      [len - r1 * 0.2, r1 * 1.04],
-      [len + r1 * 0.5, r1 * 0.9],
-      [len + r1 * 0.8, r1 * 0.4],
-      [len + r1 * 0.85, 0],
-    ],
-    20
-  );
-  joint.scale(1, 0.94, 1);
-  parts.push(joint);
-  /**
-   * Fold rings. These are not decoration: they are the only concave creases on
-   * the whole limb, and the curvature mask bake (Arm.bakeSurfaceMasks) turns
-   * every one of them into a grime line with a dust-rubbed crown either side.
-   * That is what puts texture on a surface whose albedo is 0.013 linear.
-   *
-   * Ellipticity and a per-fold radius jitter matter as much as the count: eight
-   * identical circular rings equally spaced read as a hose, which is the failure
-   * this is here to avoid.
-   */
-  const folds = opts.folds ?? 3;
-  for (let i = 0; i < folds; i++) {
-    const t = 0.14 + (i / Math.max(1, folds - 1)) * 0.7;
-    // deterministic wobble, so captures stay byte-identical
-    const j = Math.sin(i * 2.399 + 0.7) * 0.5 + Math.sin(i * 5.13) * 0.25;
-    const r = (r0 + (r1 - r0) * t) * (1 + j * 0.06);
-    const f = ring(r * 0.985, r * (0.085 + j * 0.03), 24, 6);
-    f.rotateX(Math.PI / 2);
-    f.rotateY(j * 0.12);
-    f.scale(1, 0.93, 1);
-    f.translate(0, 0, len * t + j * 0.004);
-    parts.push(f);
-  }
-  /**
-   * Two longitudinal wrinkle ridges down the inboard and outboard flanks. A
-   * tube's silhouette is a straight line; a sleeve's is not, and these are the
-   * cheapest thing that breaks it. They sit just proud of the shell so they
-   * catch the key on their crown and shade the shell beside them.
-   */
-  for (const sx of [-1, 1]) {
-    const w = latheZ(
+function buildSleeve(material, len, kind, s = 1, seed = 1) {
+  let geo;
+  if (kind === 'upper') {
+    const folds = makeFolds(seed, [
+      { count: 3, from: 0.62, to: 0.95, amp: 0.09, width: 0.035, tilt: 0.05, arc: 3.2, phase: -Math.PI / 2, phaseJitter: 0.4 },
+      { count: 3, from: 0.15, to: 0.6, amp: 0.05, width: 0.06, tilt: 0.1, arc: 2.6 },
+    ]);
+    geo = loft(
       [
-        [len * 0.2, 0],
-        [len * 0.3, r0 * 0.16],
-        [len * 0.55, r0 * 0.2],
-        [len * 0.78, r0 * 0.13],
-        [len * 0.86, 0],
+        { t: 0, z: 0.0, w: 0.058 * s, hT: 0.054 * s, hB: 0.054 * s },
+        { t: 0.45, z: -len * 0.45, w: 0.056 * s, hT: 0.052 * s, hB: 0.05 * s },
+        { t: 1, z: -len, w: 0.05 * s, hT: 0.046 * s, hB: 0.046 * s },
       ],
-      10
+      { rings: 48, seg: 36, capStart: 0.04 * s, capEnd: 0.044 * s, capRings: 7, disp: foldField(folds, 0.018, seed) }
     );
-    w.scale(1, 0.5, 1);
-    w.rotateZ(sx * 0.4);
-    w.translate(sx * (r0 + r1) * 0.46, -(r0 + r1) * 0.1, 0);
-    parts.push(w);
-  }
-  if (opts.elbowPad) {
-    const pad = blob(r0 * 1.5, r0 * 0.6, len * 0.3, r0 * 0.3, 3);
-    pad.translate(0, r0 * 0.75, len * 0.12);
-    parts.push(pad);
-  }
-  if (opts.cuff) {
-    // Rolled, stitched cuff: two proud bands with a seam channel between them,
-    // which is what a combat-shirt cuff actually looks like and gives the wrist
-    // a hard terminator so the sleeve does not appear to melt into the glove.
-    const cuff = latheZ(
+  } else {
+    const hemT = 1;
+    const zEnd = -(len - 0.046 * s);
+    const folds = makeFolds(seed, [
+      // compression folds bunched above the hem
+      { count: 4, from: 0.66, to: 0.93, amp: 0.075, width: 0.028, tilt: 0.045, arc: 4.2, phaseJitter: 2.5 },
+      // long drag folds down the middle
+      { count: 3, from: 0.22, to: 0.6, amp: 0.04, width: 0.05, tilt: 0.09, arc: 3.0, phaseJitter: 2.5 },
+      // inside of the elbow
+      { count: 2, from: 0.02, to: 0.16, amp: 0.07, width: 0.035, tilt: 0.04, arc: 2.6, phase: -Math.PI / 2, phaseJitter: 0.5 },
+    ]);
+    const fold = foldField(folds, 0.014, seed);
+    // hem: a rolled, stitched edge — flat band, then a lip
+    const disp = (th, t, sec) => {
+      let d = fold(th, t, sec);
+      const hem = Math.max(0, (t - 0.965) / 0.035);
+      d *= 1 - Math.min(1, hem * 1.6);
+      d += 0.05 * Math.min(1, hem * 2.5) - 0.01 * Math.max(0, hem - 0.8) * 5;
+      return d;
+    };
+    geo = loft(
       [
-        [len - 0.032, r1 * 1.02],
-        [len - 0.029, r1 * 1.17],
-        [len - 0.019, r1 * 1.16],
-        [len - 0.016, r1 * 1.08],
-        [len - 0.012, r1 * 1.08],
-        [len - 0.009, r1 * 1.18],
-        [len - 0.003, r1 * 1.17],
-        [len, r1 * 1.02],
+        { t: 0, z: 0.012 * s, w: 0.046 * s, hT: 0.041 * s, hB: 0.043 * s },
+        { t: 0.22, z: zEnd * 0.22, w: 0.0485 * s, hT: 0.04 * s, hB: 0.0445 * s, n: 2.1 },
+        { t: 0.55, z: zEnd * 0.55, w: 0.0415 * s, hT: 0.032 * s, hB: 0.0355 * s, n: 2.2 },
+        { t: 0.85, z: zEnd * 0.85, w: 0.0375 * s, hT: 0.0285 * s, hB: 0.0305 * s, n: 2.2 },
+        { t: hemT, z: zEnd, w: 0.0385 * s, hT: 0.0292 * s, hB: 0.031 * s, n: 2.2 },
       ],
-      SEG
+      { rings: 96, seg: 40, capStart: 0.036 * s, capEnd: 0.004 * s, capRings: 6, disp }
     );
-    parts.push(cuff);
   }
-  const g = mergeAll(parts);
-  g.rotateY(Math.PI); // extend along -Z, like the bones
-  return new THREE.Mesh(g, material);
+  return new THREE.Mesh(geo, material);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -540,38 +576,19 @@ export class Arm {
     this.pole = new THREE.Vector3(side * 0.46, -0.86, 0.22).normalize();
 
     // Bones. Geometry extends along -Z from each joint.
-    /**
-     * Sleeve radii.
-     *
-     * MEASURED, twice. At 78 mm across the elbow / 54 mm at the wrist the
-     * support forearm rendered as a 160 px-wide smooth tube crossing the lower
-     * third of every hipfire frame — "a huge untextured tan tube", and the single
-     * most-cited defect in the whole build. The width is not the only problem
-     * (see the material and the mask bake) but it is a third of it: the support
-     * forearm's closest approach to the eye is ~0.38 m, so every millimetre of
-     * radius is 2.6 px of screen at 1080p.
-     *
-     * A real combat shirt over a forearm is 68 mm at the elbow tapering to 48 mm
-     * at the wrist, and that is what these are now: 0.034/0.024. The shooting
-     * arm keeps a fuller upper sleeve (it is almost entirely out of frame) so the
-     * two arms still read as the same garment.
-     *
-     * Fold counts go UP, not down: with the tube narrower the folds are what
-     * carry the silhouette, and each one is a crease the mask bake fills with
-     * grime and a crown it rubs dust onto.
-     */
-    this.upper = buildSleeve(materials.sleeve, this.l1, 0.044 * this.scale, 0.036 * this.scale, {
-      folds: 5,
-      elbowPad: true,
-    });
-    this.fore = buildSleeve(materials.sleeve, this.l2, 0.034 * this.scale, 0.024 * this.scale, {
-      folds: 7,
-      cuff: true,
-    });
+    // Sleeves: lofted cloth over each bone (see buildSleeve). Different fold
+    // seeds per bone and per side, so the two arms never mirror each other.
+    this.upper = buildSleeve(materials.sleeve, this.l1, 'upper', this.scale, side < 0 ? 11 : 23);
+    this.fore = buildSleeve(materials.sleeve, this.l2, 'fore', this.scale, side < 0 ? 5 : 17);
     this.upperPivot = new THREE.Object3D();
     this.forePivot = new THREE.Object3D();
     this.upperPivot.add(this.upper);
     this.forePivot.add(this.fore);
+    // Glove cuff (+ watch on the support wrist) rides the forearm bone. The
+    // bone's +X is the thumb side on the left arm and the little-finger side on
+    // the right, because only the right HAND is mirrored.
+    this.cuff = buildCuff(materials, this.l2, this.scale, { watch: side < 0, radialSign: side < 0 ? 1 : -1 });
+    this.forePivot.add(this.cuff);
     this.root.add(this.upperPivot);
     this.root.add(this.forePivot);
 

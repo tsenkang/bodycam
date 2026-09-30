@@ -27,16 +27,16 @@ export class Minimap {
     this.canvas = el('canvas', null, this.root);
     this.g = this.canvas.getContext('2d');
     for (const c of ['tl', 'tr', 'bl', 'br']) el('div', 'ow-mm-corner ' + c, this.root);
-    el('div', 'ow-mm-n', this.root, 'N');
+    this.nLabel = el('div', 'ow-mm-n', this.root, 'N');
     const tag = el('div', 'ow-mm-tag', this.root);
     el('span', null, tag, 'ZONE 07');
     this.scaleTag = el('span', null, tag, '60M');
 
     this.rng = rng;
     this.k = 1;
-    this.cssSize = 178;
+    this.cssSize = 238;
     this.span = 190; // metres covered by the bake
-    this.viewSpan = 60; // metres visible in the widget
+    this.viewSpan = 70; // metres visible in the widget
     this.centre = new THREE.Vector2(0, 0);
 
     this.baked = null;
@@ -444,155 +444,151 @@ export class Minimap {
     if (!S) return;
     const half = S * 0.5;
     const ppm = S / this.viewSpan; // canvas pixels per metre
+    const u = S / this.cssSize; // canvas pixels per css reference pixel
+    const heading = ((s.heading ?? 0) * Math.PI) / 180;
 
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, S, S);
-
-    // base plate — never pure black, always slightly blue. Opaque, and every
-    // layer above it is opaque or drawn over it, so the widget composites as a
-    // single solid tile: nothing in the scene can show through the map.
-    g.fillStyle = '#2b343d';
+    g.fillStyle = '#262e35';
     g.fillRect(0, 0, S, S);
-
-    g.save();
-    g.beginPath();
-    g.rect(0, 0, S, S);
-    g.clip();
 
     const cx = s.x ?? 0;
     const cz = s.z ?? 0;
 
+    // ---- world layer: rotates so the player's heading is always up --------
+    g.save();
+    g.translate(half, half);
+    g.rotate(-heading);
     if (this.baked) {
       const bppm = BAKE / this.span;
-      const srcW = this.viewSpan * bppm;
+      const R = this.viewSpan * 0.75; // covers the corners of the rotated square
+      const srcW = R * 2 * bppm;
       const sx = (cx - this.centre.x) * bppm + BAKE * 0.5 - srcW * 0.5;
       const sy = (cz - this.centre.y) * bppm + BAKE * 0.5 - srcW * 0.5;
       g.imageSmoothingEnabled = true;
       g.imageSmoothingQuality = 'high';
-      g.drawImage(this.baked, sx, sy, srcW, srcW, 0, 0, S, S);
-    } else {
-      g.fillStyle = '#2b333b';
-      g.fillRect(0, 0, S, S);
+      g.drawImage(this.baked, sx, sy, srcW, srcW, -R * ppm, -R * ppm, R * 2 * ppm, R * 2 * ppm);
     }
 
-    // 10m grid, phase-locked to world space so it scrolls with the player
-    const u = S / this.cssSize; // canvas pixels per css reference pixel
-    g.lineWidth = 1;
-    g.strokeStyle = 'rgba(10,17,23,.20)';
-    g.beginPath();
-    const n0x = Math.floor((cx - this.viewSpan * 0.5) / 10);
-    const n1x = Math.ceil((cx + this.viewSpan * 0.5) / 10);
-    for (let n = n0x; n <= n1x; n++) {
-      const X = Math.round((n * 10 - cx) * ppm + half) + 0.5;
-      g.moveTo(X, 0);
-      g.lineTo(X, S);
-    }
-    const n0z = Math.floor((cz - this.viewSpan * 0.5) / 10);
-    const n1z = Math.ceil((cz + this.viewSpan * 0.5) / 10);
-    for (let n = n0z; n <= n1z; n++) {
-      const Y = Math.round((n * 10 - cz) * ppm + half) + 0.5;
-      g.moveTo(0, Y);
-      g.lineTo(S, Y);
-    }
-    g.stroke();
-
-    // view cone
-    const heading = ((s.heading ?? 0) * Math.PI) / 180;
-    const fov = (((s.fov ?? 80) * 0.5) * Math.PI) / 180;
-    const coneR = S * 0.42;
-    const grad = g.createRadialGradient(half, half, 2, half, half, coneR);
-    grad.addColorStop(0, 'rgba(222,242,255,.26)');
-    grad.addColorStop(0.7, 'rgba(222,242,255,.075)');
-    grad.addColorStop(1, 'rgba(214,238,255,0)');
-    g.fillStyle = grad;
-    g.beginPath();
-    g.moveTo(half, half);
-    g.arc(half, half, coneR, -Math.PI / 2 + heading - fov, -Math.PI / 2 + heading + fov);
-    g.closePath();
-    g.fill();
-    g.strokeStyle = 'rgba(226,244,255,.17)';
-    g.lineWidth = 1;
-    g.stroke();
-
-    // objectives
+    // objectives: a filled disc with the letter, kept upright
     const objs = s.objectives;
     if (objs) {
-      g.font = `700 ${(9.5 * u).toFixed(1)}px system-ui, sans-serif`;
+      g.font = `700 ${(9.5 * u).toFixed(1)}px Arial, "Liberation Sans", sans-serif`;
       g.textAlign = 'center';
       g.textBaseline = 'middle';
-      const r = 6 * u;
+      const r = 6.5 * u;
+      const lim = half - r - 2;
       for (let i = 0; i < objs.length; i++) {
         const o = objs[i];
-        const dx = clamp((o.x - cx) * ppm + half, r + 1, S - r - 1);
-        const dy = clamp((o.z - cz) * ppm + half, r + 1, S - r - 1);
-        g.fillStyle = 'rgba(121,210,255,.94)';
-        g.strokeStyle = 'rgba(4,14,20,.8)';
-        g.lineWidth = 1;
+        let dx = (o.x - cx) * ppm;
+        let dy = (o.z - cz) * ppm;
+        // clamp to the widget edge in SCREEN space
+        const c = Math.cos(-heading);
+        const sn = Math.sin(-heading);
+        let X = dx * c - dy * sn;
+        let Y = dx * sn + dy * c;
+        X = clamp(X, -lim, lim);
+        Y = clamp(Y, -lim, lim);
+        g.save();
+        g.rotate(heading);
+        g.fillStyle = 'rgba(36,118,196,.95)';
+        g.strokeStyle = 'rgba(235,245,255,.9)';
+        g.lineWidth = 1.2 * u;
         g.beginPath();
-        g.rect(dx - r, dy - r, r * 2, r * 2);
+        g.arc(X, Y, r, 0, Math.PI * 2);
         g.fill();
         g.stroke();
-        g.fillStyle = '#06171f';
-        g.fillText(o.label ?? '', dx, dy + 0.5);
-      }
-    }
-
-    // blips
-    const blips = s.blips;
-    if (blips) {
-      for (let i = 0; i < blips.length; i++) {
-        const b = blips[i];
-        const dx = (b.x - cx) * ppm + half;
-        const dy = (b.z - cz) * ppm + half;
-        if (dx < -8 || dy < -8 || dx > S + 8 || dy > S + 8) continue;
-        const enemy = b.kind !== 'friend';
-        const r = 3.4 * u;
-        g.save();
-        g.translate(dx, dy);
-        g.rotate(((b.heading ?? 0) * Math.PI) / 180);
-        g.fillStyle = enemy ? 'rgba(255,74,58,.96)' : 'rgba(126,196,255,.95)';
-        g.shadowColor = enemy ? 'rgba(255,60,40,.85)' : 'rgba(120,190,255,.7)';
-        g.shadowBlur = 6 * u;
-        g.beginPath();
-        g.moveTo(0, -r * 1.5);
-        g.lineTo(r * 1.15, r * 1.1);
-        g.lineTo(-r * 1.15, r * 1.1);
-        g.closePath();
-        g.fill();
+        g.fillStyle = '#fff';
+        g.fillText(o.label ?? '', X, Y + 0.5 * u);
         g.restore();
       }
     }
 
-    // player arrow
-    g.save();
-    g.translate(half, half);
-    g.rotate(heading);
-    const pr = 4.8 * u;
+    // contacts: enemies are red pips, friendlies blue chevrons
+    const blips = s.blips;
+    if (blips) {
+      for (let i = 0; i < blips.length; i++) {
+        const b = blips[i];
+        const dx = (b.x - cx) * ppm;
+        const dy = (b.z - cz) * ppm;
+        if (Math.abs(dx) > S || Math.abs(dy) > S) continue;
+        g.save();
+        g.translate(dx, dy);
+        if (b.kind !== 'friend') {
+          g.fillStyle = '#ff3b2a';
+          g.strokeStyle = 'rgba(40,6,4,.85)';
+          g.lineWidth = 1 * u;
+          g.beginPath();
+          g.arc(0, 0, 3.6 * u, 0, Math.PI * 2);
+          g.fill();
+          g.stroke();
+        } else {
+          g.rotate(((b.heading ?? 0) * Math.PI) / 180);
+          const r = 3.6 * u;
+          g.fillStyle = '#62b6ff';
+          g.strokeStyle = 'rgba(4,16,30,.85)';
+          g.lineWidth = 1 * u;
+          g.beginPath();
+          g.moveTo(0, -r * 1.5);
+          g.lineTo(r * 1.1, r * 1.1);
+          g.lineTo(0, r * 0.45);
+          g.lineTo(-r * 1.1, r * 1.1);
+          g.closePath();
+          g.fill();
+          g.stroke();
+        }
+        g.restore();
+      }
+    }
+    g.restore();
+
+    // ---- screen layer: view cone and arrow, always pointing up -------------
+    const fov = (((s.fov ?? 80) * 0.5) * Math.PI) / 180;
+    const coneR = S * 0.46;
+    const grad = g.createRadialGradient(half, half, 2, half, half, coneR);
+    grad.addColorStop(0, 'rgba(236,242,246,.30)');
+    grad.addColorStop(1, 'rgba(236,242,246,0)');
+    g.fillStyle = grad;
     g.beginPath();
-    g.moveTo(0, -pr * 1.55);
-    g.lineTo(pr * 1.15, pr * 1.3);
-    g.lineTo(0, pr * 0.6);
-    g.lineTo(-pr * 1.15, pr * 1.3);
+    g.moveTo(half, half);
+    g.arc(half, half, coneR, -Math.PI / 2 - fov, -Math.PI / 2 + fov);
     g.closePath();
-    g.fillStyle = '#f6fcff';
-    g.strokeStyle = 'rgba(2,6,10,.85)';
-    g.lineWidth = 1.6 * u;
+    g.fill();
+
+    const pr = 5 * u;
+    g.beginPath();
+    g.moveTo(half, half - pr * 1.5);
+    g.lineTo(half + pr * 1.1, half + pr * 1.2);
+    g.lineTo(half, half + pr * 0.55);
+    g.lineTo(half - pr * 1.1, half + pr * 1.2);
+    g.closePath();
+    g.fillStyle = '#fbfdfe';
+    g.strokeStyle = 'rgba(8,12,16,.8)';
+    g.lineWidth = 1.2 * u;
     g.lineJoin = 'round';
-    g.shadowColor = 'rgba(180,225,255,.85)';
-    g.shadowBlur = 5 * u;
     g.stroke();
     g.fill();
-    g.shadowBlur = 0;
-    g.restore();
 
-    // edge falloff so the map sinks into the frame instead of ending abruptly
-    const vg = g.createRadialGradient(half, half, S * 0.28, half, half, S * 0.72);
-    vg.addColorStop(0, 'rgba(0,0,0,0)');
-    vg.addColorStop(1, 'rgba(0,0,0,.17)');
-    g.fillStyle = vg;
-    g.fillRect(0, 0, S, S);
+    // inner hairline frame, part of the bitmap so it survives any backdrop
+    g.strokeStyle = 'rgba(0,0,0,.35)';
+    g.lineWidth = 2 * u;
+    g.strokeRect(u, u, S - 2 * u, S - 2 * u);
 
-    g.restore();
+    // the north marker rides the rim
+    if (this.nLabel) {
+      const R = this.cssSize * 0.5 - 8;
+      const nx = Math.sin(-heading) * R;
+      const ny = -Math.cos(-heading) * R;
+      const sc = Math.max(Math.abs(nx), Math.abs(ny)) / R; // push onto the square's edge
+      const k = this.k;
+      const X = (nx / sc) * k;
+      const Y = (ny / sc) * k;
+      const tr = `translate(calc(-50% + ${X.toFixed(1)}px), calc(-50% + ${Y.toFixed(1)}px))`;
+      if (this.nLabel._tr !== tr) {
+        this.nLabel._tr = tr;
+        this.nLabel.style.transform = tr;
+      }
+    }
   }
 
   dispose() {

@@ -216,6 +216,41 @@ if (VIEW === 'board') {
     camera.lookAt(-3.2, 1.15, 0.35);
   }
   camera.updateProjectionMatrix();
+} else if (VIEW === 'interior' || VIEW === 'interior_close') {
+  // A room corner: two painted walls, a concrete floor and ceiling, a doorway,
+  // lit by one warm bulb and the daylight through the door.
+  const intA = {
+    vertexMasks: true, tint: 0xc4baa8, scale: 1.9, weather: [0.15, 0.2, 0.3, 0.5],
+    interior: [1.12, 0.62, 0.85, 0.42], interiorCol: 0x6a8f86, interiorWash: 0xe2dccd,
+  };
+  const intB = { ...intA, interior: [1.25, 0.72, 0.95, 0.38], interiorCol: 0x7d93a6, interiorWash: 0xe4d9c2 };
+  const fl = new THREE.BoxGeometry(8, 0.2, 8, 8, 1, 8);
+  mesh(fl, materials.get('concrete_floor', { vertexMasks: true, tint: 0x9e9a91, scale: 3.0 }), [0, 0.03, 0]);
+  const wA = new THREE.BoxGeometry(6, 3.3, 0.2, 12, 8, 1);
+  materials.bakeMasks(wA, { wear: 0.3, grime: 0.4 });
+  mesh(wA, materials.get('plaster', intA), [0, 0.13 + 1.65, -2]);
+  const wB = new THREE.BoxGeometry(0.2, 3.3, 6, 1, 8, 12);
+  materials.bakeMasks(wB, { wear: 0.3, grime: 0.4 });
+  mesh(wB, materials.get('plaster', intB), [-3, 0.13 + 1.65, 1]);
+  const ceil = new THREE.BoxGeometry(8, 0.2, 8, 4, 1, 4);
+  mesh(ceil, materials.get('concrete_floor', { vertexMasks: true, tint: 0x9e9a91, scale: 3.0 }), [0, 3.55, 0]);
+  const shelf = new THREE.BoxGeometry(1.4, 0.04, 0.35, 4, 1, 2);
+  mesh(shelf, materials.get('wood', { vertexMasks: true, tint: 0xb08a5e, scale: 0.55, normalStrength: 1.45 }), [0.6, 1.5, -1.8]);
+  const bulb = new THREE.PointLight(0xffc07a, 6, 13, 2);
+  bulb.position.set(0.5, 3.1, 0.5);
+  scene.add(bulb);
+  sun.intensity = 0.0;
+  bounce.intensity = 0.25;
+  scene.environmentIntensity = 0.35;
+  if (VIEW === 'interior') {
+    camera.position.set(2.2, 1.6, 3.2);
+    camera.lookAt(-1.2, 1.3, -1.2);
+  } else {
+    camera.fov = 45;
+    camera.position.set(-1.6, 1.25, -1.0);
+    camera.lookAt(-2.4, 1.1, -1.9);
+  }
+  camera.updateProjectionMatrix();
 } else {
   // street
   groundPlane('asphalt', 80);

@@ -100,6 +100,10 @@ uniform float owNormalAmp;
 uniform float owGroundY;
 uniform float owAoAmt;
 uniform float owMacroRelief;
+uniform vec4  owIntP;        // interior paint: x dado height, y peel, z dirt, w dado roughness
+uniform vec3  owStorey;      // x ground-floor level, y ground-storey top, z upper storey height
+uniform vec3  owIntCol;      // dado oil paint
+uniform vec3  owIntWash;     // upper wall distemper / whitewash
 
 // Explicit-gradient sampling keeps the mip selection correct through the
 // parallax march; OW_NOGRAD falls back to implicit derivatives.
@@ -489,6 +493,83 @@ const MAIN_FRAGMENT = /* glsl */ `
   }
   #endif
 
+  // ------------------------------------------------ interior paint ----
+  #ifdef OW_INTERIOR
+  {
+    // A lived-in room in this region is not bare plaster: the bottom metre is
+    // an oil-paint dado (washable, glossy, chipped), above it a distemper or
+    // whitewash that flakes, a hand-drawn stripe between the two, leak stains
+    // coming down from the slab and a scuffed, filthy skirting zone. None of it
+    // is noise — every term has a hard edge somebody made.
+    float wy = vOwWPos.y;
+    float hRel = wy < owStorey.y ? wy - owStorey.x : mod( wy - owStorey.y, owStorey.z );
+    vec2 q = vec2( owSAxis, wy );
+    vec4 i0 = texture2D( owMacroTex, q * vec2( 0.5, 0.2 ) + 0.71 );
+    vec4 i1 = texture2D( owMacroTex, q * 0.55 + 0.13 );
+    vec4 i2 = texture2D( owMacroTex, q * 2.3 + 0.57 );
+    vec4 i3 = texture2D( owMacroTex, q * 7.5 + 0.31 );
+    // the painter's line wanders by a centimetre over a metre
+    float line = owIntP.x + ( i1.g - 0.5 ) * 0.035 + ( i2.r - 0.5 ) * 0.012;
+    float dado = 1.0 - smoothstep( line - 0.0015, line + 0.0015, hRel );
+    vec3 base = alb.rgb;
+    float bLum = dot( base, vec3( 0.2126, 0.7152, 0.0722 ) );
+    // Paint is a thin film: it keeps the plaster's relief but not its colour.
+    float relief = clamp( 0.78 + ( owHeightS - 0.6 ) * 1.4 + ( bLum - 0.3 ) * 0.5, 0.55, 1.2 );
+    vec3 upperC = owIntWash * ( 0.90 + 0.20 * i1.b ) * ( 0.94 + 0.12 * i3.g );
+    vec3 lowerC = owIntCol * ( 0.90 + 0.20 * i1.r ) * ( 0.96 + 0.08 * i3.a );
+    // Paint colours are absolute: undo the surface tint that is applied to the
+    // whole result at the end, so only flaked-through plaster carries it.
+    vec3 invTint = 1.0 / max( owTintCol, vec3( 0.05 ) );
+    vec3 paint = mix( upperC, lowerC, dado ) * relief * invTint;
+    // the stripe: a 1.5 cm band of darker paint along the top of the dado
+    float sd = hRel - line;
+    float stripe = smoothstep( -0.002, 0.001, sd ) * ( 1.0 - smoothstep( 0.013, 0.016, sd ) );
+    paint = mix( paint, owIntCol * 0.42 * relief * invTint, stripe * 0.9 );
+    // Flaking. Distemper lets go in big maps above ~1.6 m and round every leak;
+    // the oil dado chips in small sharp flakes, worst in the kick zone.
+    float pn = mix( i1.r * 0.46 + i2.g * 0.36 + i3.b * 0.18,
+                    i2.g * 0.50 + i3.b * 0.30 + i1.r * 0.20, dado );
+    float leakN = i0.g * 0.7 + i1.b * 0.3;
+    float leakZone = smoothstep( 1.2, 2.5, hRel );
+    float peelT = mix( 0.60 - owIntP.y * 0.09 - leakZone * 0.03 * owIntP.y,
+                       0.60 - owIntP.y * 0.08 + smoothstep( 0.0, 0.5, hRel ) * 0.02, dado );
+    float peel = smoothstep( peelT, peelT + 0.006, pn );
+    // the film curls where it lets go: a thin bright lip and a shadow under it
+    float lip = smoothstep( peelT - 0.012, peelT, pn ) - peel;
+    vec3 res = mix( paint, base * mix( 0.9, 1.05, i3.r ), peel );
+    res *= 1.0 + lip * 0.16 * ( 1.0 - dado );
+    res = mix( res, res * 0.62, lip * dado * 0.5 );
+    // leak stains: brown bloom with a hard tide line, falling from the slab
+    float leak = smoothstep( 0.585, 0.64, leakN ) * leakZone;
+    float tide = ( smoothstep( 0.575, 0.585, leakN ) - smoothstep( 0.59, 0.605, leakN ) ) * leakZone;
+    res = mix( res, res * vec3( 0.80, 0.72, 0.60 ), leak * owIntP.z );
+    res = mix( res, vec3( 0.16, 0.11, 0.065 ), tide * 0.45 * owIntP.z );
+    // kick zone: scuffs, mop splash and the dirt line along the floor
+    float kick = 1.0 - smoothstep( 0.02, 0.32, hRel );
+    float scuff = kick * ( 0.45 + 0.55 * smoothstep( 0.35, 0.7, i2.a ) );
+    res = mix( res, owGrimeCol * 1.3, scuff * 0.55 * owIntP.z );
+    float skirt = 1.0 - smoothstep( 0.0, 0.05, hRel );
+    res = mix( res, owGrimeCol, skirt * 0.7 * owIntP.z );
+    // hand grime at 0.9-1.6 m, patchy
+    float hand = smoothstep( 0.85, 1.05, hRel ) * ( 1.0 - smoothstep( 1.45, 1.7, hRel ) )
+               * smoothstep( 0.56, 0.7, i2.r * 0.6 + i3.g * 0.4 );
+    res = mix( res, res * 0.78, hand * owIntP.z );
+    // soot and cobweb dirt gathering under the ceiling
+    float ceil = smoothstep( owStorey.z - 0.75, owStorey.z - 0.05, hRel );
+    res = mix( res, res * 0.72, ceil * ( 0.5 + 0.5 * i1.g ) * owIntP.z );
+
+    float iv = owVert;
+    alb.rgb = mix( alb.rgb, res, iv );
+    float pr = mix( 0.90 - 0.08 * i3.g, owIntP.w + 0.1 * i2.a, dado );
+    pr += scuff * 0.08 + leak * 0.05;
+    orm.g = mix( orm.g, mix( pr, orm.g, peel ), iv );
+    orm.r *= 1.0 - lip * dado * 0.3 * iv;
+    // the film fills the finest tooth; flaked areas keep the full plaster relief
+    nShade = normalize( mix( nShade, normalize( owP2V * owNp ), ( 1.0 - peel ) * mix( 0.25, 0.5, dado ) * iv ) );
+    owHeightS = clamp( owHeightS - peel * 0.05 * iv, 0.0, 1.0 );
+  }
+  #endif
+
   // ------------------------------------------------------ weathering ----
   #ifdef OW_WEATHER
     float up = clamp( owNw.y, 0.0, 1.0 );
@@ -745,6 +826,15 @@ export const DEFAULT_PARAMS = {
    * unused ]. transmission 0 and multiplier 1 disable the whole cloth layer.
    */
   cloth: [0, 1, 0, 0],
+  /**
+   * Interior paint finish on vertical faces: [ dado height m, peel 0..1,
+   * dirt 0..1, dado roughness ]. peel 0 and dado 0 disable the layer.
+   */
+  interior: [0, 0, 0, 0.45],
+  interiorCol: 0x5f8580,
+  interiorWash: 0xd6d0c0,
+  /** floor-relative height for the interior layer: [ floor0 y, ground storey top, upper storey ] */
+  storey: [0.13, 3.45, 3.05],
   /** macro-gradient normal tilt on up-facing surfaces (ruts / drifts); 0 = off */
   macroRelief: 0,
   /** de-tiling second-sample blend amount (0 disables the extra fetches) */
@@ -842,6 +932,10 @@ export function extendMaterial(material, p, shared) {
     owGroundY: { value: p.groundY },
     owAoAmt: { value: p.aoStrength },
     owMacroRelief: { value: p.macroRelief ?? 0 },
+    owIntP: { value: new THREE.Vector4(...(p.interior ?? DEFAULT_PARAMS.interior)) },
+    owStorey: { value: new THREE.Vector3(...(p.storey ?? DEFAULT_PARAMS.storey)) },
+    owIntCol: { value: col(p.interiorCol ?? DEFAULT_PARAMS.interiorCol) },
+    owIntWash: { value: col(p.interiorWash ?? DEFAULT_PARAMS.interiorWash) },
   };
 
   const defines = {};
@@ -854,6 +948,7 @@ export function extendMaterial(material, p, shared) {
   if ((p.patch?.[0] ?? 0) > 0) defines.OW_PATCH = '';
   if ((p.cloth?.[0] ?? 0) > 0 || (p.cloth?.[1] ?? 1) < 1) defines.OW_CLOTH = '';
   if ((p.macroRelief ?? 0) > 0) defines.OW_MACRO_RELIEF = '';
+  if ((p.interior?.[0] ?? 0) > 0) defines.OW_INTERIOR = '';
   if (p.vertexMasks) defines.OW_VCOL_MASKS = '';
   if (p.alphaMask) defines.OW_ALPHA_MASK = '';
   if (p.noGrad) defines.OW_NOGRAD = '';

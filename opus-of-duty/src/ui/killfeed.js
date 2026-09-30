@@ -24,7 +24,7 @@ function skullIcon(parent) {
 }
 
 /**
- * Killfeed, top right. Newest row on top, six visible, 5.6s dwell.
+ * Killfeed, lower left above the vitals. Newest row at the bottom, 5.6s dwell.
  * Rows the local player is involved in get the amber treatment so your own
  * kills are readable at a glance without reading the names.
  */
@@ -32,7 +32,7 @@ export class Killfeed {
   constructor(parent) {
     this.root = el('div', 'ow-killfeed', parent);
     this.pool = new Pool(
-      6,
+      5,
       () => {
         const row = el('div', 'ow-kf-row');
         const a = el('span', 'ow-kf-a', row, 'PLAYER');
@@ -56,9 +56,9 @@ export class Killfeed {
     const it = this.pool.acquire();
     it.life = this.life;
     const n = it.node;
-    this.root.prepend(n); // newest on top
-    setText(n._a, (e.attacker ?? 'UNKNOWN').toUpperCase());
-    setText(n._v, (e.victim ?? 'UNKNOWN').toUpperCase());
+    this.root.append(n); // newest at the bottom, nearest the vitals
+    setText(n._a, e.attacker ?? 'Unknown');
+    setText(n._v, e.victim ?? 'Unknown');
     setStyle(n._hs, 'display', e.headshot ? '' : 'none');
     setClass(n, 'mine', !!e.mine);
     setStyle(n._a, 'color', e.attackerFriendly === false ? 'var(--enemy)' : '');
@@ -78,7 +78,7 @@ export class Killfeed {
       }
       const inT = clamp01(it.t / 0.16);
       const outT = clamp01((it.t - (it.life - 0.45)) / 0.45);
-      const x = (1 - ease.outQuint(inT)) * 26;
+      const x = -(1 - ease.outQuint(inT)) * 26;
       const a = ease.outQuad(inT) * (1 - ease.inQuad(outT));
       setStyle(it.node, 'transform', `translateX(${x.toFixed(2)}px)`);
       setStyle(it.node, 'opacity', a.toFixed(3));

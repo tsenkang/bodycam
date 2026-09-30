@@ -36,6 +36,38 @@ export const PALETTE = {
     surface: 'plaster',
     opts: { vertexMasks: true, tint: 0xd8d2c4, scale: 1.9, weather: [0.3, 0.35, 0.9, 0.5] },
   },
+  /**
+   * Interior walls of the enterable buildings: a green oil-paint dado under a
+   * flaking distemper, the finish of almost every older room in the region.
+   * The tint is white because the paint colours are authored in the shader
+   * layer; only where the paint has flaked does the plaster itself show.
+   */
+  plaster_interior: {
+    name: 'plaster',
+    surface: 'plaster',
+    opts: {
+      vertexMasks: true,
+      tint: 0xc4baa8,
+      scale: 1.9,
+      weather: [0.15, 0.2, 0.3, 0.5],
+      interior: [1.12, 0.62, 0.85, 0.42],
+      interiorCol: 0x6a8f86,
+      interiorWash: 0xe2dccd,
+    },
+  },
+  plaster_interior_b: {
+    name: 'plaster',
+    surface: 'plaster',
+    opts: {
+      vertexMasks: true,
+      tint: 0xc4baa8,
+      scale: 1.9,
+      weather: [0.15, 0.2, 0.3, 0.5],
+      interior: [1.25, 0.72, 0.95, 0.38],
+      interiorCol: 0x7d93a6,
+      interiorWash: 0xe4d9c2,
+    },
+  },
   brick: {
     name: 'brick',
     surface: 'concrete',

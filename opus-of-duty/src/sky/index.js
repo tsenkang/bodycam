@@ -685,7 +685,13 @@ export class SkySystem {
     // in the frame came out the same hue as the practicals. And the warm swing
     // at sunset belongs to the sun's own *hue*, not to a dead beam, so it is
     // gated on the beam still being alive.
-    const warm = (1 - THREE.MathUtils.smoothstep(altDeg, 1, 22)) * beamAlive;
+    // Capped at 0.4. The band this feeds is what UP-facing and vertical
+    // surfaces see of the UPPER dome, and at golden hour that is still a deep
+    // Rayleigh blue overhead: only the sunward horizon has gone to the beam's
+    // colour. At a full swing every shadow in the 19:12 frame took the sun's
+    // own orange (street 63/28/7, B-R -55) and the frame read as one sepia
+    // wash; warm light / cool shadow is the separation golden hour is for.
+    const warm = 0.4 * (1 - THREE.MathUtils.smoothstep(altDeg, 1, 22)) * beamAlive;
     const night = 1 - beamAlive;
     const nh = NIGHT_AMBIENT_HUE;
     const ar = THREE.MathUtils.lerp(

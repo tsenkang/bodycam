@@ -148,6 +148,8 @@ export class UiSystem {
     this._blipView = [];
 
     this.demo = null;
+    this.playerName = 'Lynx';
+    this.showDamageNumbers = false;
 
     this._unsubs = [];
     const on = (type, fn) => this._unsubs.push(ctx.events.on(type, fn));
@@ -182,7 +184,8 @@ export class UiSystem {
       if (this._isPlayerTarget(e.target)) return;
       const kind = e.killed ? 'kill' : e.headshot ? 'head' : e.armour ? 'armour' : 'hit';
       this.hitmarker(kind);
-      if (e.point) {
+      // Off by default, as in the games this HUD is measured against.
+      if (e.point && this.showDamageNumbers) {
         this.damageNumber(
           e.point,
           e.amount ?? 0,
@@ -192,12 +195,12 @@ export class UiSystem {
       if (e.killed) {
         this._lastKillAt = ctx.time.elapsed;
         this.killfeed.push({
-          attacker: 'YOU',
-          victim: e.target?.name ?? e.name ?? 'ENEMY',
+          attacker: this.playerName,
+          victim: e.target?.name ?? e.name ?? 'Enemy',
           headshot: !!e.headshot,
           mine: true,
         });
-        this.banner.show('Enemy Eliminated', e.headshot ? '+150 XP · HEADSHOT' : '+100 XP');
+        this.banner.show(e.headshot ? 'Headshot' : 'Kill', e.headshot ? '+150' : '+100');
         this.state.scoreUs++;
       }
     });
@@ -393,6 +396,12 @@ export class UiSystem {
     }
     if (!this.demo) this.demo = new CombatDemo();
     this.demo.start(this);
+    // The shot harness only pumps a handful of frames after applying a shot,
+    // so the scripted timeline is fast-forwarded to just short of its busiest
+    // moment (frame 90) here. Fixed 60 Hz steps: deterministic.
+    const pre = CombatDemo.PREROLL;
+    this.ctx.camera.updateMatrixWorld();
+    for (let i = 0; i < pre; i++) this._step(1 / 60, 1 / 60, this.ctx);
     return { state: 'combat', frames: 'timeline keyed to frame 90' };
   }
 
@@ -402,8 +411,12 @@ export class UiSystem {
     const t = ctx.time;
     const rawDt = clamp(t.raw - this._lastRaw, 0, 0.1);
     this._lastRaw = t.raw;
+    this.state.time = t.elapsed;
+    this._step(dt, rawDt, ctx);
+  }
+
+  _step(dt, rawDt, ctx) {
     const s = this.state;
-    s.time = t.elapsed;
 
     // ---- pause -----------------------------------------------------------
     if (ctx.input.enabled && !ctx.input.frozen) {

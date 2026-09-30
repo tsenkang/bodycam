@@ -16,6 +16,9 @@ import * as THREE from 'three';
 const CYCLE = 240;
 
 export class CombatDemo {
+  /** frames pre-rolled by debugState('combat'); the harness pumps the rest */
+  static PREROLL = 84;
+
   constructor() {
     this.active = false;
     this.frame = 0;
@@ -61,9 +64,9 @@ export class CombatDemo {
     // Killfeed seeded with three rows at different ages so the column shows the
     // full fade ramp instead of three identical rows.
     const seed = [
-      { attacker: 'VOSS', victim: 'M. RIDLEY', headshot: false, age: 3.2 },
-      { attacker: 'KRAUSE', victim: 'HOLT', headshot: true, age: 1.9, attackerFriendly: false },
-      { attacker: 'YOU', victim: 'A. SOKOL', headshot: false, age: 0.55, mine: true },
+      { attacker: '[KV7] Voss', victim: 'M_Ridley', headshot: false, age: 3.2 },
+      { attacker: 'krause_91', victim: '[OPUS] Holt', headshot: true, age: 1.9, attackerFriendly: false },
+      { attacker: 'Lynx', victim: 'Sokolov', headshot: false, age: 0.55, mine: true },
     ];
     for (const e of seed) {
       const it = ui.killfeed.push(e);
@@ -123,7 +126,7 @@ export class CombatDemo {
         ui.arcs.spawn(-0.72, 0.69, 0.8); // behind-left
         break;
       case 40:
-        ui.banner.show('Enemy Eliminated', '+100 XP');
+        ui.banner.show('Kill', '+100');
         break;
       case 50:
         ui.markers.spawnGrenade(this._worldPoint(ui, 9, -3.4, -1.3), 2.6);
@@ -134,12 +137,11 @@ export class CombatDemo {
         ui.hurt(11, 0.62, -0.78);
         break;
       case 100:
-        ui.killfeed.push({ attacker: 'YOU', victim: 'D. KOVACS', headshot: true, mine: true });
+        ui.killfeed.push({ attacker: 'Lynx', victim: 'dkovacs', headshot: true, mine: true });
         break;
       case 128:
         ui.hitmarker('kill');
-        ui.banner.show('Enemy Eliminated', '+100 XP');
-        ui.damageNumber(this._worldPoint(ui, 13, 1.1, 0.2), 118, 'kill');
+        ui.banner.show('Kill', '+100');
         break;
       case 150:
         s.reloading = true;
@@ -160,14 +162,11 @@ export class CombatDemo {
         this._fire(ui);
         if (shot === 2) {
           ui.hitmarker('hit');
-          ui.damageNumber(this._worldPoint(ui, 12.5, 2.4, 0.35), 33, 'hit');
         } else if (shot === 7) {
           ui.hitmarker('armour');
-          ui.damageNumber(this._worldPoint(ui, 12.8, -2.6, 0.05), 18, 'armour');
         } else if (shot === 8) {
           // the frame-86 headshot — this is what the critic shot lands on
           ui.hitmarker('head');
-          ui.damageNumber(this._worldPoint(ui, 12.2, 0.25, 0.8), 74, 'hs');
         }
       }
     }

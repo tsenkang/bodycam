@@ -1,15 +1,15 @@
 import { el, svg, setStyle, Pool, ease, clamp01 } from './util.js';
 
-const R_IN = 13;  // well outside the reticle blades, so the two never merge
-const R_OUT = 28.5;
+const R_IN = 9;  // just outside the reticle blades at rest
+const R_OUT = 20.5;
 const D = Math.SQRT1_2;
 
 /** kind -> { colour, weight, scale, life, ring } */
 const KINDS = {
-  hit: { c: '#f6fafc', w: 1.8, s: 1.0, life: 0.26, ring: 0, spin: 0 },
-  armour: { c: '#8fdcff', w: 2.0, s: 1.03, life: 0.28, ring: 0.5, spin: 0 },
-  head: { c: '#ffc247', w: 2.2, s: 1.08, life: 0.32, ring: 0.3, spin: 0 },
-  kill: { c: '#ff4433', w: 2.7, s: 1.18, life: 0.42, ring: 1, spin: 9 },
+  hit: { c: '#f4f6f7', w: 2.1, s: 1.0, life: 0.26, ring: 0, spin: 0 },
+  armour: { c: '#9fd8ff', w: 2.1, s: 1.0, life: 0.28, ring: 0, spin: 0 },
+  head: { c: '#f4f6f7', w: 2.4, s: 1.12, life: 0.3, ring: 0, spin: 0 },
+  kill: { c: '#ff2f22', w: 2.6, s: 1.16, life: 0.4, ring: 0, spin: 0 },
 };
 
 /**
@@ -40,7 +40,7 @@ export class Hitmarkers {
         );
 
         // dark backing strokes first so the marker keeps contrast on snow/sky
-        const back = svg('g', { stroke: 'rgba(0,0,0,.7)', 'stroke-width': 4.0, fill: 'none' }, s);
+        const back = svg('g', { stroke: 'rgba(0,0,0,.45)', 'stroke-width': 3.6, fill: 'none' }, s);
         const main = svg('g', { stroke: '#fff', 'stroke-width': 2.2, fill: 'none' }, s);
         for (const g of [back, main]) {
           for (let q = 0; q < 4; q++) {

@@ -4,6 +4,7 @@ import { el, setText, setStyle, ease, clamp01, damp } from './util.js';
 export class Prompt {
   constructor(parent) {
     this.root = el('div', 'ow-prompt', parent);
+    this.pre = el('div', 'ow-prompt-txt', this.root, 'Hold');
     this.key = el('div', 'ow-key', this.root, 'F');
     const col = el('div', null, this.root);
     this.txt = el('div', 'ow-prompt-txt', col, 'INTERACT');
@@ -26,9 +27,11 @@ export class Prompt {
   set(p) {
     this.active = true;
     setText(this.key, p.key ?? 'F');
-    setText(this.txt, (p.text ?? 'INTERACT').toUpperCase());
-    setText(this.sub, (p.sub ?? '').toUpperCase());
-    setStyle(this.sub, 'display', p.sub ? '' : 'none');
+    const hold = (p.sub ?? '').toLowerCase() === 'hold';
+    setStyle(this.pre, 'display', hold ? '' : 'none');
+    const t = p.text ?? 'Interact';
+    setText(this.txt, hold ? 'to ' + t.charAt(0).toLowerCase() + t.slice(1) : t);
+    setText(this.sub, '');
     this.progress = p.progress ?? 0;
     setStyle(this.bar, 'display', p.progress !== undefined ? '' : 'none');
   }

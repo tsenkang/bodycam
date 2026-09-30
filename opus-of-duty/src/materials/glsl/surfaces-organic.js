@@ -31,7 +31,12 @@ void owSurface(vec2 uv, out vec3 alb, out float h, out float rough, out float me
   vec2 gp = vec2(lf * 2.0 + rnd.x * 13.0, rf + rnd.y * 7.0);
   vec2 GP = vec2(16.0, 8.0);
   float warp = owFbm(vec2(gp.x * 3.0, gp.y * 12.0), vec2(GP.x * 3.0, GP.y * 12.0), 4, 0.55);
-  float ringCoord = gp.y * (14.0 + rnd.z * 12.0) + warp * 2.2 + rnd.w * 5.0;
+  // Rough-sawn softwood: mostly straight, gently wandering grain lines. A big
+  // warp turns boards into plywood veneer swirls; a slow parabolic bend gives
+  // the occasional flat-sawn cathedral arch instead.
+  float cath = (lf - 0.5 - (rnd.x - 0.5) * 0.4);
+  float ringCoord = gp.y * (14.0 + rnd.z * 12.0) + warp * 0.9 + rnd.w * 5.0
+                  + cath * cath * (6.0 + 10.0 * rnd.y) * step(0.45, rnd.y);
 
   // knots pull the rings into a tight radial swirl
   vec2 knotP = vec2(0.25 + rnd.x * 0.5, 0.35 + rnd.y * 0.3);
@@ -62,7 +67,12 @@ void owSurface(vec2 uv, out vec3 alb, out float h, out float rough, out float me
   float weather = smoothstep(0.20, 0.85, owFbm01(p * 0.8, P * 0.8, 3, 0.6)) * (0.4 + 0.6 * rnd.x);
   c = mix(c, wGrey, weather * 0.68);
 
-  float faceH = 0.74 - ringDark * 0.02 - latewood * 0.012 + (fibre - 0.5) * 0.03 + (micro - 0.5) * 0.008;
+  // Weathering erodes the soft earlywood and leaves the latewood standing as
+  // ridges: that corrugation is what reads as old timber at half a metre.
+  float erode = 0.35 + 0.65 * weather;
+  float faceH = 0.74 + ringDark * 0.045 * erode - (1.0 - latewood) * 0.03 * erode
+              + (fibre - 0.5) * 0.03 + (micro - 0.5) * 0.008;
+  c *= 1.0 - (1.0 - latewood) * 0.10 * erode;
   faceH += (rnd.y - 0.5) * 0.035;              // boards cup and sit at different heights
   faceH -= clamp(knotPull * 1.5, 0.0, 1.0) * 0.03;
 
@@ -91,9 +101,7 @@ void owSurface(vec2 uv, out vec3 alb, out float h, out float rough, out float me
   metal = 0.0;
 
   // ---- nails ----
-  vec2 nf = vec2(fract(lf * 3.0 + 0.5) - 0.5, (rf - 0.5));
-  float nd = length(nf * vec2(3.0, 1.0) / vec2(3.0, 1.0) * vec2(1.0, 1.0));
-  nd = length(vec2(fract(lf * 3.0 + 0.5) - 0.5, rf - 0.22) * vec2(1.4, 1.0));
+  float nd = length(vec2(fract(lf * 3.0 + 0.5) - 0.5, rf - 0.22) * vec2(1.4, 1.0));
   float nail = smoothstep(0.055, 0.030, nd) * m * step(0.3, rnd.w);
   h -= nail * 0.02;
   c = mix(c, owSRGB(vec3(0.230, 0.200, 0.170)), nail * 0.85);

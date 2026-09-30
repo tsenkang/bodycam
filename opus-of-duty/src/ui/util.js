@@ -17,13 +17,11 @@
  * Arial Narrow / Helvetica Neue on machines without them.
  */
 export const FONT_STACK =
-  '"Avenir Next Condensed","DIN Alternate","Roboto Condensed","Arial Narrow",' +
-  '"Helvetica Neue",Inter,system-ui,-apple-system,sans-serif';
+  '"Barlow","Roboto","Segoe UI","Helvetica Neue",Arial,"Liberation Sans",sans-serif';
 
 /** Display face: the ammo count, banners, the menu title. */
 export const FONT_DISPLAY =
-  '"DIN Condensed","Avenir Next Condensed","Oswald","Arial Narrow",' +
-  '"Helvetica Neue",Impact,system-ui,sans-serif';
+  '"Barlow Semi Condensed","Roboto Condensed","Arial Narrow","Helvetica Neue",Arial,"Liberation Sans",sans-serif';
 
 export const FONT_MONO = '"SF Mono",ui-monospace,"Roboto Mono",Menlo,monospace';
 

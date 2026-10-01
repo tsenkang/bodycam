@@ -26,6 +26,28 @@ Their process note: tonemapping, sky and indirect light are one coupled system.
 Parallel agents that each touched part of it broke each other. That is why
 `render/` and `sky/` have exactly one owner here.
 
+## What changed since round 0 (don't undo any of it)
+
+- **Two quality targets, one codebase.** `ultra` is the AAA target and the
+  default. `chromebook` (src/core/config.js) is a light preset for integrated
+  GPUs: 0.6 render scale, no screen-space effects, 2 small cascades, 4 bots,
+  no prewarm. Every visual feature you add must degrade gracefully under it:
+  read `ctx.config.q`, and gate anything expensive.
+- **Enemy bodies are an authored model now** (src/ai/assets/soldier.glb,
+  Character Creator rig). src/ai/glbsoldier.js retargets the procedural
+  25-bone rig onto it each frame. The animator, IK, ragdoll and hitboxes
+  still run on the procedural skeleton, which is no longer drawn. The
+  soldier's rifle is its own mesh. `?soldier=proc` shows the old body.
+- **src/match/** owns the TDM loop: clock, enemy score, reinforcements and end
+  of match. src/player has death and respawn. weapons has refillAll() and
+  no firing while dead. Enemy rounds don't hit enemies.
+- **Gameplay gate:** `node tools/bughunt.mjs --port=<yours>` plays the game
+  and must still pass after your changes (`--from=N` runs part of it). It
+  is slow; run it once at the end of your work, not per iteration.
+- **Shipping:** `node tools/pack.mjs` builds opus-of-duty.html (ultra) and
+  opus-of-duty-chromebook.html as single files that open from disk. The
+  lead runs it; you just keep `npx vite build` green.
+
 ## The machine
 
 This box has 4 CPU cores and no GPU. WebGL runs on SwiftShader, about

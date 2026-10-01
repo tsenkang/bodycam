@@ -477,6 +477,11 @@ function buildSleeve(material, len, kind, s = 1, seed = 1) {
       const hem = Math.max(0, (t - 0.965) / 0.035);
       d *= 1 - Math.min(1, hem * 1.6);
       d += 0.05 * Math.min(1, hem * 2.5) - 0.01 * Math.max(0, hem - 0.8) * 5;
+      // flat-felled seam down the underside of the sleeve: a narrow raised
+      // ridge that the curvature bake turns into a worn stitched line
+      const da = Math.abs(((th + Math.PI * 0.62 + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+      const s0 = da / 0.09;
+      d += 0.014 * Math.exp(-s0 * s0);
       return d;
     };
     geo = loft(

@@ -202,19 +202,23 @@ export function buildWeapon(nz, style = 'carbine', rng) {
 
   /* ---- stock ---- */
   if (long) {
-    // side-folding wire stock: two rails and a pad
-    for (const s of [-1, 1]) {
-      const pts = [
-        [s * 0.012, BORE_Y - 0.004, -0.055],
-        [s * 0.016, BORE_Y - 0.016, -0.135],
-        [s * 0.018, BORE_Y - 0.022, -0.235],
-      ];
-      const r = ribbon(pts, 0.010, 0.008, { seg: 6, up: [0, 1, 0] });
-      computeNormals(r);
-      appendMesh(steel, r);
-    }
-    appendMesh(rubber, box(0.020, 0.036, 0.008, 0, BORE_Y - 0.026, -0.245, { n: 4, roundY: 0.4 }));
-    appendMesh(poly, box(0.020, 0.026, 0.030, 0, BORE_Y - 0.018, -0.085, { n: 4, roundY: 0.3 }));
+    // AK-12 style folding polymer stock. The old side-folding WIRE stock was two
+    // 8 mm rails — at 20 m the whole rifle collapsed to one line and the blind
+    // review called it a "stick". A solid tapered stock gives the rifle mass.
+    const body = box(0.019, 0.034, 0.075, 0, BORE_Y - 0.020, -0.165, { n: 3.6, roundY: 0.3 });
+    warp(body, (v) => {
+      // deeper toward the butt, comb slopes down to the rear
+      const t = Math.max(0, Math.min(1, (-v.z - 0.09) / 0.15));
+      if (v.y < BORE_Y - 0.020) v.y -= t * 0.018;
+      if (v.y > BORE_Y - 0.020) v.y -= t * 0.006;
+    });
+    computeNormals(body);
+    displace(body, (x, y, z) => nz.fbm3(x * 80, y * 80, z * 80, 2) * 0.0012);
+    appendMesh(poly, body);
+    // cheek riser and the folding hinge block
+    appendMesh(poly, box(0.013, 0.010, 0.050, 0, BORE_Y + 0.016, -0.160, { n: 4, roundY: 0.4 }));
+    appendMesh(poly, box(0.020, 0.026, 0.030, 0, BORE_Y - 0.018, -0.080, { n: 4, roundY: 0.3 }));
+    appendMesh(rubber, box(0.020, 0.046, 0.008, 0, BORE_Y - 0.030, -0.244, { n: 4, roundY: 0.4 }));
   } else {
     appendMesh(steel, cyl(0.0155, 0.0155, -0.075, -0.225, 0, BORE_Y + 0.002, 12, false));
     // collapsible stock body
@@ -235,6 +239,14 @@ export function buildWeapon(nz, style = 'carbine', rng) {
     // rear leaf sight + front post
     appendMesh(steel, box(0.010, 0.010, 0.006, 0, BORE_Y + 0.026, -0.040, { n: 5, roundY: 0.3 }));
     appendMesh(steel, box(0.008, 0.016, 0.005, 0, BORE_Y + 0.030, long ? 0.33 : 0.29, { n: 5, roundY: 0.3 }));
+    // side-rail mount + closed red-dot: every modern-CoD AK carries an optic,
+    // and the box on top is what makes the receiver read as a rifle at range
+    appendMesh(steel, box(0.024, 0.010, 0.040, -0.004, BORE_Y + 0.030, -0.005, { n: 4.4, roundY: 0.3 }));
+    appendMesh(steel, box(0.017, 0.021, 0.036, 0, BORE_Y + 0.060, -0.005, { n: 4.0, roundY: 0.35 }));
+    appendMesh(glass, box(0.013, 0.015, 0.0015, 0, BORE_Y + 0.062, 0.0325, { n: 4.0, roundY: 0.5 }));
+    appendMesh(glass, box(0.013, 0.015, 0.0015, 0, BORE_Y + 0.062, -0.0425, { n: 4.0, roundY: 0.5 }));
+    // muzzle brake
+    appendMesh(steel, cyl(0.0125, 0.0125, barrelEnd - 0.055, barrelEnd + 0.006, 0, BORE_Y, 12, true));
   } else {
     // short tube optic on a riser
     appendMesh(steel, box(0.016, 0.016, 0.028, 0, BORE_Y + 0.056, 0.010, { n: 4.4, roundY: 0.25 }));
@@ -285,7 +297,11 @@ export function buildWeapon(nz, style = 'carbine', rng) {
     boreOrigin: toBind(0, BORE_Y, 0),
     ejection: toBind(-0.024, BORE_Y + 0.012, 0.012),
     stockTop: toBind(0, BORE_Y, -0.10),
-    foregrip: toBind(0, BORE_Y - 0.028, long ? 0.22 : 0.205),
+    /** centre of the butt pad: what the animator plants in the shoulder pocket */
+    butt: toBind(0, BORE_Y - 0.010, long ? -0.248 : -0.234),
+    /** the weapon's +Y (up) axis in bind space */
+    up: [y.x, y.y, y.z],
+    foregrip: toBind(0, BORE_Y - 0.028, long ? 0.195 : 0.205),
     magBottom: toBind(0, BORE_Y - 0.25, 0.03),
   };
 }

@@ -46,10 +46,12 @@ export function idle(P, ph, p = {}) {
   P.d('Head', -1.2, 1.0 * micro, 0.6 * sway);
 
   // stance: right leg carries, left slightly forward
-  P.d('UpLegR', -2, 6, -4.5);
+  // leg angles solved numerically for the foot placement (right planted under
+  // the hip, left 12 cm forward and out), not eyeballed: see the round-1 note
+  P.d('UpLegR', 0.6, 6, -6.2);
   P.d('LegR', -3.5, 0, 0);
   P.d('FootR', 3.0, -6, 0);
-  P.d('UpLegL', 9, -8, 7.5);
+  P.d('UpLegL', 13, -8, 1.4);
   P.d('LegL', -16, 0, 0);
   P.d('FootL', 8, 8.0, 0);
   // shoulders counter the pelvis tilt
@@ -76,17 +78,21 @@ export function idle(P, ph, p = {}) {
  * cants onto the stock. The aim IK then only has to trim the residual, so the
  * spine stays inside its clamps.
  */
-export function aimAdd(P, w = 1) {
-  // fighting stance: knees soft, hips dropped and pushed back, feet staggered
-  P.hip(0.018 * w, -0.05 * w, -0.012 * w);
-  P.d('Hips', 5 * w, -16 * w, 2.5 * w);
+export function aimAdd(P, w = 1, legW = 1) {
+  // fighting stance: knees soft, hips dropped and pushed back, feet staggered.
+  // The leg/pelvis part only applies over a standing base (legW): on top of the
+  // kneel or a gait cycle it would drag the planted feet around.
+  const l = w * legW;
+  P.hip(0.012 * l, -0.045 * l, -0.010 * l);
+  P.d('Hips', 4 * l, -10 * l, 1.5 * l);
   // support (left) leg leads and takes the weight; firing leg braces behind
-  P.d('UpLegR', -2 * w, 10 * w, -7 * w);
-  P.d('LegR', -14 * w, 0, 0);
-  P.d('FootR', 8 * w, 12 * w, 0);
-  P.d('UpLegL', 17 * w, 4 * w, 6 * w);
-  P.d('LegL', -22 * w, 0, 0);
-  P.d('FootL', 5 * w, -6 * w, 0);
+  // solved on top of idle: feet 29 cm apart, left 29 cm ahead of right
+  P.d('UpLegR', 8.9 * l, 8 * l, -9.2 * l);
+  P.d('LegR', -10 * l, 0, 0);
+  P.d('FootR', 10 * l, 10 * l, 0);
+  P.d('UpLegL', 14.4 * l, 2 * l, -1.3 * l);
+  P.d('LegL', -12 * l, 0, 0);
+  P.d('FootL', 5 * l, -4 * l, 0);
   // chest counter-rotates back toward the target and leans into the recoil
   P.d('Spine', 4 * w, 5 * w, -1.5 * w);
   P.d('Spine1', 5.5 * w, 5 * w, -1.5 * w);
@@ -98,7 +104,7 @@ export function aimAdd(P, w = 1) {
   P.d('ClavicleR', -8.0 * w, -4 * w, 8.0 * w);
   P.d('UpperArmR', 14 * w, -6 * w, 26 * w);
   P.d('ForearmR', -16 * w, 0, 0);
-  P.d('ClavicleL', -5.0 * w, 6 * w, -4.0 * w);
+  P.d('ClavicleL', 20 * w, 6 * w, -4.0 * w);
   P.d('UpperArmL', 10 * w, 0, -4 * w);
 }
 
@@ -112,17 +118,15 @@ export function aimAdd(P, w = 1) {
 export function leanAdd(P, side, w = 1) {
   if (w <= 0 || !side) return;
   const k = side * w;
-  P.hip(0.05 * k, -0.012 * w, 0);
-  P.d('Hips', 0, 2 * k, 3 * k);
-  P.d('Spine', 0, 1.5 * k, 7 * k);
-  P.d('Spine1', 0, 2 * k, 9 * k);
-  P.d('Spine2', 0, 2.5 * k, 9 * k);
+  // The pelvis only slides 2 cm and does not roll: every bit of hip motion
+  // moves the planted feet too (foot IK only corrects height), and a lean that
+  // skates the boots sideways reads worse than no lean at all.
+  P.hip(0.02 * k, -0.01 * w, 0);
+  P.d('Spine', 0, 1.5 * k, 8 * k);
+  P.d('Spine1', 0, 2 * k, 10 * k);
+  P.d('Spine2', 0, 2.5 * k, 10 * k);
   P.d('Neck', 0, 0, -6 * k);
-  P.d('Head', 0, 0, -8 * k);
-  // the leg on the lean side takes the load, the other goes light
-  P.d(side > 0 ? 'UpLegR' : 'UpLegL', 3 * w, 0, -side * 3 * w);
-  P.d(side > 0 ? 'LegR' : 'LegL', -8 * w, 0, 0);
-  P.d(side > 0 ? 'UpLegL' : 'UpLegR', -1 * w, 0, side * 4 * w);
+  P.d('Head', 0, 0, -9 * k);
 }
 
 /* ------------------------------------------------------------------ */
@@ -213,16 +217,18 @@ export function crouchWalk(P, ph) {
 export function crouchIdle(P, ph) {
   const t = ph * TAU;
   const breath = sin(t * 0.6);
-  P.hip(0.03 + 0.004 * sin(t * 0.4), -0.40 + 0.004 * breath, -0.05);
+  // leg angles solved numerically: right knee on the ground at 6 cm, toes
+  // tucked under, left shin vertical with the foot 28 cm ahead
+  P.hip(0.03 + 0.004 * sin(t * 0.4), -0.45 + 0.004 * breath, -0.05);
   P.d('Hips', 8, -12, 3);
   // firing knee down: thigh near vertical, shin back along the ground
-  P.d('UpLegR', -2, 8, -5);
-  P.d('LegR', -98, 0, 0);
-  P.d('FootR', -18, -2, 0);
+  P.d('UpLegR', 14.5, -16.9, -7.7);
+  P.d('LegR', -97.8, 0, 0);
+  P.d('FootR', -16.9, -2, 0);
   P.d('ToeR', 40, 0, 0);
   // support leg up: thigh forward, shin vertical
-  P.d('UpLegL', 84, -6, 9);
-  P.d('LegL', -92, 0, 0);
+  P.d('UpLegL', 93.6, -6, 17.6);
+  P.d('LegL', -96.6, 0, 0);
   P.d('FootL', 10, 4, 0);
   P.d('Spine', 3 + 0.6 * breath, 4, -1.5);
   P.d('Spine1', 4 + 0.8 * breath, 4, -1);

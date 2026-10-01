@@ -140,6 +140,19 @@ export class Animator {
     this.foregripLocal = this.weapon ? toLocal(this.weapon.foregrip) : new THREE.Vector3(0, 0, 0.2);
     this.magLocal = this.weapon ? toLocal(this.weapon.magBottom) : new THREE.Vector3(0, -0.2, 0);
     this.ejectLocal = this.weapon ? toLocal(this.weapon.ejection) : new THREE.Vector3(0, 0, 0);
+    this.buttLocal = this.weapon?.butt ? toLocal(this.weapon.butt) : null;
+    this.wpnUpLocal = this.weapon?.up
+      ? new THREE.Vector3(...this.weapon.up).applyQuaternion(qInv).normalize()
+      : new THREE.Vector3(0, 1, 0).applyQuaternion(qInv).normalize();
+    /* ---- the shoulder pocket, in Spine2 bind-local space ----
+     * Medial to the deltoid, on the front of the carrier's shoulder strap: where
+     * a butt pad actually sits. See _shoulderWeapon. */
+    {
+      const iS2 = rig.index('Spine2');
+      const sInv = rig.bindQuat[iS2].clone().invert();
+      const sp = rig.bindPos[iS2];
+      this.pocketLocal = new THREE.Vector3(-0.122 - sp.x, 1.388 - sp.y, 0.112 - sp.z).applyQuaternion(sInv);
+    }
 
     /* ---- scratch ---- */
     this._q = new THREE.Quaternion();
@@ -155,6 +168,18 @@ export class Animator {
     this._v3 = new THREE.Vector3();
     this._v4 = new THREE.Vector3();
     this._v5 = new THREE.Vector3();
+    // private scratch for _shoulderWeapon: it holds these across _twoBone(),
+    // which clobbers every shared slot above
+    this._swQh = new THREE.Quaternion();
+    this._swRoot = new THREE.Quaternion();
+    this._swQd = new THREE.Quaternion();
+    this._swRoll = new THREE.Quaternion();
+    this._swBore = new THREE.Vector3();
+    this._swPocket = new THREE.Vector3();
+    this._swLow = new THREE.Vector3();
+    this._swWant = new THREE.Vector3();
+    this._swUp = new THREE.Vector3();
+    this._swT = new THREE.Vector3();
     this._pole = new THREE.Vector3();
     this._elbow = new THREE.Vector3();
     this._target = new THREE.Vector3();
@@ -257,7 +282,11 @@ export class Animator {
 
     /* --- layer 2: additives --- */
     P.w = 1;
-    if (st.aimWeight > 0 && !this.vaulting) C.aimAdd(P, st.aimWeight * (1 - (this.reloadT >= 0 ? 0.6 : 0)));
+    if (st.aimWeight > 0 && !this.vaulting) {
+      const standing = (c) => c === 'idle' || c === 'hurtIdle';
+      const legW = (standing(clip) ? this.blend : 0) + (standing(this.prevClip) ? 1 - this.blend : 0);
+      C.aimAdd(P, st.aimWeight * (1 - (this.reloadT >= 0 ? 0.6 : 0)), legW);
+    }
     // lean eases in/out over ~0.25 s so a peek is a motion, not a pop
     {
       const want = this.vaulting ? 0 : (st.lean ?? 0);
@@ -302,6 +331,7 @@ export class Animator {
 
     if (this.footIk && !this.vaulting) this._footIk();
     if (st.aimTarget && st.aimWeight > 0.01 && !this.vaulting) this._aimIk(st.aimTarget, st.aimWeight);
+    if (this.buttLocal && !this.vaulting) this._shoulderWeapon(st.aimTarget, st.aimWeight);
     if (st.lookTarget) this._lookAt(st.lookTarget, Math.max(0.35, st.aimWeight));
     this._supportHandIk();
     this._updateMuzzle();
@@ -398,6 +428,80 @@ export class Animator {
         this._applyWorld(bi, this._q3);
       }
     }
+  }
+
+  /* ---------------- A2: shoulder the weapon ---------------- */
+
+  /**
+   * Put the butt pad IN the shoulder pocket and the bore on the aim line.
+   *
+   * Arm FK alone left the rifle floating a forearm's length in front of the
+   * chest (the stock never touched the body), which is the single most "toy
+   * soldier" thing a rifleman can do. So the weapon is solved first and the arm
+   * follows it: choose the weapon's world orientation (bore toward the target,
+   * or a low-ready line when not aiming, kept upright with a hint of cant), place
+   * it so the butt sits in the pocket, then two-bone the firing arm to the grip.
+   * The support hand IK that runs next finds the handguard where it now is.
+   */
+  _shoulderWeapon(target, weight) {
+    const hand = this.bones[this.iHandR];
+    const qh = this._wq(this.iHandR, this._swQh);
+    const bore = this._swBore.copy(this.boreLocal).applyQuaternion(qh).normalize();
+    const pocket = this._swPocket.copy(this.pocketLocal).applyMatrix4(this.bones[this.iSpine2].matrixWorld);
+
+    // recoil pushes the pocket back and the muzzle up
+    const rk = this.recoilT >= 0 ? Math.exp(-this.recoilT * 16) * this.recoilK : 0;
+    // reload: the weapon comes off the aim line, muzzle down and in
+    const rl = this.reloadT >= 0 ? Math.min(1, Math.min(this.reloadT * 5, (this.reloadDur - this.reloadT) * 5)) : 0;
+    const w = Math.max(0, Math.min(1, weight)) * (1 - 0.7 * rl);
+
+    const rootQ = this.bones[0].parent.getWorldQuaternion(this._swRoot);
+    // low ready: along the actor's facing, 35 deg down, a little across the body
+    const low = this._swLow.set(0.18, -0.70, 1).applyQuaternion(rootQ).normalize();
+    const want = this._swWant;
+    if (target) {
+      want.copy(target).sub(pocket).normalize();
+      want.multiplyScalar(w).addScaledVector(low, 1 - w).normalize();
+    } else {
+      want.copy(low);
+    }
+    want.y += 0.09 * rk;
+    want.normalize();
+
+    // orientation: minimal swing from the current bore, then roll upright
+    const Qd = this._swQd.setFromUnitVectors(bore, want).multiply(qh);
+    const up = this._swUp.copy(this.wpnUpLocal).applyQuaternion(Qd);
+    // world up with the bore component removed
+    const wy = -want.y;
+    const ux = want.x * wy, uy = 1 + want.y * wy, uz = want.z * wy;
+    const ul = Math.hypot(ux, uy, uz);
+    if (ul > 1e-4) {
+      const dx = ux / ul, dy = uy / ul, dz = uz / ul;
+      const c = Math.max(-1, Math.min(1, up.x * dx + up.y * dy + up.z * dz));
+      // sign from (up x desired) . want
+      const sx = up.y * dz - up.z * dy, sy = up.z * dx - up.x * dz, sz = up.x * dy - up.y * dx;
+      const sgn = sx * want.x + sy * want.y + sz * want.z >= 0 ? 1 : -1;
+      // keep ~6 deg of the natural inward cant
+      const ang = sgn * Math.acos(c) - 0.10;
+      this._swRoll.setFromAxisAngle(want, ang);
+      Qd.premultiply(this._swRoll);
+    }
+
+    // hand position that puts the butt in the pocket
+    const s = hand.matrixWorld.getMaxScaleOnAxis();
+    const buttOff = this._swUp.copy(this.buttLocal).multiplyScalar(s).applyQuaternion(Qd);
+    const t = this._swT.copy(pocket).sub(buttOff).addScaledVector(want, -0.03 * rk);
+
+    // firing elbow: down and out to the character's right (chicken wing)
+    this._pole.set(-0.75, -0.65, -0.15).applyQuaternion(rootQ);
+    this._twoBone(this.armR, t, this._pole);
+
+    // lock the weapon's orientation on the hand
+    const parent = hand.parent;
+    parent.getWorldQuaternion(this._swRoll);
+    hand.quaternion.copy(this._swRoll.invert()).multiply(Qd);
+    hand.updateMatrix();
+    hand.updateMatrixWorld(true);
   }
 
   /* ---------------- B: look-at ---------------- */

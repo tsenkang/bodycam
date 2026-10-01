@@ -61,8 +61,8 @@ const key = new THREE.DirectionalLight(0xfff3e0, 3.1);
 key.position.set(-3.2, 4.4, 2.6);
 key.castShadow = true;
 key.shadow.mapSize.set(2048, 2048);
-key.shadow.camera.left = -1.6;
-key.shadow.camera.right = 1.6;
+key.shadow.camera.left = -2.6;
+key.shadow.camera.right = 2.6;
 key.shadow.camera.top = 2.4;
 key.shadow.camera.bottom = -0.2;
 key.shadow.bias = -0.0006;
@@ -91,10 +91,10 @@ const materials = new SoldierMaterials(rng.fork(), {
 
 const view = q.get('view') ?? 'front';
 const variantName = q.get('variant') ?? 'vanguard';
-const lineup = view === 'line' || view.startsWith('squad');
+const lineup = view === 'line' || view.startsWith('squad') || view === 'sheet';
 const names = lineup ? Object.keys(VARIANTS) : [variantName];
 // poses=1: a combat tableau — standing aimed, kneeling in cover, leaning out
-const POSES = q.get('poses') ? [
+const POSES = q.get('poses') || view === 'sheet' ? [
   { clip: 'idle', lean: 0 },
   { clip: 'crouchIdle', lean: 0 },
   { clip: 'idle', lean: -0.85 },
@@ -114,7 +114,7 @@ for (let i = 0; i < names.length; i++) {
   group.position.x = (i - (names.length - 1) / 2) * (POSES ? 1.5 : 1.15);
   if (POSES) group.rotation.y = 0.5;
   scene.add(group);
-  const animator = new Animator(RIG, bones, { rng: rng.fork() });
+  const animator = new Animator(RIG, bones, { rng: rng.fork(), weapon: def.weapon });
   // in the line-up each man aims at a point 10 m out along his own facing,
   // slightly across the body, so the rifles read in three-quarter
   const aim = new THREE.Vector3(group.position.x + Math.sin(0.5) * 10 - 1.5, 1.35, Math.cos(0.5) * 10);
@@ -178,6 +178,58 @@ function frame(dt) {
   }
 }
 
+/*
+ * view=sheet — one capture, four judgements (the capture queue is the scarce
+ * resource on this box): TL the combat line-up at 4.5 m, TR the same line-up at
+ * the `combat` shot's on-screen scale (~115 px per man), BL from behind (packs,
+ * back plates), BR a head close-up of each variant.
+ */
+const SHEET = view === 'sheet';
+const sheetCams = SHEET ? {
+  near: new THREE.PerspectiveCamera(40, 4 / 3, 0.05, 80),
+  far: new THREE.PerspectiveCamera(28, 4 / 3, 0.05, 80),
+  back: new THREE.PerspectiveCamera(40, 4 / 3, 0.05, 80),
+  heads: [0, 1, 2].map(() => new THREE.PerspectiveCamera(24, 0.889, 0.02, 20)),
+} : null;
+if (SHEET) {
+  sheetCams.near.position.set(2.2, 1.45, 4.4);
+  sheetCams.near.lookAt(0, 0.95, 0);
+  sheetCams.far.position.set(6.0, 1.75, 17.5);
+  sheetCams.far.lookAt(0, 0.95, 0);
+  sheetCams.back.position.set(-2.6, 1.5, -3.8);
+  sheetCams.back.lookAt(0, 0.95, 0);
+}
+const _hp = new THREE.Vector3();
+function renderSheet() {
+  const W = innerWidth, H = innerHeight;
+  const hw = Math.floor(W / 2), hh = Math.floor(H / 2);
+  renderer.setScissorTest(true);
+  // three.js viewports are bottom-left origin
+  const quad = (cam, x, y, w, h) => {
+    renderer.setViewport(x, y, w, h);
+    renderer.setScissor(x, y, w, h);
+    cam.aspect = w / h;
+    cam.updateProjectionMatrix();
+    renderer.render(scene, cam);
+  };
+  quad(sheetCams.near, 0, hh, hw, H - hh);
+  quad(sheetCams.far, hw, hh, W - hw, H - hh);
+  quad(sheetCams.back, 0, 0, hw, hh);
+  const cw = Math.floor((W - hw) / 3);
+  for (let i = 0; i < 3 && i < actors.length; i++) {
+    const a = actors[i];
+    const head = a.bones[RIG.index('Head')];
+    head.getWorldPosition(_hp);
+    const c = sheetCams.heads[i];
+    const yaw = a.group.rotation.y + 0.45;
+    c.position.set(_hp.x + Math.sin(yaw) * 0.72, _hp.y + 0.14, _hp.z + Math.cos(yaw) * 0.72);
+    c.lookAt(_hp.x, _hp.y + 0.09, _hp.z);
+    quad(c, hw + i * cw, 0, i === 2 ? W - hw - 2 * cw : cw, hh);
+  }
+  renderer.setScissorTest(false);
+  renderer.setViewport(0, 0, W, H);
+}
+
 function loop() {
   requestAnimationFrame(loop);
   // This page has no engine, so it has no ctx.time — but it must not read the
@@ -187,7 +239,8 @@ function loop() {
   // frame N is always at t = phase + N/60, on any machine, at any frame rate.
   frameIndex++;
   frame(PREVIEW_DT);
-  renderer.render(scene, camera);
+  if (SHEET) renderSheet();
+  else renderer.render(scene, camera);
   if (frameIndex === 4) window.__READY__ = true;
 }
 requestAnimationFrame(loop);

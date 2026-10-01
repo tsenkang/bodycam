@@ -493,8 +493,9 @@ export class AiSystem {
     if (!ranked.length) return 0;
 
     const variants = ['vanguard', 'irregular', 'breacher'];
-    const squads = opts.squads ?? 2;
-    const per = opts.perSquad ?? 3;
+    const cq = this.ctx.config.q;
+    const squads = opts.squads ?? cq.aiSquads ?? 2;
+    const per = opts.perSquad ?? cq.aiPerSquad ?? 3;
     let made = 0;
     for (let q = 0; q < squads && q < ranked.length; q++) {
       const squad = this.createSquad();

@@ -25,7 +25,9 @@ const capture = params.get('capture') === '1';
 const lockstep = capture && params.get('lockstep') === '1';
 
 const config = createConfig({
-  quality: params.get('q') ?? 'ultra',
+  // `window.__OOD_QUALITY__` lets a packaged build (e.g. the Chromebook file)
+  // pick its default without touching the URL.
+  quality: params.get('q') ?? globalThis.__OOD_QUALITY__ ?? 'ultra',
   deterministic: capture,
 });
 
@@ -76,7 +78,8 @@ const shotApi = installShotApi(engine, { capture, lockstep });
 // lockstep in src/dev/shots.js; (2) `will-change: transform` on the compass strip
 // cached a composited-layer raster taken at a wall-clock-dependent moment — fixed
 // in src/ui/style.js.
-const warmup = params.get('prewarm') === '0' ? { ok: false, reason: 'disabled by ?prewarm=0' } : await prewarm(engine);
+const skipWarm = params.get('prewarm') === '0' || (config.q.prewarm === false && params.get('prewarm') !== '1');
+const warmup = skipWarm ? { ok: false, reason: `disabled (${config.quality})` } : await prewarm(engine);
 console.info('[boot] prewarm', warmup);
 window.__PREWARM__ = warmup;
 

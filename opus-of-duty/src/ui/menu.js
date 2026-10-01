@@ -1,6 +1,6 @@
 import { el, setText, setStyle, clamp, damp, ease } from './util.js';
 
-const PRESETS = ['low', 'medium', 'high', 'ultra'];
+const PRESETS = ['chromebook', 'low', 'medium', 'high', 'ultra'];
 
 /**
  * Pause / settings menu.

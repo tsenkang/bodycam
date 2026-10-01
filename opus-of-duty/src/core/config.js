@@ -19,6 +19,32 @@ export const UNITS = {
 };
 
 export const QUALITY_PRESETS = {
+  /**
+   * Chromebook / integrated-GPU tier. Same game, same world and materials, but
+   * every screen-space effect off, a low internal resolution, one small shadow
+   * cascade pair and no up-front shader pre-warm (on a slow GPU it delays the
+   * first frame by minutes). Keys below the standard set are only read here;
+   * the other presets fall back to their defaults.
+   */
+  chromebook: {
+    renderScale: 0.6,
+    pixelRatioCap: 1,
+    shadowMapSize: 1024,
+    cascades: 2,
+    shadowDistance: 45,
+    taa: false,
+    gtao: false,
+    ssr: false,
+    volumetrics: false,
+    motionBlur: false,
+    bloom: false,
+    anisotropy: 2,
+    particleBudget: 1200,
+    decalBudget: 32,
+    prewarm: false,
+    aiSquads: 2,
+    aiPerSquad: 2,
+  },
   low: {
     renderScale: 0.72,
     shadowMapSize: 1024,

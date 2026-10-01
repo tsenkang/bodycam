@@ -17,7 +17,7 @@ import { createComposite, createFxaa, createDebug, createViewComposite } from '.
 import { buildFallbackEnvironment } from './env.js';
 import { RenderProbeScene } from './probe.js';
 
-const QUALITY_LEVEL = { low: 0, medium: 1, high: 2, ultra: 3 };
+const QUALITY_LEVEL = { chromebook: 0, low: 0, medium: 1, high: 2, ultra: 3 };
 
 /**
  * Registration range at or below which a punctual light counts as a room/street
@@ -918,7 +918,7 @@ export class RenderSystem {
   // ==========================================================================
 
   resize(w, h, ctx) {
-    const pr = Math.min(globalThis.devicePixelRatio || 1, 1.5);
+    const pr = Math.min(globalThis.devicePixelRatio || 1, this.q.pixelRatioCap ?? 1.5);
     this.renderer.setPixelRatio(pr);
     this.renderer.setSize(w, h, false);
 

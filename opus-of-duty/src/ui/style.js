@@ -162,6 +162,22 @@ const CSS = `
   background: radial-gradient(ellipse 76% 70% at 50% 50%, rgba(0,0,0,0) 64%, rgba(150,14,10,.34) 100%);
 }
 
+/* ====================================================== death screen */
+.ow-death {
+  position:absolute; inset:0; z-index:5; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap: calc(10px * var(--k));
+  background: radial-gradient(ellipse at 50% 50%, rgba(40,0,0,.35), rgba(0,0,0,.78));
+}
+.ow-death[hidden] { display:none; }
+.ow-death-title {
+  font-weight:700; font-size: calc(46px * var(--k)); letter-spacing:.14em;
+  color:#e9e4df; text-shadow: 0 2px 10px rgba(0,0,0,.8);
+}
+.ow-death-sub {
+  font-size: calc(16px * var(--k)); letter-spacing:.08em; text-transform:uppercase;
+  color:#b9b3ad;
+}
+
 /* ====================================================== vitals (bottom left)
    Only shown in modes that carry health/armour (.ow-hud.vitals); team
    deathmatch shows none, like the games this is measured against. */

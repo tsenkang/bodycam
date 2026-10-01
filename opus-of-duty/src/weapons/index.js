@@ -188,6 +188,15 @@ export class WeaponSystem {
   /*  public getters                                                        */
   /* ====================================================================== */
 
+  /** Full magazines and reserve on every weapon. Used on respawn. */
+  refillAll() {
+    for (const s of this.states.values()) {
+      s.mag = s.def.magSize;
+      s.chambered = true;
+      s.reserve = s.def.reserve;
+    }
+  }
+
   get state() {
     return this.states.get(this.activeId);
   }
@@ -597,7 +606,7 @@ export class WeaponSystem {
     if (this._sinceShot > 0.6) this._shotIndex = 0;
 
     // ---- gather state ----------------------------------------------------
-    const live = !input.frozen && input.enabled !== false && this.debugMode === null;
+    const live = !input.frozen && input.enabled !== false && this.debugMode === null && player?.dead !== true;
     st.ads = live ? input.ads || player?.adsRequested === true : this.debugMode === 'ads';
     st.sprint = live ? player?.sprinting === true && this._sinceShot > 0.3 : false;
     st.speed = player?.horizontalSpeed ?? player?.speed ?? 0;

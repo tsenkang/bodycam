@@ -86,6 +86,9 @@ import { LowHealthPass } from './lowhealth.js';
 import { STANCE, MOVE, CAMERA, HEALTH, FOOTSTEP, JUMP_SPEED } from './tuning.js';
 import { clamp, clamp01, lerp, approach, DEG } from './springs.js';
 
+/** Seconds on the ground before coming back. */
+const RESPAWN_DELAY = 4;
+
 export class PlayerSystem {
   static id = 'player';
   static deps = ['physics', 'world', 'render'];
@@ -149,6 +152,8 @@ export class PlayerSystem {
     this.movement = new Movement(ctx, this);
     this.rig = new CameraRig(ctx);
     this.health = new Health(ctx, this.rig);
+    this._deathT = -1;
+    this._deaths = 0;
 
     // ---- spawn -----------------------------------------------------------
     const spawn = this._resolveSpawn();
@@ -280,6 +285,7 @@ export class PlayerSystem {
     this._updateAds(dt);
     this._drainMovementEvents();
     this.health.update(dt);
+    this._updateDeath(dt);
 
     this.rig.update(dt, this.movement, this.health);
     if (this.controlEnabled) this.rig.applyTo(ctx.camera);
@@ -612,6 +618,59 @@ export class PlayerSystem {
   }
   addSuppression(a) {
     this.health.addSuppression(a);
+  }
+
+  /**
+   * Death and respawn. `health.js` only flags `dead` and emits `player:death`;
+   * this owns what follows: input is cut, the view sinks to the ground, and
+   * after RESPAWN_DELAY the player comes back at a spawn point away from where
+   * they fell, with full health and ammo. `player:respawn` tells the HUD to
+   * drop its death screen.
+   */
+  _updateDeath(dt) {
+    const hp = this.health;
+    if (!hp.dead) {
+      this._deathT = -1;
+      return;
+    }
+    if (this._deathT < 0) {
+      this._deathT = 0;
+      this.movement.controlEnabled = false;
+      this.movement.latchInput(-2); // flush held keys
+      this.movement.velocity.set(0, 0, 0);
+      this.movement.sprinting = false;
+      this.movement.sliding = false;
+      this._deaths = (this._deaths ?? 0) + 1;
+    }
+    this._deathT += dt;
+    // Sink the view toward the ground over the first second.
+    const sink = Math.min(1, this._deathT);
+    this.movement.pitch = lerp(this.movement.pitch, -0.35, sink * 0.08);
+    if (this._deathT >= RESPAWN_DELAY) this._respawnAfterDeath();
+  }
+
+  _respawnAfterDeath() {
+    const world = this.ctx.peek('world');
+    const pts = world?.spawnPoints ?? [];
+    // The spawn farthest from where we died, so the killer isn't waiting.
+    let best = 0;
+    let bestD = -1;
+    const here = this.movement.renderPosition;
+    for (let i = 0; i < pts.length; i++) {
+      const d = pts[i].position.distanceToSquared(here) * (0.75 + this.rng.float() * 0.5);
+      if (d > bestD) { bestD = d; best = i; }
+    }
+    this.respawn(best);
+    const hp = this.health;
+    hp.effect = 0;
+    hp.pulse = 0;
+    hp.beatPhase = 0;
+    hp.regenerating = false;
+    hp._emitState(true);
+    this.movement.controlEnabled = this.controlEnabled;
+    this.ctx.peek('weapons')?.refillAll?.();
+    this._deathT = -1;
+    this.ctx.events.emit('player:respawn', { deaths: this._deaths });
   }
 
   setControlEnabled(on) {

@@ -156,6 +156,28 @@ export class UiSystem {
     this._unsubs = [];
     const on = (type, fn) => this._unsubs.push(ctx.events.on(type, fn));
 
+    // ---- death screen -------------------------------------------------------
+    // Shown from `player:death` until `player:respawn`, with a live countdown.
+    this.deathScreen = el('div', 'ow-death', this.root);
+    this.deathScreen.hidden = true;
+    el('div', 'ow-death-title', this.deathScreen, 'VOCÊ MORREU');
+    this._deathCount = el('div', 'ow-death-sub', this.deathScreen, '');
+    this._deathTimer = 0;
+    on('player:death', () => {
+      this.deathScreen.hidden = false;
+      let left = 4;
+      this._deathCount.textContent = `Renascendo em ${left}`;
+      clearInterval(this._deathTimer);
+      this._deathTimer = setInterval(() => {
+        left = Math.max(1, left - 1);
+        this._deathCount.textContent = `Renascendo em ${left}`;
+      }, 1000);
+    });
+    on('player:respawn', () => {
+      clearInterval(this._deathTimer);
+      this.deathScreen.hidden = true;
+    });
+
     on('weapon:fire', (e) => {
       this.crosshair.onFire(e?.recoil ?? 1);
       if (this.state.simulate) return;
@@ -608,6 +630,7 @@ export class UiSystem {
   }
 
   dispose() {
+    clearInterval(this._deathTimer);
     for (const off of this._unsubs) off();
     this._unsubs.length = 0;
     this.crosshair.dispose();

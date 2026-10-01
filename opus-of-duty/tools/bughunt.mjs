@@ -235,6 +235,21 @@ if (FROM <= 10) {
   check('our death raises the enemy score', s.them > them0, { before: them0, after: s.them });
 }
 
+// 11. end of match: results screen, then a fresh match ------------------------
+if (FROM <= 11) {
+  await hunt(() => { window.__ENGINE__.ctx.peek('match').timeLeft = 0.5; });
+  await frames(20);
+  const end = await hunt(() => ({ shown: document.querySelector('.ow-match-end')?.style.display === 'flex', text: document.querySelector('.ow-match-end')?.innerText.replace(/\n/g, ' | ') }));
+  check('match ends with a results screen', end.shown, end);
+  let s = null;
+  for (let i = 0; i < 30; i++) {
+    await frames(20);
+    s = await hunt(() => ({ hidden: document.querySelector('.ow-match-end')?.style.display === 'none', left: Math.round(window.__ENGINE__.ctx.peek('match').timeLeft), us: window.__HUNT__.ui().state.scoreUs, them: window.__HUNT__.ui().state.scoreThem }));
+    if (s.hidden) break;
+  }
+  check('a new match starts after the results', s.hidden && s.left > 590 && s.us === 0 && s.them === 0, s);
+}
+
 check('no page errors during play', errors.length === 0, errors.slice(0, 8));
 
 await browser.close();

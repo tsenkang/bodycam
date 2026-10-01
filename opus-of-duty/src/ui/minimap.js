@@ -34,7 +34,7 @@ export class Minimap {
 
     this.rng = rng;
     this.k = 1;
-    this.cssSize = 250;
+    this.cssSize = 236;
     this.span = 190; // metres covered by the bake
     this.viewSpan = 70; // metres visible in the widget
     this.centre = new THREE.Vector2(0, 0);
@@ -569,20 +569,21 @@ export class Minimap {
     g.stroke();
     g.fill();
 
-    // inner hairline frame, part of the bitmap so it survives any backdrop
-    g.strokeStyle = 'rgba(0,0,0,.35)';
-    g.lineWidth = 2 * u;
-    g.strokeRect(u, u, S - 2 * u, S - 2 * u);
+    // inner shade ring: the disc sinks into its rim
+    const vg = g.createRadialGradient(half, half, half * 0.72, half, half, half);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, 'rgba(0,0,0,.32)');
+    g.fillStyle = vg;
+    g.fillRect(0, 0, S, S);
 
     // the north marker rides the rim
     if (this.nLabel) {
-      const R = this.cssSize * 0.5 - 8;
+      const R = this.cssSize * 0.5 - 11;
       const nx = Math.sin(-heading) * R;
       const ny = -Math.cos(-heading) * R;
-      const sc = Math.max(Math.abs(nx), Math.abs(ny)) / R; // push onto the square's edge
       const k = this.k;
-      const X = (nx / sc) * k;
-      const Y = (ny / sc) * k;
+      const X = nx * k;
+      const Y = ny * k;
       const tr = `translate(calc(-50% + ${X.toFixed(1)}px), calc(-50% + ${Y.toFixed(1)}px))`;
       if (this.nLabel._tr !== tr) {
         this.nLabel._tr = tr;

@@ -1407,7 +1407,47 @@ function coverClusters(A, rng) {
  * Facade services and roof clutter, driven by the anchors each building
  * returned while it was being generated.
  */
+/**
+ * A lettered face on a sign board: a quad mapped into one cell of the
+ * materials sign atlas, sitting just proud of the board. Cells are dealt from
+ * a private stream so the level rng is untouched, and the cell is cropped
+ * rather than stretched when the board is wider than the lettering.
+ */
+let _signRng = null;
+const _signCells = { boards: 0, plates: 0 };
+function signFace(A, kind, w, h, matrix, z) {
+  if (!_signRng) _signRng = new Rng(0x5160b);
+  const cells = A.materials.signCells?.[kind];
+  if (!cells) return;
+  const idx = (_signCells[kind] + _signRng.int(0, 1)) % cells.length;
+  _signCells[kind] = idx + 1;
+  let [u0, v0, u1, v1] = cells[idx];
+  const inset = 0.002;
+  u0 += inset; u1 -= inset; v0 += inset; v1 -= inset;
+  const cellAspect = ((u1 - u0) / (v1 - v0));
+  const faceAspect = w / h;
+  if (faceAspect > cellAspect) {
+    const keep = (v1 - v0) * (cellAspect / faceAspect);
+    const mid = (v0 + v1) / 2;
+    v0 = mid - keep / 2;
+    v1 = mid + keep / 2;
+  }
+  const g = new THREE.PlaneGeometry(w, h, 2, 1);
+  const uv = g.getAttribute('uv');
+  for (let i = 0; i < uv.count; i++) {
+    uv.setXY(i, u0 + uv.getX(i) * (u1 - u0), v0 + uv.getY(i) * (v1 - v0));
+  }
+  g.translate(0, 0, z);
+  // hanging plates read from both sides
+  const back = kind === 'plates' ? g.clone().rotateY(Math.PI) : null;
+  A.addOnce('signage', g, matrix, { masks: [0.15, 0.35, 0.05] });
+  if (back) A.addOnce('signage', back, matrix, { masks: [0.15, 0.35, 0.05] });
+}
+
 export function dressBuildings(A, rng, infos) {
+  _signRng = null;
+  _signCells.boards = 0;
+  _signCells.plates = 0;
   A.jitter = jitterRig();
   for (const info of infos) dressBuilding(A, rng, info);
   alleyLines(A, rng, infos);
@@ -1518,17 +1558,22 @@ function dressBuilding(A, rng, info) {
   for (const aw of info.awnings) {
     if (rng.float() < 0.55) {
       const wp = worldOf(aw.pm, aw.x, aw.y + 1.0, -0.16);
-      A.putS('sign_board', wp[0], wp[1], wp[2], ryOf(aw.pm) + Math.PI, Math.min(1.3, aw.w / 1.6), 1, 1, [
+      const sx = Math.min(1.3, aw.w / 1.6);
+      A.putS('sign_board', wp[0], wp[1], wp[2], ryOf(aw.pm) + Math.PI, sx, 1, 1, [
         1,
         rng.range(0.8, 1.3),
         1,
       ]);
+      signFace(A, 'boards', 1.55 * sx, 0.46, LL(IDENT, wp[0], wp[1], wp[2], ryOf(aw.pm) + Math.PI), 0.027);
     }
   }
   for (const dr of info.doors) {
     if (rng.float() < 0.5) {
       const wp = worldOf(dr.pm, dr.x + rng.range(-0.2, 0.2), 2.55, -0.12);
-      A.put('sign_hang', wp[0], wp[1], wp[2], ryOf(dr.pm) + Math.PI, rng.range(0.85, 1.15), [1, 1.2, 1]);
+      const ss = rng.range(0.85, 1.15);
+      A.put('sign_hang', wp[0], wp[1], wp[2], ryOf(dr.pm) + Math.PI, ss, [1, 1.2, 1]);
+      const m = LL(IDENT, wp[0], wp[1], wp[2], ryOf(dr.pm) + Math.PI, ss, ss, ss).clone();
+      signFace(A, 'plates', 0.86, 0.58, m.multiply(new THREE.Matrix4().makeTranslation(0, -0.43, 0)), 0.022);
     }
     // step, mat, and the junk that lives beside a doorway
     const wp = worldOf(dr.pm, dr.x, 0.02, -0.55);

@@ -151,7 +151,7 @@ export class Animator {
       const iS2 = rig.index('Spine2');
       const sInv = rig.bindQuat[iS2].clone().invert();
       const sp = rig.bindPos[iS2];
-      this.pocketLocal = new THREE.Vector3(-0.122 - sp.x, 1.388 - sp.y, 0.112 - sp.z).applyQuaternion(sInv);
+      this.pocketLocal = new THREE.Vector3(-0.110 - sp.x, 1.388 - sp.y, 0.128 - sp.z).applyQuaternion(sInv);
     }
 
     /* ---- scratch ---- */

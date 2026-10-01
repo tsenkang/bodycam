@@ -26,31 +26,48 @@ function flashIcon(parent) {
   return s;
 }
 
-/** Three stacked rounds: the fire-mode glyph (auto = 3, burst = 2, semi = 1). */
-function modeIcon(parent) {
-  const s = svg('svg', { viewBox: '0 0 14 10' }, parent);
-  const rounds = [];
-  for (let i = 0; i < 3; i++) {
-    rounds.push(svg('path', { d: `M${i * 4.6} 10V3.2c0-1.4.8-2.6 1.6-3.2.8.6 1.6 1.8 1.6 3.2V10z` }, s));
-  }
-  return rounds;
+/** Side silhouette of a carbine, drawn for this HUD (original geometry). */
+function weaponIcon(parent) {
+  const s = svg('svg', { viewBox: '0 0 120 40', fill: 'rgba(240,244,246,.92)' }, parent);
+  svg('path', {
+    d:
+      'M2 14h14l3-2h20l2-3h22l1 2h18v3h22l2 1v3h-2v2h-8v-1H86l-2 2H70l-3 3h-6l-1 3' +
+      'c-1 4-2 9-1 14h-9c-1-4 0-9 1-13l-2-1H41l-2 3-4 0 1-3h-4l-3 4H16l-2-6H2z',
+  }, s);
+  // ejection port / rail detail cut back out of the receiver
+  svg('rect', { x: 44, y: 14, width: 9, height: 3, fill: 'rgba(0,0,0,.45)' }, s);
+  svg('rect', { x: 64, y: 9.5, width: 20, height: 1.4, fill: 'rgba(0,0,0,.35)' }, s);
+  // magazine
+  svg('path', { d: 'M49 22h9l1 9c0 3-1 5-2 7h-7c1-3 1-6 0-9z', fill: 'rgba(240,244,246,.92)' }, s);
+  return s;
 }
 
 /**
- * Ammo / weapon readout, bottom right.
+ * Ammo / weapon readout, bottom right, in the shipped layout of this genre:
  *
- *    (frag) 2  |          M4A1
- *   (flash) 1  |    26   94
- *              |         ||| AUTO
+ *       M4A1
+ *   [ weapon silhouette ]   26     (frag) 2  (flash) 1
+ *        Auto                94
  *
- * Equipment is a narrow column to the left of a hairline rule; the weapon
- * name, the magazine count (the biggest glyphs on the HUD) and the reserve sit
- * right-aligned to the safe margin. No boxes, no per-round pips: shipped
- * shooters of this generation show the count and nothing else.
+ * The magazine count is the biggest glyph run on the HUD; the reserve sits
+ * under it at half size. No plates, no boxes, no per-round pips.
  */
 export class AmmoPanel {
   constructor(parent) {
     this.root = el('div', 'ow-ammo', parent);
+
+    const wpn = el('div', 'ow-ammo-wpn', this.root);
+    this.name = el('div', 'ow-ammo-name', wpn, 'M4A1');
+    weaponIcon(wpn);
+    const modeRow = el('div', 'ow-ammo-mode', wpn);
+    this.mode = el('span', null, modeRow, 'Auto');
+
+    const nums = el('div', 'ow-ammo-nums', this.root);
+    this.cur = el('div', 'ow-ammo-cur', nums, '30');
+    const resRow = el('div', 'ow-ammo-resrow', nums);
+    const magI = svg('svg', { viewBox: '0 0 8 12', fill: 'rgba(226,232,236,.7)' }, resRow);
+    svg('path', { d: 'M1 0h6v3l1 9H0l1-9z' }, magI);
+    this.res = el('div', 'ow-ammo-res', resRow, '210');
 
     this.equip = el('div', 'ow-equip', this.root);
     this.slotL = el('div', 'ow-slot', this.equip);
@@ -59,20 +76,9 @@ export class AmmoPanel {
     this.slotT = el('div', 'ow-slot', this.equip);
     flashIcon(this.slotT);
     this.slotTn = el('span', null, this.slotT, '1');
-    el('div', 'ow-ammo-rule', this.root);
 
-    const main = el('div', 'ow-ammo-main', this.root);
-    this.name = el('div', 'ow-ammo-name', main, 'M4A1');
-    const row = el('div', 'ow-ammo-row', main);
-    this.cur = el('div', 'ow-ammo-cur', row, '30');
-    const side = el('div', 'ow-ammo-side', row);
-    this.res = el('div', 'ow-ammo-res', side, '210');
-    const modeRow = el('div', 'ow-ammo-mode', side);
-    this.modeRounds = modeIcon(modeRow);
-    this.mode = el('span', null, modeRow, 'AUTO');
-
-    this.reload = el('div', 'ow-reload', main, 'RELOADING');
-    const bar = el('div', 'ow-reload-bar', main);
+    this.reload = el('div', 'ow-reload', this.root, 'RELOADING');
+    const bar = el('div', 'ow-reload-bar', this.root);
     this.reloadFill = el('i', null, bar);
     this.reloadBar = bar;
 
@@ -103,18 +109,16 @@ export class AmmoPanel {
       this._lastName = name;
       setText(this.name, name);
     }
-    const mode = String(s.fireMode ?? 'AUTO').toUpperCase();
+    const mode = String(s.fireMode ?? 'AUTO');
     if (mode !== this._lastMode) {
       this._lastMode = mode;
-      setText(this.mode, mode);
-      const n = mode.startsWith('AUTO') || mode.startsWith('FULL') ? 3 : mode.startsWith('BURST') ? 2 : 1;
-      for (let i = 0; i < 3; i++) this.modeRounds[i].setAttribute('opacity', i >= 3 - n ? '1' : '0.28');
+      setText(this.mode, mode.charAt(0).toUpperCase() + mode.slice(1).toLowerCase());
     }
 
     this.punch = Math.max(0, this.punch - dt * 7.5);
     const p = 1 - 0.05 * ease.outQuad(this.punch);
-    // 0.82 horizontal: the condensed display cut (see .ow-cx in style.js)
-    setStyle(this.cur, 'transform', `scale(${(p * 0.82).toFixed(3)},${p.toFixed(3)})`);
+    // 0.92 horizontal: a touch of condensing on the display numerals
+    setStyle(this.cur, 'transform', `scale(${(p * 0.92).toFixed(3)},${p.toFixed(3)})`);
 
     const frac = ammo / magSize;
     setClass(this.root, 'ow-ammo-low', ammo > 0 && frac <= 0.25);
@@ -125,7 +129,7 @@ export class AmmoPanel {
 
     // --- reload state -----------------------------------------------------
     setStyle(this.reload, 'display', reloading || ammo === 0 ? '' : 'none');
-    setText(this.reload, reloading ? 'RELOADING' : 'RELOAD');
+    setText(this.reload, reloading ? 'Reloading' : 'Reload');
     if (!reloading && ammo === 0) {
       const pulse = 0.55 + 0.45 * Math.abs(Math.sin((s.time ?? 0) * 3.8));
       setStyle(this.reload, 'opacity', pulse.toFixed(3));

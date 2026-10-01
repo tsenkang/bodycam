@@ -994,7 +994,7 @@ export function registerProps(A, rngIn) {
   P('sandbag_a', 'burlap', sandbag(rng, 0), LOOSE(0.085, 0.006));
   P('sandbag_b', 'burlap', sandbag(rng, 1), LOOSE(0.09, 0.006));
   P('sandbag_c', 'burlap', sandbag(rng, 2), LOOSE(0.095, 0.006));
-  P('jersey', 'concrete_prop', jerseyBarrier(rng), { skirt: 0.69, maxDist: 0 });
+  P('jersey', 'concrete_barrier', jerseyBarrier(rng), { skirt: 0.69, maxDist: 0 });
   P('block_big', 'concrete_prop', concreteBlock(rng, 1.25, 0.95, 0.85), { skirt: 0.63, ...LOOSE(0.05, 0.03) });
   P('block_small', 'concrete_dark', concreteBlock(rng, 0.55, 0.42, 0.4), { skirt: 0.31, ...LOOSE(0.09, 0.018) });
   P('tyre', 'rubber', tyre(rng), { skirt: 0.33, ...LOOSE(0.10, 0.008) });

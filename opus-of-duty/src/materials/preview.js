@@ -155,7 +155,7 @@ if (VIEW === 'board') {
   if (dbg.includes('nograd')) brick = materials.get('brick', { ...M, noGrad: true });
   if (dbg.includes('meshuv')) brick = materials.get('brick', { ...M, uvMode: 'mesh', scale: 4 });
   const concrete = materials.get('concrete', M);
-  const plaster = materials.get('plaster', M);
+  const plaster = materials.get('plaster', { ...M, tint: 0xcfc0a4, graffiti: [1.0, 0.55, 2.3, 2.8] });
   const wood = materials.get('wood', M);
   const corr = materials.get('corrugated', M);
   const painted = materials.get('metal_painted', M);

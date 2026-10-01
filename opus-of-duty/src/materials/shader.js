@@ -83,7 +83,7 @@ uniform sampler2D owMacroTex;
 uniform vec4  owTile;        // xy = scale (tiles per metre, or uv multiplier), zw = offset
 uniform vec4  owDetailP;     // x tile, y normal amt, z albedo amt, w fade distance
 uniform vec4  owMacroP;      // x scale, y albedo amt, z rough amt, w hue amt
-uniform vec4  owMacroBig;    // x contrast, y big-band amt, z big-band scale, w unused
+uniform vec4  owMacroBig;    // x contrast, y big-band amt, z big-band scale, w wet-patch coverage
 uniform vec4  owPatchP;      // x coverage, y cell metres, z albedo delta, w rough delta
 uniform vec4  owClothP;      // x transmission, y underside darkening, z fold amt, w unused
 uniform vec4  owParallaxP;   // x depth (m), y fade start, z fade end, w max layers
@@ -100,6 +100,7 @@ uniform float owNormalAmp;
 uniform float owGroundY;
 uniform float owAoAmt;
 uniform float owMacroRelief;
+uniform vec4  owGrafP;       // graffiti: x coverage, y min height, z max height, w cell metres
 uniform vec4  owIntP;        // interior paint: x dado height, y peel, z dirt, w dado roughness
 uniform vec3  owStorey;      // x ground-floor level, y ground-storey top, z upper storey height
 uniform vec3  owIntCol;      // dado oil paint
@@ -446,6 +447,22 @@ const MAIN_FRAGMENT = /* glsl */ `
     alb.rgb *= 1.0 - ( mac1.b - 0.5 ) * 0.16 * owUpFace;
   #endif
 
+  // ---- wet patches in the hollows of up-facing ground (macroBig.w) ----
+  // Water thrown out of a shop, an AC unit dripping, a burst pipe: darker,
+  // glossier ground with a soft damp halo. Gated to low spots of the macro map
+  // so it sits in ruts and dips like real standing water.
+  if ( owMacroBig.w > 0.0 ) {
+    vec2 wUv = vOwWPos.xz * 0.09 + 0.43;
+    float wn = texture2D( owMacroTex, wUv ).g * 0.7 + texture2D( owMacroTex, wUv * 3.3 ).b * 0.3;
+    float wT = 0.64 - owMacroBig.w * 0.08;
+    float upOnly = step( 0.62, owNw.y );
+    float wet = smoothstep( wT, wT + 0.015, wn ) * upOnly;
+    float damp = smoothstep( wT - 0.05, wT, wn ) * upOnly;
+    alb.rgb *= 1.0 - damp * 0.22 - wet * 0.30;
+    orm.g = mix( orm.g, mix( orm.g * 0.7, 0.08, wet ), max( damp * 0.5, wet ) );
+    nShade = normalize( mix( nShade, normalize( owP2V * owNp ), wet * 0.85 ) );
+  }
+
   // Horizontal coordinate along a wall, shared by the patch and runoff layers.
   float owVert = smoothstep( 0.72, 0.34, abs( owNw.y ) );
   float owSAxis = vOwWPos.z * owNw.x - vOwWPos.x * owNw.z;
@@ -493,6 +510,82 @@ const MAIN_FRAGMENT = /* glsl */ `
   }
   #endif
 
+  // ------------------------------------------------------ graffiti ----
+  #ifdef OW_GRAFFITI
+  {
+    // Spray-painted tags at arm's reach. A wall is cut into cells along its
+    // length; some cells carry a tag: a run of 3-7 scrawled glyphs, each made
+    // of three straight strokes with overspray, the odd drip, and a palette of
+    // black, red, blue and green aerosol. Only the glyph under the fragment is
+    // evaluated, so it is three segment distances, not a font.
+    float gy = vOwWPos.y - owGroundY;
+    if ( owVert > 0.5 && gy > owGrafP.y - 0.3 && gy < owGrafP.z + 0.3 ) {
+      float cw = owGrafP.w;
+      float cx = floor( owSAxis / cw );
+      float cr = owHash11( cx * 7.13 + floor( vOwWPos.y / 3.0 ) * 3.7 + 0.5 );
+      if ( cr < owGrafP.x ) {
+        float r1 = owHash11( cx * 3.31 + 1.7 );
+        float r2 = owHash11( cx * 5.77 + 9.1 );
+        float r3 = owHash11( cx * 9.41 + 4.3 );
+        float tw = cw * ( 0.35 + 0.5 * r1 );                      // tag width
+        float th = min( 0.28 + 0.5 * r2, owGrafP.z - owGrafP.y ); // tag height
+        float tx0 = cx * cw + ( cw - tw ) * r3;
+        float ty0 = owGrafP.y + ( owGrafP.z - owGrafP.y - th ) * r2;
+        float slant = ( r1 - 0.5 ) * 0.35;
+        vec2 tl = vec2( ( owSAxis - tx0 ) / tw, ( gy - ty0 ) / th );
+        tl.x -= tl.y * slant * th / tw;
+        float n = floor( 3.0 + r2 * 4.99 );
+        float strokeW = 0.018 + 0.016 * r3;                        // metres
+        if ( tl.x > -0.05 && tl.x < 1.05 && tl.y > -0.6 && tl.y < 1.1 ) {
+          float k = clamp( floor( tl.x * n ), 0.0, n - 1.0 );
+          vec2 g = vec2( ( tl.x * n - k ) * tw / n, tl.y * th );     // metres in glyph
+          vec2 gs = vec2( tw / n, th );
+          float d = 1e3;
+          float dripD = 1e3;
+          for ( int j = 0; j < 3; j ++ ) {
+            float fj = float( j );
+            vec4 h = vec4( owHash11( cx * 1.3 + k * 7.7 + fj * 3.1 + 0.1 ),
+                           owHash11( cx * 2.9 + k * 5.3 + fj * 1.7 + 0.2 ),
+                           owHash11( cx * 4.1 + k * 3.9 + fj * 6.3 + 0.3 ),
+                           owHash11( cx * 6.7 + k * 2.3 + fj * 4.9 + 0.4 ) );
+            vec2 a = vec2( 0.05 + 0.9 * h.x, 0.05 + 0.9 * h.y ) * gs;
+            vec2 b = vec2( 0.05 + 0.9 * h.z, 0.05 + 0.9 * h.w ) * gs;
+            vec2 pa = g - a, ba = b - a;
+            float t = clamp( dot( pa, ba ) / max( dot( ba, ba ), 1e-5 ), 0.0, 1.0 );
+            d = min( d, length( pa - ba * t ) );
+            // a drip off the lower end of the first stroke on some glyphs
+            if ( j == 0 && owHash11( cx + k * 13.1 ) < 0.45 ) {
+              vec2 lo = a.y < b.y ? a : b;
+              float len = 0.05 + 0.25 * owHash11( cx * 3.0 + k );
+              float below = lo.y - g.y;
+              if ( below > 0.0 && below < len ) dripD = abs( g.x - lo.x ) + below / len * 0.004;
+            }
+          }
+          vec4 gn = texture2D( owMacroTex, vec2( owSAxis, gy ) * 4.1 + 0.3 );
+          float edgeJ = ( gn.a - 0.5 ) * 0.012;
+          float core = 1.0 - smoothstep( strokeW * 0.5 - 0.003 + edgeJ, strokeW * 0.5 + 0.004 + edgeJ, d );
+          float over = ( 1.0 - smoothstep( strokeW * 0.5, strokeW * 2.2, d ) ) * 0.28;
+          float drip = 1.0 - smoothstep( 0.003, 0.007, dripD );
+          float cov = max( max( core, over ), drip * 0.9 );
+          // aged: sun-faded and partly scrubbed on some walls
+          cov *= ( 0.55 + 0.4 * r1 ) * ( 0.75 + 0.5 * smoothstep( 0.35, 0.65, gn.g ) );
+          float ci = owHash11( cx * 11.7 + 2.0 );
+          vec3 sprayC = ci < 0.45 ? vec3( 0.025, 0.025, 0.028 )
+                      : ci < 0.68 ? vec3( 0.32, 0.035, 0.03 )
+                      : ci < 0.85 ? vec3( 0.04, 0.08, 0.22 )
+                      : vec3( 0.05, 0.16, 0.06 );
+          // paint is absolute colour: undo the tint applied at the end
+          sprayC /= max( owTintCol, vec3( 0.05 ) );
+          float bl = dot( alb.rgb, vec3( 0.2126, 0.7152, 0.0722 ) );
+          vec3 painted = sprayC * clamp( 0.8 + ( bl - 0.3 ) * 0.6, 0.6, 1.2 );
+          alb.rgb = mix( alb.rgb, painted, clamp( cov, 0.0, 1.0 ) );
+          orm.g = mix( orm.g, 0.62, core * 0.6 );
+        }
+      }
+    }
+  }
+  #endif
+
   // ------------------------------------------------ interior paint ----
   #ifdef OW_INTERIOR
   {
@@ -527,16 +620,23 @@ const MAIN_FRAGMENT = /* glsl */ `
     paint = mix( paint, owIntCol * 0.42 * relief * invTint, stripe * 0.9 );
     // Flaking. Distemper lets go in big maps above ~1.6 m and round every leak;
     // the oil dado chips in small sharp flakes, worst in the kick zone.
-    float pn = mix( i1.r * 0.46 + i2.g * 0.36 + i3.b * 0.18,
-                    i2.g * 0.50 + i3.b * 0.30 + i1.r * 0.20, dado );
+    float pn = mix( i1.r * 0.50 + i2.g * 0.40 + i3.b * 0.10,
+                    i2.g * 0.55 + i3.b * 0.20 + i1.r * 0.25, dado );
     float leakN = i0.g * 0.7 + i1.b * 0.3;
     float leakZone = smoothstep( 1.2, 2.5, hRel );
-    float peelT = mix( 0.60 - owIntP.y * 0.09 - leakZone * 0.03 * owIntP.y,
-                       0.60 - owIntP.y * 0.08 + smoothstep( 0.0, 0.5, hRel ) * 0.02, dado );
-    float peel = smoothstep( peelT, peelT + 0.006, pn );
+    // Flaking happens in a few places on a wall — round a leak, behind where a
+    // cupboard stood — not everywhere, so it is gated by a 1-2 m zone mask.
+    float zone = smoothstep( 0.50, 0.58, i0.r + leakZone * 0.04 + ( owIntP.y - 0.6 ) * 0.1 );
+    float peelT = mix( 0.585 - owIntP.y * 0.03 - leakZone * 0.015,
+                       0.625 - owIntP.y * 0.03 + smoothstep( 0.0, 0.4, hRel ) * 0.025, dado );
+    float peel = smoothstep( peelT, peelT + 0.006, pn ) * mix( zone, 0.5 + 0.5 * zone, dado );
     // the film curls where it lets go: a thin bright lip and a shadow under it
     float lip = smoothstep( peelT - 0.012, peelT, pn ) - peel;
-    vec3 res = mix( paint, base * mix( 0.9, 1.05, i3.r ), peel );
+    // Under distemper is lime plaster: grey-beige, only a little darker than
+    // the paint. Under the oil dado it is the same, with old paint ghosts.
+    vec3 sub = mix( vec3( 0.43, 0.40, 0.35 ), vec3( 0.33, 0.30, 0.26 ), i3.r ) * relief * invTint;
+    sub = mix( sub, lowerC * 1.3 * invTint, dado * 0.25 );
+    vec3 res = mix( paint, sub, peel );
     res *= 1.0 + lip * 0.16 * ( 1.0 - dado );
     res = mix( res, res * 0.62, lip * dado * 0.5 );
     // leak stains: brown bloom with a hard tide line, falling from the slab
@@ -826,6 +926,8 @@ export const DEFAULT_PARAMS = {
    * unused ]. transmission 0 and multiplier 1 disable the whole cloth layer.
    */
   cloth: [0, 1, 0, 0],
+  /** Spray tags on vertical faces: [ coverage 0..1, min y, max y above ground, cell metres ]. */
+  graffiti: [0, 0.5, 2.4, 3.2],
   /**
    * Interior paint finish on vertical faces: [ dado height m, peel 0..1,
    * dirt 0..1, dado roughness ]. peel 0 and dado 0 disable the layer.
@@ -932,6 +1034,7 @@ export function extendMaterial(material, p, shared) {
     owGroundY: { value: p.groundY },
     owAoAmt: { value: p.aoStrength },
     owMacroRelief: { value: p.macroRelief ?? 0 },
+    owGrafP: { value: new THREE.Vector4(...(p.graffiti ?? DEFAULT_PARAMS.graffiti)) },
     owIntP: { value: new THREE.Vector4(...(p.interior ?? DEFAULT_PARAMS.interior)) },
     owStorey: { value: new THREE.Vector3(...(p.storey ?? DEFAULT_PARAMS.storey)) },
     owIntCol: { value: col(p.interiorCol ?? DEFAULT_PARAMS.interiorCol) },
@@ -949,6 +1052,7 @@ export function extendMaterial(material, p, shared) {
   if ((p.cloth?.[0] ?? 0) > 0 || (p.cloth?.[1] ?? 1) < 1) defines.OW_CLOTH = '';
   if ((p.macroRelief ?? 0) > 0) defines.OW_MACRO_RELIEF = '';
   if ((p.interior?.[0] ?? 0) > 0) defines.OW_INTERIOR = '';
+  if ((p.graffiti?.[0] ?? 0) > 0) defines.OW_GRAFFITI = '';
   if (p.vertexMasks) defines.OW_VCOL_MASKS = '';
   if (p.alphaMask) defines.OW_ALPHA_MASK = '';
   if (p.noGrad) defines.OW_NOGRAD = '';

@@ -215,7 +215,7 @@ export function muzzleFlash(fx, o) {
   // baseline capture showed. A flash hider vents its gas RADIALLY through its
   // prongs, so the petals leave the crown 55-80 deg off the bore: from behind
   // the weapon they spread into the lopsided 4-5 point star players know.
-  const ports = Math.min(5, Math.max(4, prof.lobes + 1 + (rng.float() < 0.4 ? 1 : 0)));
+  const ports = Math.min(6, Math.max(5, prof.lobes + 2 + (rng.float() < 0.4 ? 1 : 0)));
   const rollBase = rng.float() * TWO_PI;
   const weak = rng.int(0, ports - 1); // one port always gets less gas
   const big = rng.int(0, ports - 1); // and one always gets the long tongue

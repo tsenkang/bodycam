@@ -83,20 +83,23 @@ export function aimAdd(P, w = 1, legW = 1) {
   // The leg/pelvis part only applies over a standing base (legW): on top of the
   // kneel or a gait cycle it would drag the planted feet around.
   const l = w * legW;
-  P.hip(0.012 * l, -0.045 * l, -0.010 * l);
-  P.d('Hips', 4 * l, -10 * l, 1.5 * l);
+  P.hip(0.012 * l, -0.064 * l, -0.010 * l);
+  P.d('Hips', 9 * l, -10 * l, 1.5 * l);
   // support (left) leg leads and takes the weight; firing leg braces behind
-  // solved on top of idle: feet 29 cm apart, left 29 cm ahead of right
-  P.d('UpLegR', 8.9 * l, 8 * l, -9.2 * l);
-  P.d('LegR', -10 * l, 0, 0);
+  // solved on top of idle (feet planted at ankle height, knees >= 30 deg):
+  // feet 30 cm apart, left 35 cm ahead of right, hips 7 cm lower
+  P.d('UpLegR', 25.4 * l, 8 * l, -13.6 * l);
+  P.d('LegR', -36 * l, 0, 0);
   P.d('FootR', 10 * l, 10 * l, 0);
-  P.d('UpLegL', 14.4 * l, 2 * l, -1.3 * l);
-  P.d('LegL', -12 * l, 0, 0);
+  P.d('UpLegL', 23 * l, 2 * l, 1.4 * l);
+  P.d('LegL', -14 * l, 0, 0);
   P.d('FootL', 5 * l, -4 * l, 0);
   // chest counter-rotates back toward the target and leans into the recoil
-  P.d('Spine', 4 * w, 5 * w, -1.5 * w);
-  P.d('Spine1', 5.5 * w, 5 * w, -1.5 * w);
-  P.d('Spine2', 5.0 * w, 2.0 * w, -1.0 * w);
+  // MW-style aggressive lean: the chest well forward of the hips, nose over the
+  // lead toe (refs: MW3 Paris rifleman, MW2019 TDM movers)
+  P.d('Spine', 6 * w, 5 * w, -1.5 * w);
+  P.d('Spine1', 8 * w, 5 * w, -1.5 * w);
+  P.d('Spine2', 7 * w, 2.0 * w, -1.0 * w);
   // head down and canted onto the stock (cheek weld)
   P.d('Neck', 10.0 * w, 6.0 * w, -3 * w);
   P.d('Head', -1.0 * w, 5.0 * w, -9.0 * w);
@@ -104,7 +107,7 @@ export function aimAdd(P, w = 1, legW = 1) {
   P.d('ClavicleR', -8.0 * w, -4 * w, 8.0 * w);
   P.d('UpperArmR', 14 * w, -6 * w, 26 * w);
   P.d('ForearmR', -16 * w, 0, 0);
-  P.d('ClavicleL', 20 * w, 6 * w, -4.0 * w);
+  P.d('ClavicleL', 26 * w, 6 * w, -4.0 * w);
   P.d('UpperArmL', 10 * w, 0, -4 * w);
 }
 
@@ -230,9 +233,10 @@ export function crouchIdle(P, ph) {
   P.d('UpLegL', 93.6, -6, 17.6);
   P.d('LegL', -96.6, 0, 0);
   P.d('FootL', 10, 4, 0);
-  P.d('Spine', 3 + 0.6 * breath, 4, -1.5);
-  P.d('Spine1', 4 + 0.8 * breath, 4, -1);
-  P.d('Spine2', 3 + 1.0 * breath, 2, 0);
+  // hunched over the lead knee, not upright (ref: MW3 Prague kneeler)
+  P.d('Spine', 8 + 0.6 * breath, 4, -1.5);
+  P.d('Spine1', 9 + 0.8 * breath, 4, -1);
+  P.d('Spine2', 6 + 1.0 * breath, 2, 0);
   P.d('Neck', 4, 0, 0);
   P.d('ClavicleR', -2, 0, 1.5);
   P.d('ClavicleL', -1.5, 0, -1.5);

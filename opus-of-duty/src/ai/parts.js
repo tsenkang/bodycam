@@ -762,10 +762,12 @@ export function pouch(nz, o) {
 /** Plate carrier: front & back plates, cummerbund, shoulder straps, buckles. */
 export function plateCarrier(nz, p = {}) {
   const out = emptyMesh();
-  const front = plate(0.152, 0.140, 0.030, 1.298, 0.126, -0.05, 0.20);
+  // 38 / 34 mm, not 30 / 26: MW-era carriers are BULKY, and torso mass is the
+  // first thing that reads at 15 m (refs: MW2019 TDM)
+  const front = plate(0.156, 0.142, 0.038, 1.298, 0.130, -0.05, 0.20);
   displace(front, (x, y, z) => nz.fbm3(x * 34, y * 34, z * 34, 3) * 0.0026);
   appendMesh(out, front);
-  const back = plate(0.154, 0.148, 0.026, 1.300, -0.116, 0.05, 0.21);
+  const back = plate(0.158, 0.150, 0.034, 1.300, -0.120, 0.05, 0.21);
   displace(back, (x, y, z) => nz.fbm3(x * 34, y * 34, z * 34, 3) * 0.0026);
   appendMesh(out, back);
 
@@ -807,7 +809,7 @@ export function carrierWebbing() {
     for (let i = 0; i <= 8; i++) {
       const t = i / 8;
       const x = (t - 0.5) * 0.150;
-      pts.push([x, y, 0.150 - (x * x) / 0.20]);
+      pts.push([x, y, 0.164 - (x * x) / 0.20]);
     }
     const row = ribbon(pts, 0.013, 0.0035, { seg: 5, up: [0, 1, 0], upright: true });
     computeNormals(row);
@@ -1247,13 +1249,13 @@ export function backPack(nz, kind = 'assault') {
     const m = boxRound(0.108, 0.150, 0.030, { n: 4.2, seg: 18, rows: 9, roundY: 0.3 });
     computeNormals(m);
     displace(m, (x, y, z) => nz.fbm3(x * 30, y * 30, z * 30, 3) * 0.003);
-    place(m, 0, 1.275, -0.168, 0.06, 0, 0);
-    bendY(m, 0.26, -0.168);
+    place(m, 0, 1.275, -0.186, 0.06, 0, 0);
+    bendY(m, 0.26, -0.186);
     appendMesh(body, m);
     // PALS rows across it
     for (let r = 0; r < 3; r++) {
       const row = boxRound(0.100, 0.007, 0.004, { n: 5, seg: 12, rows: 3, roundY: 0.5 });
-      place(row, 0, 1.225 + r * 0.045, -0.199 + r * 0.003, 0.06, 0, 0);
+      place(row, 0, 1.225 + r * 0.045, -0.217 + r * 0.003, 0.06, 0, 0);
       appendMesh(body, row);
     }
     // drink tube: out of the top, over the right shoulder, clipped to the strap
@@ -1270,8 +1272,8 @@ export function backPack(nz, kind = 'assault') {
     return { body, tube: drink };
   }
   const daypack = kind === 'daypack';
-  const hx = daypack ? 0.118 : 0.128, hy = daypack ? 0.150 : 0.170, hz = daypack ? 0.062 : 0.066;
-  const cy = daypack ? 1.125 : 1.205, cz = daypack ? -0.215 : -0.228;
+  const hx = daypack ? 0.122 : 0.135, hy = daypack ? 0.155 : 0.190, hz = daypack ? 0.068 : 0.080;
+  const cy = daypack ? 1.125 : 1.215, cz = daypack ? -0.228 : -0.250;
   const m = boxRound(hx, hy, hz, { n: daypack ? 2.8 : 4.0, seg: 20, rows: 10, roundY: daypack ? 0.45 : 0.3 });
   computeNormals(m);
   // soft pack: bulges at the bottom, sags, never a clean box
@@ -1361,7 +1363,7 @@ export function tourniquet(nz) {
   const t = boxRound(0.019, 0.040, 0.015, { n: 3.2, seg: 10, rows: 6, roundY: 0.45 });
   computeNormals(t);
   displace(t, (x, y, z) => nz.fbm3(x * 70, y * 70, z * 70, 2) * 0.0012);
-  place(t, 0.088, 1.395, 0.162, -0.35, 0.1, 0.05);
+  place(t, 0.088, 1.395, 0.172, -0.35, 0.1, 0.05);
   return t;
 }
 

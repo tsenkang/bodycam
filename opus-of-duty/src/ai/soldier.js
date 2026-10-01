@@ -485,8 +485,8 @@ export function buildSoldier(name, { rng, materials }) {
     const x = (t - 0.5) * (nPouch > 2 ? 0.156 : 0.09);
     B.add(
       P.pouch(nz, {
-        hx: 0.033, hy: 0.056, hz: 0.034,
-        x, y: 1.236 + rng.range(-0.006, 0.006), z: 0.148,
+        hx: 0.036, hy: 0.060, hz: 0.040,
+        x, y: 1.236 + rng.range(-0.006, 0.006), z: 0.160,
         rx: -0.10, rz: rng.range(-0.05, 0.05),
         lidTilt: i === 1 ? -0.5 : 0,
         bend: 0.26,
@@ -507,7 +507,7 @@ export function buildSoldier(name, { rng, materials }) {
     if (i === 1) {
       const mag = P.pouch(nz, {
         hx: 0.0145, hy: 0.042, hz: 0.023,
-        x, y: 1.308, z: 0.152, rx: -0.12,
+        x, y: 1.314, z: 0.164, rx: -0.12,
       });
       B.add(mag, {
         material: 'polymer',
@@ -524,7 +524,7 @@ export function buildSoldier(name, { rng, materials }) {
   B.add(
     P.pouch(nz, {
       hx: 0.032, hy: 0.058, hz: 0.028,
-      x: 0.112, y: 1.336, z: 0.118, ry: 0.35, rz: 0.10, bend: 0.24,
+      x: 0.114, y: 1.336, z: 0.126, ry: 0.35, rz: 0.10, bend: 0.24,
     }),
     {
       material: 'gear',
@@ -539,7 +539,7 @@ export function buildSoldier(name, { rng, materials }) {
   );
   // antenna
   {
-    const ant = P.pouch(nz, { hx: 0.005, hy: 0.075, hz: 0.005, x: 0.116, y: 1.424, z: 0.104, rx: -0.18 });
+    const ant = P.pouch(nz, { hx: 0.005, hy: 0.075, hz: 0.005, x: 0.118, y: 1.424, z: 0.112, rx: -0.18 });
     B.add(ant, {
       material: 'polymer',
       bones: ['Spine2', 'ClavicleL'],

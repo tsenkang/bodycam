@@ -3,6 +3,7 @@ import { TextureForge } from './generator.js';
 import { LIBRARY, resolveName } from './library.js';
 import { extendMaterial, DEFAULT_PARAMS } from './shader.js';
 import { bakeMasks, setMask } from './masks.js';
+import { buildSignAtlas, SIGN_CELLS } from './signs.js';
 
 /**
  * Procedural PBR texture generation and the shared material library.
@@ -125,6 +126,25 @@ export class MaterialSystem {
     const key = this._resolve(name);
     const def = LIBRARY[key];
     if (!this._tryBuild()) return null;
+
+    if (def.canvas) {
+      const ck = `canvas:${def.canvas}`;
+      let cs = this._sets.get(ck);
+      if (!cs) {
+        const base = this.getTextureSet(def.base);
+        cs = {
+          albedo: buildSignAtlas(this._anisotropy),
+          normal: base.normal,
+          orm: base.orm,
+          size: 1024,
+          worldSize: 1,
+          relief: base.relief,
+          name: key,
+        };
+        this._sets.set(ck, cs);
+      }
+      return cs;
+    }
 
     const bake = { ...def.bake, ...(opts.bake ?? {}) };
     bake.size = this._size(bake.size);
@@ -265,6 +285,11 @@ export class MaterialSystem {
     }
   }
 
+  /** UV rectangles of the sign atlas cells: { boards:[[u0,v0,u1,v1]...], plates:[...] } */
+  get signCells() {
+    return SIGN_CELLS;
+  }
+
   get detailNormal() {
     return this._shared?.detailNormal ?? null;
   }
@@ -289,6 +314,8 @@ export class MaterialSystem {
   dispose() {
     for (const m of this._materials.values()) m.dispose();
     this._materials.clear();
+    // canvas-built sets own their albedo; the forge owns everything else
+    for (const [k, set] of this._sets) if (k.startsWith('canvas:')) set.albedo?.dispose();
     this._sets.clear();
     this._forge?.dispose();
     this._forge = null;

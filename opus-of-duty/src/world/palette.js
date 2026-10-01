@@ -14,27 +14,27 @@ export const PALETTE = {
   plaster_cream: {
     name: 'plaster',
     surface: 'plaster',
-    opts: { vertexMasks: true, tint: 0xcfc0a4, scale: 2.35, weather: [0.4, 0.5, 1.4, 0.55] },
+    opts: { graffiti: [0.32, 0.55, 2.3, 3.2], vertexMasks: true, tint: 0xcfc0a4, scale: 2.35, weather: [0.4, 0.5, 1.4, 0.55] },
   },
   plaster_sand: {
     name: 'plaster',
     surface: 'plaster',
-    opts: { vertexMasks: true, tint: 0xb9a582, scale: 2.1, weather: [0.45, 0.5, 1.5, 0.6] },
+    opts: { graffiti: [0.35, 0.55, 2.3, 3.2], vertexMasks: true, tint: 0xb9a582, scale: 2.1, weather: [0.45, 0.5, 1.5, 0.6] },
   },
   plaster_blue: {
     name: 'plaster',
     surface: 'plaster',
-    opts: { vertexMasks: true, tint: 0x8f9aa0, scale: 2.2, weather: [0.4, 0.55, 1.5, 0.6] },
+    opts: { graffiti: [0.3, 0.55, 2.3, 3.2], vertexMasks: true, tint: 0x8f9aa0, scale: 2.2, weather: [0.4, 0.55, 1.5, 0.6] },
   },
   plaster_pink: {
     name: 'plaster',
     surface: 'plaster',
-    opts: { vertexMasks: true, tint: 0xc09a86, scale: 2.5, weather: [0.45, 0.5, 1.3, 0.55] },
+    opts: { graffiti: [0.3, 0.55, 2.3, 3.2], vertexMasks: true, tint: 0xc09a86, scale: 2.5, weather: [0.45, 0.5, 1.3, 0.55] },
   },
   plaster_white: {
     name: 'plaster',
     surface: 'plaster',
-    opts: { vertexMasks: true, tint: 0xd8d2c4, scale: 1.9, weather: [0.3, 0.35, 0.9, 0.5] },
+    opts: { graffiti: [0.25, 0.55, 2.3, 3.2], vertexMasks: true, tint: 0xd8d2c4, scale: 1.9, weather: [0.3, 0.35, 0.9, 0.5] },
   },
   /**
    * Interior walls of the enterable buildings: a green oil-paint dado under a
@@ -68,6 +68,12 @@ export const PALETTE = {
       interiorWash: 0xe4d9c2,
     },
   },
+  /** Lettered sign faces: mesh-UV mapped into the materials sign atlas. */
+  signage: {
+    name: 'signage',
+    surface: 'metal',
+    opts: { vertexMasks: true },
+  },
   brick: {
     name: 'brick',
     surface: 'concrete',
@@ -82,7 +88,20 @@ export const PALETTE = {
   concrete: {
     name: 'concrete',
     surface: 'concrete',
-    opts: { vertexMasks: true, tint: 0xa9a49a, scale: 2.5 },
+    opts: { vertexMasks: true, tint: 0xa9a49a, scale: 2.5, graffiti: [0.3, 0.5, 2.2, 3.0] },
+  },
+  /** Jersey barriers: prop-scale concrete that every street tags. */
+  concrete_barrier: {
+    name: 'concrete',
+    surface: 'concrete',
+    opts: {
+      vertexMasks: true,
+      tint: 0xa5a096,
+      scale: 0.9,
+      normalStrength: 1.3,
+      weather: [0.45, 0.5, 0.35, 0.55],
+      graffiti: [0.5, 0.22, 0.86, 1.6],
+    },
   },
   /**
    * Prop-scale concrete. A 2.5 m texture tile across a 0.5 m block shows a
@@ -149,6 +168,7 @@ export const PALETTE = {
       // No edge wear on a road. The vertex wear mask exists to rub through the
       // arris of a prop; on a 100 m plane it just brightens every stone crown.
       wear: [0, 0.5, 0.45, 0],
+      macroBig: [1, 0, 0.03, 0.55],
     },
   },
   asphalt: {

@@ -359,6 +359,27 @@ export const LIBRARY = {
       roughness: [0.94, -0.03, 0.34],
     },
   },
+  /**
+   * Painted shop signage. The albedo is the canvas sign atlas (signs.js), not a
+   * GLSL bake; relief and roughness borrow the painted-metal set. Mesh UVs pick
+   * the atlas cell, so this is only used on faces the world maps explicitly.
+   */
+  signage: {
+    canvas: 'signs',
+    base: 'metal_painted',
+    surface: 'metal',
+    bake: { size: 1024, worldSize: 1.5, relief: 0.018, seed: 61 },
+    mat: {
+      uvMode: 'mesh',
+      scale: 1,
+      detail: [14, 0.35, 0.22, 10],
+      macro: [0.10, 0.22, 0.12, 0.25],
+      weather: [0.35, 0.55, 0.0, 0.1],
+      wearColor: 0x8f8a80,
+      wearMaterial: [0.5, 0.0, 0, 0.6],
+      roughness: [0.85, 0.08, 0.3],
+    },
+  },
   glass: {
     glsl: GLASS,
     surface: 'glass',

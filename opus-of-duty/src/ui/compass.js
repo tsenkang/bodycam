@@ -1,4 +1,4 @@
-import { el, setText, setStyle, clamp, Pool, mmss } from './util.js';
+import { el, svg, setText, setStyle, clamp, Pool, mmss } from './util.js';
 
 const SPAN_DEG = 150; // degrees visible across the strip
 const STRIP_W = 560; // css px at k=1, must match .ow-compass width
@@ -21,6 +21,8 @@ export class Compass {
     el('div', 'ow-compass-caret', this.root);
     this.hdgWrap = el('div', 'ow-compass-hdg', parent);
     this.hdg = el('span', null, this.hdgWrap, '0');
+    // the tape's labels are hidden where the live heading sits
+    this.gap = el('div', 'ow-compass-gap', this.root);
 
     for (let a = 0; a < 720; a += 5) {
       const t = el('div', 'ow-tick' + (a % 15 === 0 ? ' maj' : ''), this.strip);
@@ -100,37 +102,28 @@ export class Compass {
 }
 
 /**
- * Team score widget, tucked under the minimap: one row per team, the score in
- * a tinted chip and a progress rule toward the limit, with the mode and the
- * round clock on a line of their own.
+ * Team score, bottom left (the TDM layout of the reference HUD): a faction
+ * emblem, our score over theirs, and the round clock under the emblem. The
+ * emblem is an original shield-and-chevron mark drawn here.
  */
 export class MatchBar {
   constructor(parent) {
     this.root = el('div', 'ow-score', parent);
-    const mk = (cls) => {
-      const r = el('div', 'ow-sc-row ' + cls, this.root);
-      const n = el('b', null, r, '0');
-      const bar = el('div', 'ow-sc-bar', r);
-      const fill = el('i', null, bar);
-      return { n, fill };
-    };
-    this.us = mk('us');
-    this.them = mk('them');
-    const meta = el('div', 'ow-sc-meta', this.root);
-    this.mode = el('span', null, meta, 'TDM');
-    this.clock = el('span', 'clock', meta, '4:12');
-    this.limit = 75;
+    const em = el('div', 'ow-sc-emblem', this.root);
+    const g = svg('svg', { viewBox: '0 0 40 44' }, em);
+    svg('path', { d: 'M20 1l17 6v13c0 11-7 18-17 23C10 38 3 31 3 20V7z', fill: 'rgba(70,96,118,.9)', stroke: 'rgba(225,235,242,.9)', 'stroke-width': 1.6 }, g);
+    svg('path', { d: 'M9 16l11 7 11-7v5l-11 7-11-7zM9 24l11 7 11-7v5l-11 7-11-7z', fill: 'rgba(236,242,246,.95)' }, g);
+    svg('circle', { cx: 20, cy: 10.5, r: 2.6, fill: 'rgba(236,242,246,.95)' }, g);
+    const nums = el('div', 'ow-sc-nums', this.root);
+    this.us = el('b', 'us', nums, '0');
+    this.them = el('b', 'them', nums, '0');
+    this.clock = el('div', 'ow-sc-clock', this.root, '4:12');
+    this.mode = null;
   }
 
   update(s) {
-    const lim = s.scoreLimit ?? this.limit;
-    const a = s.scoreUs ?? 0;
-    const b = s.scoreThem ?? 0;
-    setText(this.us.n, a);
-    setText(this.them.n, b);
-    setStyle(this.us.fill, 'transform', `scaleX(${clamp(a / lim, 0, 1).toFixed(3)})`);
-    setStyle(this.them.fill, 'transform', `scaleX(${clamp(b / lim, 0, 1).toFixed(3)})`);
-    setText(this.mode, s.modeName ?? (s.mode === 'TDM' ? 'TEAM DEATHMATCH' : s.mode ?? ''));
+    setText(this.us, s.scoreUs ?? 0);
+    setText(this.them, s.scoreThem ?? 0);
     setText(this.clock, mmss(s.timeLeft ?? 0));
   }
 

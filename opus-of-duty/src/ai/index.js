@@ -41,6 +41,7 @@ import * as THREE from 'three';
 import { SoldierMaterials } from './textures.js';
 import { buildSoldier, resolveMaterials, MATERIAL_SLOTS, VARIANTS } from './soldier.js';
 import { RIG } from './rig.js';
+import { loadSoldierModel } from './glbsoldier.js';
 import { NavGrid, CoverMap } from './nav.js';
 import { Agent, STATE } from './agent.js';
 import { Squad } from './squad.js';
@@ -56,6 +57,11 @@ export class AiSystem {
     this.root = new THREE.Group();
     this.root.name = 'ai';
     ctx.scene.add(this.root);
+
+    // Authored soldier body (src/ai/glbsoldier.js). `?soldier=proc` keeps the
+    // procedural body, e.g. for A/B captures.
+    const wantModel = new URLSearchParams(globalThis.location?.search ?? '').get('soldier') !== 'proc';
+    this.soldierModel = wantModel ? await loadSoldierModel() : null;
 
     const t0 = performance.now();
     this.materials = new SoldierMaterials(this.rng.fork(), {
@@ -767,6 +773,7 @@ export class AiSystem {
     for (let i = 0; i < this.agents.length; i++) {
       const a = this.agents[i];
       a.syncHitboxes();
+      a.skin?.sync();
       // Dead men keep their contact: a ragdoll on the floor needs it most.
       g.addActor(a);
     }

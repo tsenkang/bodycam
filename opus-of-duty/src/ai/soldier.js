@@ -856,9 +856,22 @@ export function buildSoldier(name, { rng, materials }) {
   }
   const mats = resolveMaterials(name, built.materialNames, materials);
 
+  // The carried rifle again, on its own: a body model loaded from a file
+  // (src/ai/glbsoldier.js) replaces the procedural uniform but not the weapon,
+  // and the weapon shares material slots with body gear, so it needs its own
+  // mesh. Built AFTER the body so the body's random draws are unchanged.
+  const WB = new CharacterBuilder(RIG, { noise: nz, materials: MATERIALS });
+  WB.add(W.steel, { material: 'steel', bone: 'HandR', grime: 0.55, wear: 0.25, name: 'wpnSteel' });
+  WB.add(W.polymer, { material: 'polymer', bone: 'HandR', grime: 0.5, wear: 0.3, name: 'wpnPoly' });
+  WB.add(W.rubber, { material: 'rubber', bone: 'HandR', grime: 0.6, name: 'wpnRubber' });
+  if (W.glass.p.length) WB.add(W.glass, { material: 'glass', bone: 'HandR', grime: 0.1, name: 'wpnGlass' });
+  const wbuilt = WB.build();
+
   return {
     geometry: built.geometry,
     materials: mats,
+    weaponGeometry: wbuilt.geometry,
+    weaponMaterials: resolveMaterials(name, wbuilt.materialNames, materials),
     parts: built.parts,
     weapon: W,
     stats: { vertices: built.vertices, triangles: built.triangles },

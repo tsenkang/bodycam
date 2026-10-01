@@ -22,6 +22,7 @@
 
 import * as THREE from 'three';
 import { RIG } from './rig.js';
+import { SoldierSkin } from './glbsoldier.js';
 import { Animator } from './animator.js';
 
 const STATE = {
@@ -116,6 +117,21 @@ export class Agent {
     this.mesh.bind(skeleton);
     this.group.scale.setScalar(this.scale);
     ai.root.add(this.group);
+
+    // Authored body: the procedural mesh keeps its skeleton (animator, ragdoll
+    // and hitboxes all run on it) but is no longer drawn. Its rifle is, as a
+    // mesh of its own on the same skeleton.
+    if (ai.soldierModel && def.weaponGeometry) {
+      this.group.updateMatrixWorld(true);
+      this.skin = new SoldierSkin(bones, RIG.names, this.group);
+      this.mesh.visible = false;
+      this.weaponMesh = new THREE.SkinnedMesh(def.weaponGeometry, def.weaponMaterials);
+      this.weaponMesh.castShadow = true;
+      this.weaponMesh.receiveShadow = true;
+      this.weaponMesh.userData.agent = this;
+      this.group.add(this.weaponMesh);
+      this.weaponMesh.bind(skeleton);
+    }
 
     /** Physics looks for these when it adopts the skeleton on death. */
     this.skinnedMesh = this.mesh;
@@ -1013,6 +1029,7 @@ export class Agent {
   }
 
   dispose() {
+    this.skin?.dispose();
     if (this.controller) this.phys?.removeCharacter(this.controller);
     for (const c of this.colliders) this.phys?.removeCollider(c);
     this.colliders.length = 0;

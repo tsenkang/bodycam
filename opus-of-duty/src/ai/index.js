@@ -617,7 +617,12 @@ export class AiSystem {
         damage: agent.weaponDamage,
         penetration: 0.9,
         maxDist: 200,
-        mask: phys.MASK.BULLET,
+        // Every agent is on the same team, and the round starts inside the
+        // shooter's own capsule. With ACTOR in the mask, enemy fire wounded
+        // teammates and the shooter himself, and since physics reports those
+        // hits as plain damage:dealt, the HUD credited each such kill to the
+        // player. The player is tested separately below.
+        mask: phys.MASK.BULLET & ~phys.LAYER.ACTOR,
       });
       if (impacts.length) end = impacts[0].point;
     }

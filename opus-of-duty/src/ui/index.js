@@ -244,11 +244,17 @@ export class UiSystem {
     });
 
     on('actor:death', (e) => {
-      if (ctx.time.elapsed - this._lastKillAt < 0.3) return; // already credited
-      this.killfeed.push({
-        attacker: e?.by?.name ?? 'ENEMY',
-        victim: e?.actor?.name ?? 'OPERATOR',
-        attackerFriendly: false,
+      // \`actor:death\` fires from inside the killing \`damage:dealt\`, BEFORE
+      // our own damage:dealt handler has credited the kill, so checking
+      // _lastKillAt here directly always missed and every kill also printed a
+      // bogus "ENEMY killed OPERATOR" row. Decide after the emit has finished.
+      queueMicrotask(() => {
+        if (ctx.time.elapsed - this._lastKillAt < 0.3) return; // already credited
+        this.killfeed.push({
+          attacker: e?.by?.name ?? 'ENEMY',
+          victim: e?.actor?.name ?? 'OPERATOR',
+          attackerFriendly: false,
+        });
       });
     });
 

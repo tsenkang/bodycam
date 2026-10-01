@@ -1,5 +1,6 @@
 import { Engine } from './core/engine.js';
 import { createConfig } from './core/config.js';
+import { MatchSystem } from './match/index.js';
 
 import { RenderSystem } from './render/index.js';
 import { MaterialSystem } from './materials/index.js';
@@ -47,7 +48,8 @@ engine
   .add(FxSystem)
   .add(AiSystem)
   .add(UiSystem)
-  .add(AudioSystem);
+  .add(AudioSystem)
+  .add(MatchSystem);
 
 try {
   await engine.init();

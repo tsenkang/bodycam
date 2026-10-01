@@ -163,7 +163,7 @@ const CSS = `
 }
 
 /* ====================================================== vitals (bottom left)
-   Only shown in modes that carry health/armour (`.ow-hud.vitals`); team
+   Only shown in modes that carry health/armour (.ow-hud.vitals); team
    deathmatch shows none, like the games this is measured against. */
 .ow-vitals {
   position:absolute; left:var(--pad); bottom:calc(var(--pad) + 2px * var(--k));

@@ -222,8 +222,9 @@ function renderSheet() {
     head.getWorldPosition(_hp);
     const c = sheetCams.heads[i];
     const yaw = a.group.rotation.y + 0.45;
-    c.position.set(_hp.x + Math.sin(yaw) * 0.72, _hp.y + 0.14, _hp.z + Math.cos(yaw) * 0.72);
-    c.lookAt(_hp.x, _hp.y + 0.09, _hp.z);
+    // the Head bone is the skull base: aim at the face, from ~1.2 m
+    c.position.set(_hp.x + Math.sin(yaw) * 1.2, _hp.y + 0.16, _hp.z + Math.cos(yaw) * 1.2);
+    c.lookAt(_hp.x, _hp.y + 0.06, _hp.z);
     quad(c, hw + i * cw, 0, i === 2 ? W - hw - 2 * cw : cw, hh);
   }
   renderer.setScissorTest(false);

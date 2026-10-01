@@ -664,7 +664,7 @@ export const WEAPON_MATERIALS = {
       ...BASE,
       // Warm the baked weave as well as the tint: a cool-grey base modulated by
       // a warm tint still reads grey wherever the weave is light.
-      bake: { seed: 401, tintA: 0x453a30, tintB: 0x2a2320, size: 512 },
+      bake: { seed: 401, tintA: 0x3a3836, tintB: 0x232120, size: 512 },
       scale: 0.032,
       /**
        * MEASURED WITH A LIVE UNIFORM SWEEP, and this is the single most important
@@ -706,7 +706,8 @@ export const WEAPON_MATERIALS = {
        * the gun instead of separating from it. A glove and a combat shirt are the
        * same kit at the same wash; 0.19 lands the shell ~0.35 stop under the
        * sleeve, which is the interval the original note asked for. */
-      tint: c(0.19, 0.155, 0.127),
+      // Black synthetic-leather shooting glove, as in the MW2019/Warzone refs.
+      tint: c(0.085, 0.08, 0.076),
       // 0.9+ is non-negotiable: a glove has no gloss lobe at all. The floor
       // stops the fabric ORM dipping into anything that could catch a highlight.
       roughness: [0.92, 0.06, 0.78],
@@ -724,7 +725,7 @@ export const WEAPON_MATERIALS = {
       wear: [0.34, 0.85, 0.75, 0],
       // Polished leather, not bare metal — the shine on a used glove is where
       // the dye has rubbed off, and that is a darker, warmer BROWN.
-      wearColor: 0x2a2118,
+      wearColor: 0x2a2826,
       wearMaterial: [0.72, 0.0, 0, 0.4],
       grimeColor: 0x080604,
       /**
@@ -768,7 +769,7 @@ export const WEAPON_MATERIALS = {
       // rather than as bolted-on plate. Recalibrated with the shell (see `glove`):
       // 0.20 -> 0.072 lands the TPR at ~0.0024 linear, half a stop under the
       // glove's 0.0051 — the same interval as before, at a readable exposure.
-      tint: c(0.118, 0.095, 0.08),
+      tint: c(0.05, 0.048, 0.047),
       roughness: [1.0, 0.0, 0.78],
       /**
        * 1.3 -> 0.7. At 1.3 the rubber surface's own relief was deep enough that
@@ -808,7 +809,7 @@ export const WEAPON_MATERIALS = {
       // 1.85x the recalibrated shell (0.115): a seam is a doubled, proud,
       // dye-worn edge, and at 1-3 px wide it needs more separation than 1.4x to
       // survive the AA filter. Same warm ratio as the shell.
-      tint: c(0.35, 0.286, 0.234),
+      tint: c(0.16, 0.152, 0.145),
       roughness: [0.9, 0.06, 0.74],
       normalStrength: 1.0,
       detail: [24, 0.6, 0.45, 5],
@@ -840,7 +841,7 @@ export const WEAPON_MATERIALS = {
     'fabric',
     {
       ...BASE,
-      bake: { seed: 503, tintA: 0x6e6047, tintB: 0x4c4231, size: 512 },
+      bake: { seed: 503, tintA: 0x5a6047, tintB: 0x3e4431, size: 512 },
       // 0.09 -> 0.05: a 50 mm ripstop tile. At 0.09 the base weave was 2.2 px at
       // the distance the support forearm actually sits (0.38-0.5 m) and read as
       // one flat value; the detail layer below carries the thread, this carries
@@ -854,7 +855,8 @@ export const WEAPON_MATERIALS = {
        * garment than the gloves and it is the thing that should read as the
        * warmest object on the rig.
        */
-      tint: c(0.16, 0.152, 0.138),
+      // Ranger-green ripstop (was coyote): reads as kit, separates from the sand.
+      tint: c(0.1, 0.112, 0.08),
       roughness: [0.95, 0.05, 0.8],
       normalStrength: 1.45,
       // ~6 mm ripstop grid at this tile, at full amplitude on both albedo and
@@ -864,7 +866,7 @@ export const WEAPON_MATERIALS = {
       detail: [9, 0.95, 0.7, 6],
       wear: [0.5, 0.9, 0.75, 0],
       // Dust on the fold crowns, not bare white canvas.
-      wearColor: 0x4a4034,
+      wearColor: 0x4a4a3c,
       wearMaterial: [0.9, 0.0, 0, 0.45],
       grimeColor: 0x0c0a06,
       /**

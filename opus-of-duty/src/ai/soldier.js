@@ -122,7 +122,9 @@ export const VARIANTS = {
     goggles: false,
     gogglesDown: false,
     faceWrap: true,
-    wrapColour: [0.34, 0.335, 0.33],
+    // mid-value tan shemagh pulled over the nose, eye band open (ref: MW2019
+    // firefight). A black knit balaclava read as a featureless dark mask at range.
+    wrapColour: [0.86, 0.80, 0.68],
     nvg: 'mono',
     headset: true,
     helmetBand: true,
@@ -171,7 +173,10 @@ export const VARIANTS = {
     goggles: false,
     gogglesDown: false,
     faceWrap: true,
-    maskHard: true,
+    // olive wrap + clear-ish ballistic glasses instead of the black hard mask:
+    // the eye band and a sliver of skin are what make a head read as a face
+    wrapColour: [0.66, 0.70, 0.56],
+    shades: true,
     nvg: 'bino',
     headset: true,
     pack: 'hydration',
@@ -292,10 +297,11 @@ export function buildSoldier(name, { rng, materials }) {
     });
     B.add(
       P.limbTube(nz, [sh[0] + side * 0.012, sh[1] + 0.055, sh[2]], el, wr,
-        [0.050, 0.057, 0.054, 0.049, 0.045, 0.041, 0.037], {
+        [0.050, 0.058, 0.056, 0.052, 0.047, 0.044, 0.040], {
         rings: 22,
         seg: 16,
         fold: 0.0016,
+        bag: 0.0055,
         // 3 mm creases: at 35 m that is sub-pixel as displacement but the normals
         // it generates are what put light and shade *inside* the sleeve outline.
         crease: 0.0030,
@@ -360,10 +366,11 @@ export function buildSoldier(name, { rng, materials }) {
   ]) {
     B.add(
       P.limbTube(nz, hip, kn, [an[0], an[1] + 0.085, an[2] + 0.008],
-        [0.090, 0.085, 0.076, 0.068, 0.062, 0.060, 0.064], {
+        [0.097, 0.090, 0.079, 0.074, 0.064, 0.058, 0.067], {
         rings: 24,
         seg: 17,
         fold: 0.0018,
+        bag: 0.0075,
         // trousers crease harder than sleeves and stack on the boot cuff
         crease: 0.0042,
         bend: [0, 0, -1], // gathers behind the knee
@@ -595,7 +602,7 @@ export function buildSoldier(name, { rng, materials }) {
       material: 'gear',
       bones: ['Spine1', 'Spine2', 'Spine'],
       bias: [1, 0.8, 0.5],
-      colour: V.pack === 'daypack' ? GEAR.dump : GEAR.pouch,
+      colour: V.pack === 'daypack' ? [0.62, 0.62, 0.62] : [0.60, 0.60, 0.60],
       grime: 0.95,
       dirt: 0.35,
       dust: 0.55,

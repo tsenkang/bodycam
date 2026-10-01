@@ -916,12 +916,16 @@ export class Arm {
           const zz = z0 - 0.9 + (1.8 * k) / 14;
           this.thumb.root.rotation.y = yy;
           this.thumb.root.rotation.z = zz;
-          const g = gapAt(this.thumb.joints[1], tLocal[0], tLocal[1], tLocal[2]);
+          const g = gapAt(this.thumb.joints[1], tLocal[0], tLocal[1], tLocal[2], _hp);
+          // The cylinder is infinite; the part is not. `axialMin` keeps the thumb
+          // on the grip itself rather than over whatever sits above its axis.
+          const ax = _hp.sub(ax0).dot(_fitAxis);
           // Prefer just-touching; punish burying much harder than standing off, and
           // add a small pull toward the authored pose so the solve stays plausible.
           const cost =
             Math.abs(g - clearance) +
             (g < -0.002 ? (-g - 0.002) * 10 : 0) +
+            (opts.axialMin != null && ax < opts.axialMin ? (opts.axialMin - ax) * 10 : 0) +
             (Math.abs(yy - y0) + Math.abs(zz - z0)) * 0.0009;
           if (cost < bestCost) {
             bestCost = cost;

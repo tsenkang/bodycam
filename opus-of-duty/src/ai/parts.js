@@ -230,6 +230,20 @@ export function limbTube(nz, a, b, c, radii, opts = {}) {
     const fine = nz.fbm3(x * 34, y * 30, z * 34, 2);
     return f * amp + fine * amp * 0.3;
   });
+  // BAGGINESS (`opts.bag`): loose combat trousers and sleeves are not tubes.
+  // Large, low-frequency, one-sided lumps where the slack fabric pools (5-10 cm
+  // features, up to ~1 cm deep) plus a couple of long diagonal drape folds.
+  // These change the OUTLINE, which is what stops a limb reading as a pipe at
+  // 15 m; the mm creases above only change shading.
+  const bag = opts.bag ?? 0;
+  if (bag > 0) {
+    displace(m, (x, y, z) => {
+      const lump = nz.fbm3(x * 5.5 + 17, y * 4.2, z * 5.5 - 3, 2);
+      const drape = Math.sin((y * 9 + x * 14 + z * 6) + nz.fbm3(x * 3, y * 3, z * 3, 2) * 5);
+      return bag * (Math.max(0, lump) * 2.2 - 0.25 + 0.45 * drape * drape);
+    });
+    computeNormals(m);
+  }
   return m;
 }
 

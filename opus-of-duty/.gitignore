@@ -14,3 +14,6 @@ demo/
 .tmp-demo/
 .tmp-rend/
 revcrops/
+
+# Single-file playable build (regenerate from source)
+opus-of-duty.html

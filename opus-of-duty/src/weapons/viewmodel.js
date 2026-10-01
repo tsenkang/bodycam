@@ -510,6 +510,7 @@ export class Viewmodel {
       clearance: 0.001,
       poseName,
       skip: [0],
+      axialMin: 0.006,
       trigger: w.model.nodes.triggerFace ?? null,
     });
     this.armR.bakeContactAO(contacts, 0.012, 0.6);

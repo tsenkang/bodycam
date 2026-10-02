@@ -15,7 +15,7 @@
 import * as THREE from 'three';
 import { MaterialSystem } from '../materials/index.js';
 import { Rng } from '../core/rng.js';
-import { WeaponMaterials } from './materials.js';
+import { WeaponMaterials, WEAPON_MATERIALS } from './materials.js';
 import { Viewmodel } from './viewmodel.js';
 import { WEAPON_DEFS } from './defs.js';
 import { buildRifle } from './models/rifle.js';
@@ -232,6 +232,51 @@ if (!FIRST_PERSON) {
   key.target.updateMatrixWorld();
 }
 
+
+/**
+ * ?view=albedo — measure each weapon material's EFFECTIVE linear albedo (mean of
+ * the baked albedo map, decoded to linear, times the material's tint), so the
+ * set can be calibrated against render's physical-albedo contract by number.
+ */
+function probeAlbedo() {
+  const rt = new THREE.WebGLRenderTarget(64, 64, { type: THREE.FloatType });
+  const q = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.ShaderMaterial({
+      uniforms: { t: { value: null } },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy,0.,1.); }',
+      fragmentShader:
+        'uniform sampler2D t; varying vec2 vUv; void main(){ gl_FragColor = vec4(texture2D(t, vUv).rgb, 1.); }',
+    })
+  );
+  q.frustumCulled = false;
+  const sc = new THREE.Scene();
+  sc.add(q);
+  const cam = new THREE.Camera();
+  const buf = new Float32Array(64 * 64 * 4);
+  const out = {};
+  for (const key of Object.keys(WEAPON_MATERIALS)) {
+    const m = mats.get(key);
+    if (!m.map) continue;
+    q.material.uniforms.t.value = m.map;
+    renderer.setRenderTarget(rt);
+    renderer.render(sc, cam);
+    renderer.readRenderTargetPixels(rt, 0, 0, 64, 64, buf);
+    let r = 0, g = 0, b = 0;
+    for (let i = 0; i < 64 * 64; i++) { r += buf[i * 4]; g += buf[i * 4 + 1]; b += buf[i * 4 + 2]; }
+    const n = 64 * 64;
+    const t = WEAPON_MATERIALS[key][1].tint ?? new THREE.Color(1, 1, 1);
+    out[key] = {
+      base: [r / n, g / n, b / n].map((v) => +v.toFixed(4)),
+      eff: [(r / n) * t.r, (g / n) * t.g, (b / n) * t.b].map((v) => +v.toFixed(4)),
+      metal: m.metalness,
+    };
+  }
+  renderer.setRenderTarget(null);
+  rt.dispose();
+  return out;
+}
+
 /* ------------------------------------------------------------------ loop --- */
 /**
  * Fixed timestep, exactly like the game's capture path (src/dev/shots.js pins
@@ -281,6 +326,7 @@ function tick() {
       adsT: +vm.adsT.toFixed(3),
       sprintT: +vm.sprintT.toFixed(3),
       clip: vm.clipName,
+      albedo: VIEW === 'albedo' ? probeAlbedo() : undefined,
     };
     window.__READY__ = true;
   }

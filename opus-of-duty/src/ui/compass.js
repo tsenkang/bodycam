@@ -115,15 +115,32 @@ export class MatchBar {
     svg('path', { d: 'M9 16l11 7 11-7v5l-11 7-11-7zM9 24l11 7 11-7v5l-11 7-11-7z', fill: 'rgba(236,242,246,.95)' }, g);
     svg('circle', { cx: 20, cy: 10.5, r: 2.6, fill: 'rgba(236,242,246,.95)' }, g);
     const nums = el('div', 'ow-sc-nums', this.root);
-    this.us = el('b', 'us', nums, '0');
-    this.them = el('b', 'them', nums, '0');
+    const row = (cls) => {
+      const r = el('div', 'ow-sc-row ' + cls, nums);
+      const n = el('b', cls, r, '0');
+      const track = el('i', 'ow-sc-track', r);
+      const fill = el('i', 'ow-sc-fill', track);
+      return { n, fill };
+    };
+    const us = row('us');
+    const them = row('them');
+    this.us = us.n;
+    this.them = them.n;
+    this.usFill = us.fill;
+    this.themFill = them.fill;
     this.clock = el('div', 'ow-sc-clock', this.root, '4:12');
     this.mode = null;
+    this.limit = 50; // src/match SCORE_LIMIT
   }
 
   update(s) {
-    setText(this.us, s.scoreUs ?? 0);
-    setText(this.them, s.scoreThem ?? 0);
+    const a = s.scoreUs ?? 0;
+    const b = s.scoreThem ?? 0;
+    const lim = s.scoreLimit ?? this.limit;
+    setText(this.us, a);
+    setText(this.them, b);
+    setStyle(this.usFill, 'transform', `scaleX(${clamp(a / lim, 0, 1).toFixed(3)})`);
+    setStyle(this.themFill, 'transform', `scaleX(${clamp(b / lim, 0, 1).toFixed(3)})`);
     setText(this.clock, mmss(s.timeLeft ?? 0));
   }
 

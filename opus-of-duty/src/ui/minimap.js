@@ -473,7 +473,7 @@ export class Minimap {
     // objectives: a filled disc with the letter, kept upright
     const objs = s.objectives;
     if (objs) {
-      g.font = `700 ${(9.5 * u).toFixed(1)}px Arial, "Liberation Sans", sans-serif`;
+      g.font = `700 ${(9.5 * u).toFixed(1)}px "OW Tactical", Arial, "Liberation Sans", sans-serif`;
       g.textAlign = 'center';
       g.textBaseline = 'middle';
       const r = 6.5 * u;

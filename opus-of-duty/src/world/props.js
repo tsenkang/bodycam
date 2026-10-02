@@ -185,16 +185,105 @@ function crateHardware(s = 0.62) {
   return g;
 }
 
+/**
+ * A cardboard carton. The old one was a bevelled block in the wood material,
+ * and up close it read as a plywood chest. Cardboard reads by its failures:
+ * dented faces, a crushed corner, flaps that never sit flat with a gap down the
+ * middle, scuffed paler arrises, and a strip of packing tape (the companion
+ * prototype `cardboardTape`, in its own glossy material).
+ *
+ * It draws exactly the two values it always drew from the level rng and takes
+ * everything else from a private stream, so the level layout does not move.
+ */
+const _cardRng = { s: 0x3c6ef372 };
+function cardRand() {
+  // xorshift32 — private, deterministic, independent of the level stream
+  let x = _cardRng.s;
+  x ^= x << 13;
+  x ^= x >>> 17;
+  x ^= x << 5;
+  _cardRng.s = x >>> 0;
+  return _cardRng.s / 4294967296;
+}
+const _cardDims = [];
 function cardboardBox(rng, s = 0.45) {
-  const p = new PB();
   const h = s * rng.range(0.6, 0.9);
-  p.box(s, h, s * rng.range(0.8, 1.1), 0, 0, 0, { bevel: 0.006, grime: 0.25 });
-  // flaps, one folded up
-  p.box(s * 0.48, 0.012, s * 0.9, -s * 0.25, h / 2 + 0.006, 0, { bevel: 0.003, wear: 1 });
-  p.box(s * 0.48, 0.012, s * 0.9, s * 0.25, h / 2 + 0.09, 0, { bevel: 0.003, rz: -0.9 });
+  const d = s * rng.range(0.8, 1.1);
+  _cardDims.push([s, h, d]);
+  const w = s;
+  const body = new THREE.BoxGeometry(w, h, d, 5, 4, 5);
+  const pa = body.getAttribute('position');
+  const na = body.getAttribute('normal');
+  // two dents and a crushed top corner
+  const dents = [];
+  for (let k = 0; k < 2; k++) {
+    dents.push([(cardRand() - 0.5) * w, (cardRand() - 0.5) * h, (cardRand() - 0.5) * d, 0.05 + cardRand() * 0.07, 0.008 + cardRand() * 0.014]);
+  }
+  const cx = (cardRand() < 0.5 ? -1 : 1) * w * 0.5;
+  const cz = (cardRand() < 0.5 ? -1 : 1) * d * 0.5;
+  const crush = 0.02 + cardRand() * 0.04;
+  for (let i = 0; i < pa.count; i++) {
+    let x = pa.getX(i);
+    let y = pa.getY(i);
+    let z = pa.getZ(i);
+    const nx = na.getX(i);
+    const ny = na.getY(i);
+    const nz = na.getZ(i);
+    let push = 0;
+    for (const [dx, dy, dz, r, a] of dents) {
+      const q = ((x - dx) ** 2 + (y - dy) ** 2 + (z - dz) ** 2) / (r * r);
+      push += a * Math.exp(-q);
+    }
+    // faces bow out a little between the arrises (it is full of something)
+    const ex = 1 - Math.abs(x) / (w * 0.5);
+    const ey = 1 - Math.abs(y) / (h * 0.5);
+    const ez = 1 - Math.abs(z) / (d * 0.5);
+    const mid = Math.min(1, (Math.abs(nx) > 0.5 ? ey * ez : Math.abs(ny) > 0.5 ? ex * ez : ex * ey) * 2.2);
+    push -= mid * 0.006;
+    x -= nx * push;
+    y -= ny * push;
+    z -= nz * push;
+    const dc = Math.hypot(x - cx, z - cz);
+    if (y > 0 && dc < 0.16) y -= (0.16 - dc) / 0.16 * crush * (y / (h * 0.5));
+    pa.setXYZ(i, x, y, z);
+  }
+  body.computeVertexNormals();
+  autoEdgeWear(body, 0.018, 0.85);
+  paintMasks(body, (x, y, z, nx, ny, nz, o) => {
+    const low = Math.max(0, 1 - (y + h / 2) / (h * 0.35));
+    o[1] = Math.min(1, 0.15 + low * low * 0.7 + Math.max(0, -ny) * 0.5 + Math.max(0, fbm3(x * 9, y * 9, z * 9, 2) - 0.55));
+    o[2] = Math.min(1, low * low * 0.4);
+  });
+  const p = new PB();
+  p.geo(body, 0, 0, 0, { autoWear: false });
+  // flaps: two long flaps meeting over the middle with a gap, one sprung up
+  const open = cardRand();
+  const fy = h / 2 + 0.004;
+  p.box(w * 0.49, 0.006, d * 0.98, -w * 0.255, fy, 0, { bevel: 0.002, rz: open < 0.3 ? 0.04 : 0.01, wear: 1 });
+  if (open < 0.45) {
+    // the other flap sprung up off its crease, hinged on the +x arris
+    const th = 0.45 + cardRand() * 0.8;
+    const L = w * 0.49;
+    p.box(L, 0.006, d * 0.96, w * 0.5 + Math.cos(th) * L * 0.5, fy + Math.sin(th) * L * 0.5, 0, { bevel: 0.002, rz: th, wear: 1 });
+  } else {
+    p.box(w * 0.49, 0.006, d * 0.98, w * 0.255, fy + 0.004, 0, { bevel: 0.002, rz: -0.03 - cardRand() * 0.05, wear: 1 });
+  }
   const g = p.build();
   g.translate(0, h / 2, 0);
   return g;
+}
+
+/**
+ * Packing tape for the carton made `idx`-th: a strip over the lid seam and
+ * down both ends, 1 mm proud. Companion prototype (same matrix as the box).
+ */
+function cardboardTape(idx) {
+  const [s, h, d] = _cardDims[idx];
+  const p = new PB();
+  const tw = 0.048;
+  p.box(tw, 0.0015, d * 0.9, 0, h + 0.0085, 0, { bevel: 0.0005, wear: 0.4 });
+  for (const sz of [-1, 1]) p.box(tw, h * 0.32, 0.0015, 0, h * 0.84, sz * (d / 2 + 0.001), { bevel: 0.0005, wear: 0.4 });
+  return p.build();
 }
 
 function barrel(rng, r = 0.29, h = 0.88, ribs = 3) {
@@ -981,8 +1070,14 @@ export function registerProps(A, rngIn) {
   P('crate_b', 'wood_prop', crate(rng, 0.48), { companions: ['crate_b_hw'], ...LOOSE(0.10, 0.018) });
   P('crate_c', 'wood_prop_dark', crate(rng, 0.82), { skirt: 0.45, companions: ['crate_c_hw'], ...LOOSE(0.075, 0.026) });
   P('crate_flat', 'wood_prop', crate(rng, 0.55, false), LOOSE(0.10, 0.02));
-  P('box_card_a', 'wood_pale', cardboardBox(rng, 0.46), LOOSE(0.10, 0.016));
-  P('box_card_b', 'wood_pale', cardboardBox(rng, 0.34), LOOSE(0.11, 0.012));
+  _cardDims.length = 0;
+  _cardRng.s = 0x3c6ef372;
+  const cardA = cardboardBox(rng, 0.46);
+  const cardB = cardboardBox(rng, 0.34);
+  P('box_card_a_tape', 'tape', cardboardTape(0), { castShadow: false, maxDist: 30 });
+  P('box_card_b_tape', 'tape', cardboardTape(1), { castShadow: false, maxDist: 30 });
+  P('box_card_a', 'cardboard', cardA, { companions: ['box_card_a_tape'], ...LOOSE(0.10, 0.016) });
+  P('box_card_b', 'cardboard', cardB, { companions: ['box_card_b_tape'], ...LOOSE(0.11, 0.012) });
   P('barrel_rust', 'metal_rust_prop', barrel(rng), { skirt: 0.28, ...LOOSE(0.085, 0.014) });
   P('barrel_blue', 'metal_blue', barrel(rng, 0.28, 0.9, 2), { skirt: 0.26, ...LOOSE(0.085, 0.014) });
   P('barrel_wood', 'wood_prop_dark', barrel(rng, 0.31, 0.78, 4), { skirt: 0.28, ...LOOSE(0.09, 0.015) });

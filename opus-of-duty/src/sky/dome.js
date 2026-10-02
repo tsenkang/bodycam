@@ -54,6 +54,7 @@ uniform vec3 uGroundAlbedo;
 uniform float uHorizonMurk;       // city haze piled up at eye level
 uniform vec2 uSkyRolloff;         // x knee (scene radiance), y overshoot room
 uniform float uSkyGain;           // night-sky presentation gain (see SkySystem)
+uniform float uNight;             // 0 by day -> 1 once the sun is 9 deg under
 
 float owSkLum( vec3 c ) { return dot( c, vec3( 0.2126, 0.7152, 0.0722 ) ); }
 
@@ -225,6 +226,25 @@ vec3 skSample( vec3 rayDir, int quality ) {
   vec4 cl = skClouds( rayDir, uSunDir, sunLow, sunHigh,
                       uMoonDir, moonLow, moonHigh, ambSky, quality );
 
+  // ---- night: clouds are NOT moonlit cumulus ------------------------------
+  // Physically a moonlit deck stands to the moonlit sky exactly as a sunlit
+  // deck stands to the day sky, so after the night gain the frame showed bright
+  // white billows on a navy dome — "the day sky, dimmed" (round-0 critic). A
+  // night deck over a town reads as dark grey mass a little LIGHTER than the
+  // sky at the horizon, where the town's sodium glow lights its base, and a
+  // little DARKER than the sky up high; only a thin moonlit fringe survives.
+  // Everything is expressed against the sky's own radiance on that ray, so it
+  // cannot glow whatever the exposure does.
+  float skyL = dot( col, vec3( 0.2126, 0.7152, 0.0722 ) );
+  if ( uNight > 0.001 ) {
+    float low = 1.0 - smoothstep( 0.02, 0.55, rayDir.y );
+    vec3 cityBase = vec3( 1.0, 0.66, 0.42 ) * skyL * ( 0.55 + 1.35 * low );
+    vec3 nightCl = cl.rgb * 0.16 + vec3( 0.62, 0.66, 0.76 ) * skyL * 0.42 + cityBase * 0.55;
+    cl.rgb = mix( cl.rgb, nightCl, uNight );
+    // Light pollution: a warm, low dome over the town on the sky itself.
+    col += vec3( 1.0, 0.62, 0.36 ) * skyL * 0.9 * exp( -max( rayDir.y, 0.0 ) * 7.0 ) * uNight;
+  }
+
   // ---- night sky, BEHIND the decks ---------------------------------------
   // Stars have to be occluded by cloud. A star seen *through* an opaque cumulus
   // is the single most obvious tell in a night frame, and it was visible here
@@ -277,6 +297,20 @@ vec3 skSample( vec3 rayDir, int quality ) {
   // and they are the only thing in the sky that is.
   if ( quality > 0 ) col += skSunDisc( rayDir, thetaS );
   col += skMoonDisc( rayDir, thetaM, quality > 0 ? 4 : 2 );
+
+  // Lunar halo. The aureole the scattering produces is a fixed fraction of a
+  // moonlit sky that the night gain has already pulled down, so on screen the
+  // moon was a hard white blob on a flat dome. A photograph of the moon always
+  // carries a corona and a wide veiling glow (lens + forward aerosol), sized in
+  // degrees, not in disc radii. Scaled off the sky's own radiance on the ray
+  // (the inner core) and off the disc level (the glow) so it tracks exposure.
+  if ( uNight > 0.001 && uMoonDir.y > -0.02 ) {
+    float th = thetaM;
+    float halo = 3.2 * exp( -th / 0.035 ) + 1.1 * exp( -th / 0.16 );
+    float vis = smoothstep( -0.02, 0.06, uMoonDir.y ) * ( 1.0 - 0.6 * clamp( cl.a, 0.0, 1.0 ) );
+    col += vec3( 0.80, 0.88, 1.0 ) * ( skyL * uSkyGain * halo
+           + uMoonDiscRadiance.x * 0.010 * exp( -th / 0.05 ) ) * vis * uNight;
+  }
 
   return max( col, vec3( 0.0 ) );
 }

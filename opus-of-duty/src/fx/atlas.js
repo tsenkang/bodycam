@@ -153,64 +153,66 @@ const PARTICLE_PAINTERS = [
     out[2] = 1;
     out[3] = clamp01(a);
   },
-  // 6 — FLASH_LOBE: ONE tongue of burning gas. Root at the -X edge, tip toward
-  //     +X. Deliberately one-sided and asymmetric: muzzle.js stamps a handful of
-  //     these at independent rolls, so any radial symmetry in the sprite itself
-  //     rebuilds the cartoon starburst this replaces. There is no spike term.
+  // 6 — FLASH_LOBE: ONE tongue of burning propellant gas. Root at the -X edge,
+  //     tip toward +X. It is FIRE, not a petal: a broad, ragged tongue whose
+  //     body is broken up by domain-warped turbulence (bright folds, darker
+  //     voids), whose flanks are eroded into flamelets and whose tip shreds
+  //     into separate licks. muzzle.js stamps a handful at independent rolls
+  //     and lengths, so nothing here may be radially symmetric: a smooth,
+  //     airbrushed comet is exactly the cartoon starburst this replaces.
   (n, x, y, r, out) => {
-    const u = clamp01((x + 1) * 0.5); // 0 at the root, 1 at the tip
-    // Width: swells just past the crown where the gas is still choked, then
-    // tapers to a torn point. Half-width in painter units.
-    const swell = Math.pow(u + 0.02, 0.45) * Math.pow(1 - u, 1.15);
-    // The tongue leans and wanders instead of running straight down +X.
-    const lean = 0.26 * u * u - 0.07 * u + 0.2 * (n.fbm(u * 2.4 + 4.1, 8.3, 3) - 0.5) * u;
-    // a pointed petal, not a fat tongue: at 1.5x the swell every lobe was
-    // nearly round and a set of them fused into one ball
-    let w = 0.03 + 0.66 * swell;
-    // Shear only the +Y flank: a smooth pressure face on one side, a shredded
-    // shear layer on the other, which is what high-speed film actually shows.
-    const shear = n.fbm(u * 4.6 - 3.3, y * 2.2 + 1.9, 4);
-    const flank = smoothstep(0.0, 0.5, (y - lean) / Math.max(w, 1e-3));
-    w *= 1 - flank * (1 - shear) * 0.5;
-    const q = (y - lean) / Math.max(w, 1e-3);
-    let a = Math.exp(-q * q * 3.0);
-    // Tip: the gas has burnt out and is tearing into filaments.
-    const frag = n.fbm(u * 6.8 + 12.7, y * 4.4 - 6.4, 4);
-    a *= 1 - smoothstep(0.46, 1.0, u) * (1 - frag) * 1.5;
-    // Internal turbulence so the body is not a smooth airbrushed blob.
-    // Streaks run down the tongue's length (gas jets, not boiling cloud):
-    // noise stretched along u, fine across y.
-    const striae = n.fbm(u * 2.6 - 8.1, y * 10.5 + 15.2, 3);
-    a *= 0.5 + 0.72 * striae;
-    // Close the root with a rounded cap, and never let the tip touch the tile
-    // edge (a clipped filament reads as a hard rectangle at this intensity).
-    a *= smoothstep(-1.0, -0.86, x) * smoothstep(1.0, 0.86, u);
-    a += Math.exp(-((x + 0.8) * (x + 0.8) * 13.0 + y * y * 30.0)) * 0.85;
-    // Colour: white-hot at the choke, orange through the body, sooty at the
-    // shredding tip and along the cool outer edges.
-    const edge = clamp01(Math.abs(q) * 0.72);
-    const t = clamp01(smoothstep(0.08, 0.8, u) * 0.92 + edge * 0.45);
-    const soot = smoothstep(0.62, 1.0, u) * 0.34;
-    const den = 0.82 + 0.34 * shear;
-    out[0] = clamp01((1 - soot) * den);
-    out[1] = clamp01((1 - 0.52 * t) * (1 - soot * 1.3) * den);
-    out[2] = clamp01((1 - 0.84 * t) * (1 - soot * 1.6) * den);
+    const u = clamp01((x + 1) * 0.5); // 0 root -> 1 tip
+    // domain warp: the whole tongue folds and curls
+    const wx = n.fbm(x * 1.7 + 3.1, y * 1.7 - 7.4, 3) - 0.5;
+    const wy = n.fbm(x * 1.7 - 9.6, y * 1.7 + 2.2, 3) - 0.5;
+    const yy = y + wy * 0.34 * u - (0.12 * u * u);
+    const uu = clamp01(u + wx * 0.16);
+    // width: fat just past the crown, tapering to a ragged point
+    const swell = Math.pow(uu + 0.03, 0.4) * Math.pow(1 - uu, 0.85);
+    const w = 0.05 + 0.86 * swell;
+    const q = yy / Math.max(w, 1e-3);
+    let a = smoothstep(1.0, 0.25, Math.abs(q));
+    // flamelets: the flanks break into licks aligned with the flow
+    const licks = n.ridged(uu * 3.2 + 1.7, yy * 6.5 - 4.1, 4);
+    a *= 1 - smoothstep(0.35, 1.0, Math.abs(q)) * (1 - licks) * 1.1;
+    // tip shreds into separate tongues
+    const frag = n.warped(uu * 4.5 + 12.7, yy * 3.6 - 6.4, 0.7, 4);
+    a *= 1 - smoothstep(0.42, 1.0, uu) * smoothstep(0.62, 0.35, frag) * 1.3;
+    // body: bright folds and dark voids, streaming down the tongue
+    const body = n.warped(uu * 2.4 - 8.1, yy * 4.2 + 15.2, 0.9, 4);
+    a *= 0.42 + 0.9 * smoothstep(0.25, 0.75, body);
+    // round the root, keep the tip off the tile edge
+    a *= smoothstep(-1.0, -0.84, x) * smoothstep(0.98, 0.66, u);
+    // white-hot choke at the root
+    a += Math.exp(-((x + 0.78) * (x + 0.78) * 9.0 + y * y * 14.0)) * 0.9;
+    // colour: yellow-white at the choke, orange body, deep red-brown tips/edges
+    const heat = clamp01(1.0 - uu * 1.25 - Math.abs(q) * 0.45 + (body - 0.5) * 0.6);
+    out[0] = clamp01(0.62 + 0.38 * Math.sqrt(heat));
+    out[1] = clamp01(0.16 + 0.8 * heat);
+    out[2] = clamp01(0.02 + 0.78 * heat * heat * heat);
     out[3] = clamp01(a);
   },
-  // 7 — FLASH_CORE: the choked, boiling gas ball right at the crown. Drawn
-  //     small and very hot, so what has to survive clipping is the *silhouette*:
-  //     the radius is warped per-direction and the interior churns.
+  // 7 — FLASH_CORE: the fireball at the crown. A lumpy, boiling ball of flame
+  //     with 6-9 bulges in its silhouette, folded turbulent fire inside and
+  //     a white-yellow heart that goes orange toward a dark, eroded rim.
   (n, x, y, r, out) => {
     const ang = Math.atan2(y, x);
-    const lump = n.fbm(Math.cos(ang) * 1.7 + 30.1, Math.sin(ang) * 1.7 + 9.4, 3);
-    const churn = n.fbm(x * 3.1 - 5.5, y * 3.1 + 2.2, 4);
-    const rr = r * (0.84 + 0.32 * lump) * (0.94 + 0.14 * churn);
-    let a = Math.exp(-rr * rr * 15.0) * (0.74 + 0.48 * churn) + Math.exp(-rr * rr * 44) * 0.95;
-    a *= smoothstep(1.02, 0.72, r);
-    const t = smoothstep(0.0, 0.7, rr);
-    out[0] = 1;
-    out[1] = 1 - 0.2 * t;
-    out[2] = 1 - 0.5 * t;
+    const wx = n.fbm(x * 2.2 + 30.1, y * 2.2 + 9.4, 3) - 0.5;
+    const wy = n.fbm(x * 2.2 - 14.3, y * 2.2 - 3.8, 3) - 0.5;
+    const xx = x + wx * 0.32;
+    const yy = y + wy * 0.32;
+    const rr = Math.hypot(xx, yy);
+    const lobes = n.fbm(Math.cos(ang) * 2.6 + 4.4, Math.sin(ang) * 2.6 - 1.7, 3);
+    const edge = 0.5 + 0.42 * lobes;
+    let a = smoothstep(edge, edge * 0.35, rr);
+    const fire = n.warped(xx * 3.0 + 7.7, yy * 3.0 - 2.5, 0.95, 5);
+    a *= 0.45 + 0.85 * smoothstep(0.2, 0.7, fire);
+    a = clamp01(a + Math.exp(-r * r * 30) * 0.9);
+    a *= smoothstep(1.0, 0.8, r);
+    const heat = clamp01(1.1 - rr / edge + (fire - 0.5) * 0.6);
+    out[0] = clamp01(0.7 + 0.3 * Math.sqrt(heat));
+    out[1] = clamp01(0.2 + 0.78 * heat);
+    out[2] = clamp01(0.03 + 0.8 * heat * heat * heat);
     out[3] = clamp01(a);
   },
   // 8 — CHIP: solid angular fleck of masonry

@@ -17,11 +17,11 @@
  * Arial Narrow / Helvetica Neue on machines without them.
  */
 export const FONT_STACK =
-  '"Barlow","Roboto","Segoe UI","Helvetica Neue",Arial,"Liberation Sans",sans-serif';
+  '"OW Tactical","Barlow","Roboto","Segoe UI","Helvetica Neue",Arial,"Liberation Sans",sans-serif';
 
 /** Display face: the ammo count, banners, the menu title. */
 export const FONT_DISPLAY =
-  '"Barlow Semi Condensed","Roboto Condensed","Arial Narrow","Helvetica Neue",Arial,"Liberation Sans",sans-serif';
+  '"OW Tactical","Barlow Semi Condensed","Roboto Condensed","Arial Narrow","Helvetica Neue",Arial,"Liberation Sans",sans-serif';
 
 export const FONT_MONO = '"SF Mono",ui-monospace,"Roboto Mono",Menlo,monospace';
 

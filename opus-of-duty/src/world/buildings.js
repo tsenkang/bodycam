@@ -169,6 +169,7 @@ export function buildBuilding(A, rng, spec) {
     roofY: 0,
     windows: [],
     awnings: [],
+    facades: [],
     top: 0,
   };
 
@@ -436,6 +437,11 @@ function buildFacade(A, rng, spec, info, ctx) {
         break;
     }
   }
+
+  // Every facade, per floor, for the clutter pass (wall-foot litter, cable
+  // runs): panel matrix, length and the openings to keep clear. Recording it
+  // draws nothing from the rng, so the layout does not move.
+  info.facades.push({ side, f, len, pm, h, t, street, openFace, openings });
 
   // ---- the wall itself ----
   const isTop = f === floors - 1;

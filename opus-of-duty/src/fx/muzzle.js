@@ -160,8 +160,8 @@ export function muzzleFlash(fx, o) {
   // 0.085 -> 0.135 m. At 0.032 m the core was a ~40 px ball at 80 deg FOV: too
   // small to read as burning gas and far too small to be the source of a light
   // that is supposed to wash the handguard.
-  s.size0 = 0.07 * sc;
-  s.size1 = 0.11 * sc;
+  s.size0 = 0.085 * sc;
+  s.size1 = 0.15 * sc;
   s.sizeCurve = 0.35;
   // 50 ms: three frames at 60 Hz. A real flash is ~2 ms, but a sprite that dies
   // inside one frame is a flash the player only ever sees half the time — and
@@ -185,8 +185,8 @@ export function muzzleFlash(fx, o) {
   s.y = p.y;
   s.z = p.z;
   s.tile = P.FLASH_CORE;
-  s.size0 = 0.036 * sc;
-  s.size1 = 0.056 * sc;
+  s.size0 = 0.042 * sc;
+  s.size1 = 0.068 * sc;
   s.sizeCurve = 0.4;
   s.life = 0.046;
   s.drag = 12;
@@ -230,7 +230,7 @@ export function muzzleFlash(fx, o) {
     LOBE.y = d.y * cp + BORE.ty * rc + BORE.by * rs;
     LOBE.z = d.z * cp + BORE.tz * rc + BORE.bz * rs;
     const choke =
-      i === weak ? rng.range(0.5, 0.7) : i === big ? rng.range(1.08, 1.22) : rng.range(0.78, 1.0);
+      i === weak ? rng.range(0.42, 0.6) : i === big ? rng.range(1.1, 1.3) : rng.range(0.66, 1.02);
     const push = rng.range(0.6, 2.2) * choke;
     s = resetSpawn();
     s.tile = P.FLASH_LOBE;
@@ -263,25 +263,39 @@ export function muzzleFlash(fx, o) {
     emitAdd(s);
   }
 
-  // --- forward gas jet: velocity-aligned, so it stretches down the bore ----
-  s = resetSpawn();
-  s.x = p.x + d.x * 0.04;
-  s.y = p.y + d.y * 0.04;
-  s.z = p.z + d.z * 0.04;
-  s.vx = d.x * 7; s.vy = d.y * 7; s.vz = d.z * 7;
-  s.tile = P.STREAK;
-  s.size0 = 0.045 * sc * prof.jet;
-  s.size1 = 0.018 * sc * prof.jet;
-  // Short: a long velocity-aligned streak off the crown reads as a hard spike.
-  s.stretch = 0.28 * prof.jet;
-  s.life = 0.044;
-  s.drag = 14;
-  s.r0 = 1; s.g0 = 0.8; s.b0 = 0.5; s.i0 = 9 * gain;
-  s.r1 = 1; s.g1 = 0.4; s.b1 = 0.1; s.i1 = 0;
-  s.alphaCurve = 0.6;
-  s.soft = 0.12;
-  s.seed = rng.float();
-  emitAdd(s);
+  // --- forward flame: tongues blown down the bore -----------------------
+  // Seen from behind the weapon these foreshorten into the fireball; seen from
+  // the side (every enemy flash) they are what gives the flash its forward
+  // throw instead of a round sparkler. Two of them, a few degrees apart.
+  for (let i = 0; i < 2; i++) {
+    const roll = rng.float() * TWO_PI;
+    const pitch = rng.range(0.04, 0.3);
+    const cp = Math.cos(pitch);
+    const sp = Math.sin(pitch);
+    LOBE.x = d.x * cp + (BORE.tx * Math.cos(roll) + BORE.bx * Math.sin(roll)) * sp;
+    LOBE.y = d.y * cp + (BORE.ty * Math.cos(roll) + BORE.by * Math.sin(roll)) * sp;
+    LOBE.z = d.z * cp + (BORE.tz * Math.cos(roll) + BORE.bz * Math.sin(roll)) * sp;
+    s = resetSpawn();
+    s.tile = P.FLASH_LOBE;
+    const len = (i === 0 ? rng.range(0.22, 0.32) : rng.range(0.13, 0.2)) * sc * prof.jet;
+    s.size0 = len * 0.55;
+    s.size1 = len;
+    const off = 0.34 * len;
+    s.x = p.x + LOBE.x * off;
+    s.y = p.y + LOBE.y * off;
+    s.z = p.z + LOBE.z * off;
+    s.vx = LOBE.x * 2.5; s.vy = LOBE.y * 2.5; s.vz = LOBE.z * 2.5;
+    s.sizeCurve = 0.35;
+    s.life = 0.04 + rng.float() * 0.016;
+    s.drag = 12;
+    s.rot = screenAngle(fx, view, LOBE.x, LOBE.y, LOBE.z) + rng.signed() * 0.08;
+    s.r0 = cr; s.g0 = cg * 0.9; s.b0 = cb * 0.75; s.i0 = (9 + rng.float() * 4) * gain;
+    s.r1 = gr; s.g1 = gg; s.b1 = gb; s.i1 = 2 * gain;
+    s.alphaCurve = 0.75;
+    s.soft = 0.15;
+    s.seed = rng.float();
+    emitAdd(s);
+  }
 
   // --- unburnt powder: tiny embers thrown DOWN-BORE -------------------------
   // Every grain is constrained to the forward hemisphere: burning powder leaves

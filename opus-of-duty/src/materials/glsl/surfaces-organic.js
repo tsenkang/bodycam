@@ -233,8 +233,10 @@ void owSurface(vec2 uv, out vec3 alb, out float h, out float rough, out float me
   float macro = owFbm01(p * 1.0, P * 1.0, 4, 0.62);
   float dirt  = owFbm01(owWarp(p * 2.5, P * 2.5, 0.8, 3), P * 2.5, 5, 0.55);
 
-  vec3 cJute = owSRGB(vec3(0.520, 0.430, 0.275));
-  vec3 cPale = owSRGB(vec3(0.640, 0.560, 0.400));
+  // Sun-bleached polypropylene/jute sandbag stock is khaki-grey, not orange:
+  // at the old values a sunlit emplacement read as a tray of bread rolls.
+  vec3 cJute = owSRGB(vec3(0.500, 0.445, 0.330));
+  vec3 cPale = owSRGB(vec3(0.615, 0.575, 0.470));
   vec3 cSoil = owSRGB(vec3(0.230, 0.180, 0.120));
   vec3 c = mix(cJute, cPale, owHash12(cell + 3.0) * 0.5 + fibre * 0.15);
   c *= 0.855 + 0.235 * (weave * 0.5 + 0.5);

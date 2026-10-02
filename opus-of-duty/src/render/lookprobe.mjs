@@ -33,6 +33,8 @@ const SHOTS = String(args.shots ?? 'hero,weapon').split(',');
 const WHITE = args.white !== '0';
 const ROOT = resolve(import.meta.dirname, '../..');
 const TIMEOUT = 1800000;
+// Extra query string, e.g. --query=q=chromebook (no leading ? or &).
+const QUERY = args.query ? '&' + String(args.query).replace(/^[?&]/, '') : '';
 
 const portOpen = (p) =>
   new Promise((res) => {
@@ -95,7 +97,7 @@ const scale = (s, k) =>
 
 const results = {};
 try {
-  await page.goto(`http://127.0.0.1:${PORT}/?capture=1&lockstep=1`, { waitUntil: 'domcontentloaded', timeout: TIMEOUT });
+  await page.goto(`http://127.0.0.1:${PORT}/?capture=1&lockstep=1${QUERY}`, { waitUntil: 'domcontentloaded', timeout: TIMEOUT });
   await page.waitForFunction('window.__READY__ === true', null, { timeout: TIMEOUT });
   for (const name of SHOTS) {
     await page.evaluate(({ s, settle }) => window.__APPLY_SHOT__(s, { grabFrame: settle }), { s: name, settle: SETTLE });

@@ -117,8 +117,8 @@ export class AmmoPanel {
 
     this.punch = Math.max(0, this.punch - dt * 7.5);
     const p = 1 - 0.05 * ease.outQuad(this.punch);
-    // 0.92 horizontal: a touch of condensing on the display numerals
-    setStyle(this.cur, 'transform', `scale(${(p * 0.92).toFixed(3)},${p.toFixed(3)})`);
+    // the display face is natively condensed: no horizontal squash needed
+    setStyle(this.cur, 'transform', `scale(${p.toFixed(3)})`);
 
     const frac = ammo / magSize;
     setClass(this.root, 'ow-ammo-low', ammo > 0 && frac <= 0.25);

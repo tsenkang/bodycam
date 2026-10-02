@@ -29,6 +29,8 @@ export const LIBRARY = {
       // retaining wall or a barrier run is not one value end to end.
       macroBig: [2.05, 0.130, 0.028, 0],
       patch: [0.28, 2.0, 0.145, -0.08],
+      // shrinkage and impact cracking only: a cast face has nothing to spall off
+      damage: [0.45, 0, 0, 0],
       weather: [0.42, 0.4, 0.55, 0.5],
       wearColor: 0x9a978f,
       dustColor: 0x8b7f6a,
@@ -89,6 +91,8 @@ export const LIBRARY = {
       // A 12 m elevation seen at 3 m is mostly ONE surface, so the only thing
       // that can stop it reading as flat colour is structure at 1-4 m.
       patch: [0.34, 2.2, 0.175, -0.10],
+      // settlement cracks and the odd patch of fallen render over block/brick
+      damage: [0.55, 0.5, 0, 0],
       // streaks are gated by the runoff model now, so the amplitude can be real
       weather: [0.34, 0.5, 0.6, 0.5],
       wearColor: 0xb0a692,

@@ -399,7 +399,7 @@ export class RenderSystem {
       // ...and the wrap term: the shaded side of the street lit by the sunlit
       // side of it. Both up hard, because this is the "warm kick where a shadow
       // faces a sunlit surface" that was missing entirely.
-      bounceFill: 0.014,
+      bounceFill: 0.02,
       // The PMREM sky cubemap is the single biggest indirect term in the frame
       // (materials ship envMapIntensity 1.6). Scaling its *diffuse* here is the
       // only place the total indirect budget can actually be controlled from.
@@ -422,6 +422,9 @@ export class RenderSystem {
       // source because the balance is a lighting decision, not an art one.
       practicalGain: 0.55,
       practicalNight: 1.5,
+      // Extra cull reach for street lamps after dark, as a fraction of their
+      // registered range (22 m -> 48 m at 1.2). See _cullLights.
+      lampNightReach: 1.2,
       // ---- viewmodel (see VIEWMODEL LIGHTING CONTRACT, _updateViewRig) -----
       // Fraction of the world's sky band a shouldered weapon receives: the
       // shooter's head, shoulders and chest take the rest of the upper dome.
@@ -438,6 +441,12 @@ export class RenderSystem {
       // camera, re-applied to the weapon as an isotropic fill: the average
       // cosine a small held object presents to a point source.
       viewPracticalFill: 0.5,
+      // Exposure-relative irradiance floor for the weapon and hands, in units
+      // of 1/exposure (materialpatch.js owViewFloor). A black-anodised receiver
+      // (albedo 0.04) under it lands about 3 stops under mid-grey: dark, never
+      // a hole. Daylight outdoors the world's own bands already beat it, so it
+      // only binds indoors, after dark and in deep shade.
+      viewFloor: 2.0,
       shadowStrength: 1.0,
       sunSoftness: 0.024,
     };
@@ -501,9 +510,14 @@ export class RenderSystem {
   /** Register a punctual light so it participates in culling and budgets. */
   addLight(light, opts = {}) {
     if (!light || this.lights.some((l) => l.light === light)) return light;
+    const range = opts.range ?? light.distance ?? 25;
     this.lights.push({
       light,
-      range: opts.range ?? light.distance ?? 25,
+      range,
+      // The registration range. `range` itself is the LIVE cull radius (it
+      // opens up after dark for street lamps, see _cullLights) and is what
+      // src/world mirrors for its light-count ballast.
+      baseRange: range,
       priority: opts.priority ?? 1,
       baseIntensity: light.intensity,
     });
@@ -1155,7 +1169,7 @@ export class RenderSystem {
     for (let i = 0; i < this.lights.length; i++) {
       const e = this.lights[i];
       const l = e.light;
-      if (e.range > PRACTICAL_RANGE || !l.visible || !(l.isPointLight || l.isSpotLight)) continue;
+      if (e.baseRange > PRACTICAL_RANGE || !l.visible || !(l.isPointLight || l.isSpotLight)) continue;
       const I = l.intensity;
       if (I <= 0) continue;
       const d = Math.max(0.25, l.getWorldPosition(this._tmpV3b).distanceTo(cam));
@@ -1221,7 +1235,10 @@ export class RenderSystem {
       const l = 0.2126 * hue.x + 0.7152 * hue.y + 0.0722 * hue.z;
       // 1.06: the extra chroma now comes from a warmer ground band instead;
       // at 1.18 every shaded facade in a desert street went sky-blue.
-      const k = 1.06;
+      // 1.06 -> 0.85: under the round-0 review every shade read "flat blue-
+      // grey". MW2019/Warzone shade is close to neutral, carried by warm
+      // ground bounce; the cool cast should be a hint, not a filter.
+      const k = 0.85;
       hue.set(
         Math.max(0, l + (hue.x - l) * k),
         Math.max(0, l + (hue.y - l) * k),
@@ -1349,6 +1366,13 @@ export class RenderSystem {
       if (e.applied !== undefined && e.light.intensity !== e.applied) {
         e.baseIntensity = e.light.intensity;
       }
+      // After dark a street lamp is the lighting design, and a lamp 30 m down
+      // the street lighting nothing is what made the night frame a dimmed day
+      // with no pools (round-0 critic). Street-lamp-sized practicals (range
+      // above a room bulb's) get their cull radius opened up with the night
+      // ramp; bulbs keep theirs, the room's walls hide them anyway.
+      const lamp = e.baseRange > 16 && e.baseRange <= PRACTICAL_RANGE;
+      e.range = lamp ? e.baseRange * (1 + s.lampNightReach * this._nightK) : e.baseRange;
       const d = e.light.position.distanceTo(camPos);
       const fade = 1 - THREE.MathUtils.smoothstep(d, e.range * 0.75, e.range * 1.15);
       // Practicals are held against the sun by the renderer, because the
@@ -1359,7 +1383,7 @@ export class RenderSystem {
       // The trim is a DAYLIGHT balance (interior vs the sunlit street through
       // its door). After dark the practicals ARE the lighting design — pools
       // under every lamp — so the trim releases and goes above unity.
-      const gain = e.range <= PRACTICAL_RANGE ? THREE.MathUtils.lerp(s.practicalGain, s.practicalNight, this._nightK) : 1;
+      const gain = e.baseRange <= PRACTICAL_RANGE ? THREE.MathUtils.lerp(s.practicalGain, s.practicalNight, this._nightK) : 1;
       e.applied = e.baseIntensity * fade * gain;
       e.light.intensity = e.applied;
       e.light.visible = fade > 0.002;
@@ -1534,6 +1558,16 @@ export class RenderSystem {
       const roomN = this.patcher.uniforms.owIndirect.value.z;
       this.patcher.uniforms.owIndirect.value.z = 0;
       viewScene.environmentIntensity = this._viewEnvIntensity;
+      // Last frame's adapted exposure: this frame's is metered after the
+      // viewmodel is composited, and a one-frame lag is invisible.
+      const pu = this.patcher.uniforms;
+      pu.owExposureTex.value = this.exposure.texture;
+      pu.owViewFloor.value.set(
+        this.settings.viewFloor * 0.96,
+        this.settings.viewFloor,
+        this.settings.viewFloor * 1.04,
+        1
+      );
 
       // Still walked every frame — that is where new weapon/hand materials get
       // the shadow/AO/fill injection. It just no longer feeds the gbuffer.
@@ -1556,6 +1590,7 @@ export class RenderSystem {
       uSky.copy(this._fillSkySave);
       uGnd.copy(this._fillGroundSave);
       this.patcher.uniforms.owIndirect.value.z = roomN;
+      pu.owViewFloor.value.w = 0;
     }
 
     if (this.taa) this._removeJitter(camera);

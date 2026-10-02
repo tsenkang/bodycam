@@ -100,6 +100,7 @@ uniform float owNormalAmp;
 uniform float owGroundY;
 uniform float owAoAmt;
 uniform float owMacroRelief;
+uniform vec4  owDamageP;     // damage: x crack amount, y spall amount, z ground stains, w unused
 uniform vec4  owGrafP;       // graffiti: x coverage, y min height, z max height, w cell metres
 uniform vec4  owIntP;        // interior paint: x dado height, y peel, z dirt, w dado roughness
 uniform vec3  owStorey;      // x ground-floor level, y ground-storey top, z upper storey height
@@ -456,11 +457,14 @@ const MAIN_FRAGMENT = /* glsl */ `
     float wn = texture2D( owMacroTex, wUv ).g * 0.7 + texture2D( owMacroTex, wUv * 3.3 ).b * 0.3;
     float wT = 0.64 - owMacroBig.w * 0.08;
     float upOnly = step( 0.62, owNw.y );
-    float wet = smoothstep( wT, wT + 0.015, wn ) * upOnly;
-    float damp = smoothstep( wT - 0.05, wT, wn ) * upOnly;
-    alb.rgb *= 1.0 - damp * 0.22 - wet * 0.30;
-    orm.g = mix( orm.g, mix( orm.g * 0.7, 0.08, wet ), max( damp * 0.5, wet ) );
-    nShade = normalize( mix( nShade, normalize( owP2V * owNp ), wet * 0.85 ) );
+    // A thin film on dusty ground is not a mirror: it darkens the dust a lot,
+    // glosses it a little, and only the deepest middle stands as water. The old
+    // 0.08-roughness flat core reflected bare sky and read as spilt white paint.
+    float wet = smoothstep( wT + 0.004, wT + 0.03, wn ) * upOnly;
+    float damp = smoothstep( wT - 0.07, wT + 0.004, wn ) * upOnly;
+    alb.rgb *= 1.0 - damp * 0.30 - wet * 0.22;
+    orm.g = mix( orm.g, mix( orm.g * 0.6, 0.2, wet ), max( damp * 0.45, wet ) );
+    nShade = normalize( mix( nShade, normalize( owP2V * owNp ), wet * 0.6 ) );
   }
 
   // Horizontal coordinate along a wall, shared by the patch and runoff layers.
@@ -667,6 +671,146 @@ const MAIN_FRAGMENT = /* glsl */ `
     // the film fills the finest tooth; flaked areas keep the full plaster relief
     nShade = normalize( mix( nShade, normalize( owP2V * owNp ), ( 1.0 - peel ) * mix( 0.25, 0.5, dado ) * iv ) );
     owHeightS = clamp( owHeightS - peel * 0.05 * iv, 0.0, 1.0 );
+  }
+  #endif
+
+  // ------------------------------------------------- render damage ----
+  #ifdef OW_DAMAGE
+  {
+    // Old render on a block wall does not just get dirty, it BREAKS: a web of
+    // settlement cracks running out of stressed zones, and the odd patch where
+    // the render has let go and the blockwork (or brick) behind it shows,
+    // ringed by a pale fresh fracture edge. Both live in the plane of the wall
+    // in metres, so they hold their size from 0.5 m to 40 m.
+    vec2 q = vec2( owSAxis, vOwWPos.y );
+    float hG = vOwWPos.y - owGroundY;
+    // metres per pixel: the coverage of anything thinner than a pixel is
+    // scaled down instead of aliasing into a dotted line
+    float px = max( length( fwidth( q ) ), 1e-4 );
+    float iv = owVert;
+
+    if ( iv > 0.01 ) {
+    // ---- spalls: render fallen off, structure exposed -------------------
+    float zA = texture2D( owMacroTex, q * 0.23 + vec2( 0.17, 0.61 ) ).r;
+    float zB = texture2D( owMacroTex, q * 0.61 + vec2( 0.43, 0.07 ) ).g;
+    float zD = texture2D( owMacroTex, q * 1.9 + vec2( 0.29, 0.83 ) ).a;
+    // worst along the foot of the wall (rising damp, kicks, carts) and under
+    // the parapet; the bias is gentle so mid-wall spalls still happen
+    float footBias = ( 1.0 - smoothstep( 0.0, 1.3, hG ) ) * 0.09;
+    float sN = zA * 0.62 + zB * 0.30 + zD * 0.14 + footBias;
+    float sT = 0.80 - owDamageP.y * 0.17;
+    float spall = smoothstep( sT, sT + 0.0035, sN ) * iv;
+    float rim = ( smoothstep( sT - 0.022, sT, sN ) * iv - spall );
+    if ( spall > 0.001 || rim > 0.001 ) {
+      // brick or block? one choice per ~7 m stretch of wall
+      float kind = owHash11( floor( q.x / 7.0 ) * 3.71 + floor( q.y / 6.0 ) * 1.13 + 2.0 );
+      vec2 unit = kind < 0.4 ? vec2( 0.235, 0.075 ) : vec2( 0.40, 0.20 );
+      float row = floor( q.y / unit.y );
+      float bx = q.x / unit.x + mod( row, 2.0 ) * 0.5;
+      vec2 cell = vec2( floor( bx ), row );
+      vec2 fr = vec2( fract( bx ) * unit.x, fract( q.y / unit.y ) * unit.y );
+      float jw = kind < 0.4 ? 0.009 : 0.011;
+      float jd = min( min( fr.x, unit.x - fr.x ), min( fr.y, unit.y - fr.y ) );
+      float joint = 1.0 - smoothstep( jw * 0.5, jw * 0.5 + max( px, 0.002 ), jd );
+      float hb = owHash11( cell.x * 7.7 + cell.y * 31.3 );
+      vec3 unitC = kind < 0.4
+        ? mix( vec3( 0.36, 0.17, 0.10 ), vec3( 0.48, 0.27, 0.16 ), hb )
+        : mix( vec3( 0.30, 0.295, 0.28 ), vec3( 0.43, 0.42, 0.39 ), hb );
+      vec3 mortar = vec3( 0.47, 0.44, 0.39 );
+      float bl = dot( alb.rgb, vec3( 0.2126, 0.7152, 0.0722 ) );
+      // keep the plaster bake's tooth as surface texture of the block face
+      vec3 inner = mix( unitC, mortar, joint ) * clamp( 0.72 + ( bl - 0.35 ) * 0.9 + owMicro * 0.12, 0.55, 1.25 );
+      // a skim of render clings in the joints and on the edges of the hole
+      float cling = smoothstep( 0.55, 0.75, zD + ( 1.0 - smoothstep( sT, sT + 0.03, sN ) ) * 0.5 );
+      inner = mix( inner, alb.rgb * owTintCol * 0.82, cling * 0.6 );
+      // shadowed band under the upper lip of the hole
+      float lipShade = 1.0 - smoothstep( sT, sT + 0.025, sN );
+      inner *= 1.0 - lipShade * 0.35;
+      inner /= max( owTintCol, vec3( 0.05 ) );
+      alb.rgb = mix( alb.rgb, inner, spall );
+      orm.g = mix( orm.g, 0.9 + joint * 0.06, spall );
+      orm.r *= 1.0 - spall * ( joint * 0.45 + lipShade * 0.3 );
+      // the hole is 1.5-2.5 cm deep; joints another 1 cm behind the face
+      owHeightS = mix( owHeightS, 0.18 + ( 1.0 - joint ) * 0.25, spall );
+      // flatten the plaster normal inside, then pitch the joints in
+      vec3 jN = owNp;
+      nShade = normalize( mix( nShade, normalize( owP2V * jN ), spall * 0.6 ) );
+      // the fresh fracture edge of the render: paler, chalky, rough
+      alb.rgb *= 1.0 + rim * 0.22;
+      orm.g = clamp( orm.g + rim * 0.12, 0.0, 1.0 );
+    }
+
+    // ---- cracks ---------------------------------------------------------
+    // Iso-lines of a warped field are long, meandering, closed-ish curves —
+    // what settlement cracking looks like — and their width in METRES comes
+    // from the field's gradient, which is two extra taps.
+    float cz = texture2D( owMacroTex, q * 0.17 + vec2( 0.71, 0.29 ) ).b;
+    float cZone = smoothstep( 0.50 - owDamageP.x * 0.12, 0.62 - owDamageP.x * 0.12, cz + footBias * 0.8 ) * iv;
+    if ( cZone > 0.001 ) {
+      const float E = 0.012;
+      vec2 cq = q * 0.47 + vec2( 0.13, 0.37 );
+      vec2 wq = q * 2.3;
+      float jag = texture2D( owMacroTex, wq ).a - 0.5;
+      float n0 = texture2D( owMacroTex, cq ).g + jag * 0.035;
+      float nx = texture2D( owMacroTex, cq + vec2( E * 0.47, 0.0 ) ).g;
+      float ny = texture2D( owMacroTex, cq + vec2( 0.0, E * 0.47 ) ).g;
+      vec2 grad = ( vec2( nx, ny ) - texture2D( owMacroTex, cq ).g ) / E;
+      float gl = max( length( grad ), 0.05 );
+      float d = abs( n0 - 0.5 ) / gl;                 // metres to the crack line
+      // the crack opens and closes along its length and dies out at its ends
+      float along = texture2D( owMacroTex, q * 0.9 + vec2( 0.51, 0.11 ) ).r;
+      float open = smoothstep( 0.38, 0.62, along );
+      float hw = ( 0.0009 + 0.0022 * open ) * cZone;    // half-width, metres
+      float hwe = max( hw, px * 0.5 );
+      float crack = ( 1.0 - smoothstep( hwe * 0.6, hwe * 1.4, d ) ) * ( hw / hwe ) * open;
+      // a second, finer generation branching off the first
+      vec2 cq2 = q * 1.31 + vec2( 0.77, 0.53 );
+      float m0 = texture2D( owMacroTex, cq2 ).b + jag * 0.02;
+      float mx = texture2D( owMacroTex, cq2 + vec2( E * 1.31, 0.0 ) ).b;
+      float my = texture2D( owMacroTex, cq2 + vec2( 0.0, E * 1.31 ) ).b;
+      vec2 g2 = ( vec2( mx, my ) - texture2D( owMacroTex, cq2 ).b ) / E;
+      float d2 = abs( m0 - 0.5 ) / max( length( g2 ), 0.05 );
+      float hw2 = 0.0007 * cZone * smoothstep( 0.45, 0.7, along + d * 1.5 );
+      float hwe2 = max( hw2, px * 0.5 );
+      float crack2 = ( 1.0 - smoothstep( hwe2 * 0.6, hwe2 * 1.4, d2 ) ) * ( hw2 / max( hwe2, 1e-5 ) )
+                   * ( 1.0 - smoothstep( 0.08, 0.35, d ) );
+      float cr = clamp( max( crack, crack2 * 0.8 ), 0.0, 1.0 ) * ( 1.0 - spall );
+      // dirt washes into a crack and stains a few mm either side of it
+      float halo = ( 1.0 - smoothstep( 0.0, 0.012 + hw * 3.0, d ) ) * open * cZone * 0.22 * ( 1.0 - spall );
+      alb.rgb *= 1.0 - halo;
+      alb.rgb = mix( alb.rgb, owGrimeCol * 0.55 / max( owTintCol, vec3( 0.05 ) ), cr * 0.92 );
+      orm.r *= 1.0 - cr * 0.75;
+      orm.g = clamp( orm.g + cr * 0.1 + halo * 0.15, 0.0, 1.0 );
+      owHeightS = clamp( owHeightS - cr * 0.4, 0.0, 1.0 );
+      // the two lips of the crack are rarely flush: one side sits proud
+      vec2 gd = grad / gl * sign( n0 - 0.5 );
+      vec3 tiltW = ( vec3( 0.0, gd.y, 0.0 ) + cross( owNw, vec3( 0.0, 1.0, 0.0 ) ) * gd.x )
+                 * ( 1.0 - smoothstep( 0.0, 0.006, d ) ) * open * cZone * 0.35;
+      nShade = normalize( nShade + mat3( viewMatrix ) * tiltW * ( 1.0 - spall ) );
+    }
+    }
+
+    // ---- ground stains (owDamageP.z) -----------------------------------
+    // Oil drips, spilt water dried to a tide mark, burnt patches: dark,
+    // hard-edged blotches 0.3-1.5 m across on up-facing ground. Each has a
+    // darker rim where the liquid dried last, and the fresh ones keep a
+    // little gloss. Without them a street is one evenly dusty plane.
+    float upG = smoothstep( 0.62, 0.9, owNw.y );
+    if ( owDamageP.z > 0.0 && upG > 0.01 ) {
+      vec2 gq = vOwWPos.xz;
+      float s0 = texture2D( owMacroTex, gq * 0.083 + vec2( 0.31, 0.77 ) ).g;
+      float s1 = texture2D( owMacroTex, gq * 0.37 + vec2( 0.59, 0.13 ) ).b;
+      float s2 = texture2D( owMacroTex, gq * 1.6 + vec2( 0.11, 0.41 ) ).a;
+      float sv = s0 * 0.68 + s1 * 0.24 + s2 * 0.12;
+      float sT2 = 0.70 - owDamageP.z * 0.08;
+      float stain = smoothstep( sT2, sT2 + 0.012, sv ) * upG;
+      float tideR = ( smoothstep( sT2, sT2 + 0.006, sv ) - smoothstep( sT2 + 0.008, sT2 + 0.03, sv ) ) * upG;
+      float oily = step( 0.5, texture2D( owMacroTex, floor( gq * 0.25 ) * 0.173 + 0.5 ).r );
+      vec3 stC = mix( vec3( 0.80, 0.76, 0.70 ), vec3( 0.55, 0.53, 0.50 ), oily );
+      alb.rgb *= mix( vec3( 1.0 ), stC, stain );
+      alb.rgb *= 1.0 - tideR * 0.22;
+      orm.g = clamp( orm.g - stain * oily * 0.28 + tideR * 0.04, 0.0, 1.0 );
+    }
   }
   #endif
 
@@ -929,6 +1073,12 @@ export const DEFAULT_PARAMS = {
   /** Spray tags on vertical faces: [ coverage 0..1, min y, max y above ground, cell metres ]. */
   graffiti: [0, 0.5, 2.4, 3.2],
   /**
+   * Render damage on vertical faces: [ crack amount 0..1, spall amount 0..1,
+   * ground-stain amount 0..1 (up faces), unused ]. Cracks are a meandering two-generation network sized in
+   * metres; spalls expose block or brick behind a pale fracture rim. 0 disables.
+   */
+  damage: [0, 0, 0, 0],
+  /**
    * Interior paint finish on vertical faces: [ dado height m, peel 0..1,
    * dirt 0..1, dado roughness ]. peel 0 and dado 0 disable the layer.
    */
@@ -1035,6 +1185,7 @@ export function extendMaterial(material, p, shared) {
     owAoAmt: { value: p.aoStrength },
     owMacroRelief: { value: p.macroRelief ?? 0 },
     owGrafP: { value: new THREE.Vector4(...(p.graffiti ?? DEFAULT_PARAMS.graffiti)) },
+    owDamageP: { value: new THREE.Vector4(...(p.damage ?? DEFAULT_PARAMS.damage)) },
     owIntP: { value: new THREE.Vector4(...(p.interior ?? DEFAULT_PARAMS.interior)) },
     owStorey: { value: new THREE.Vector3(...(p.storey ?? DEFAULT_PARAMS.storey)) },
     owIntCol: { value: col(p.interiorCol ?? DEFAULT_PARAMS.interiorCol) },
@@ -1053,6 +1204,7 @@ export function extendMaterial(material, p, shared) {
   if ((p.macroRelief ?? 0) > 0) defines.OW_MACRO_RELIEF = '';
   if ((p.interior?.[0] ?? 0) > 0) defines.OW_INTERIOR = '';
   if ((p.graffiti?.[0] ?? 0) > 0) defines.OW_GRAFFITI = '';
+  if ((p.damage?.[0] ?? 0) > 0 || (p.damage?.[1] ?? 0) > 0 || (p.damage?.[2] ?? 0) > 0) defines.OW_DAMAGE = '';
   if (p.vertexMasks) defines.OW_VCOL_MASKS = '';
   if (p.alphaMask) defines.OW_ALPHA_MASK = '';
   if (p.noGrad) defines.OW_NOGRAD = '';

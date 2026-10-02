@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { installStyles, removeStyles } from './style.js';
+import { installHudFont, removeHudFont } from './font.js';
 import { el, clamp, clamp01, damp, setStyle, setClass } from './util.js';
 import { Crosshair } from './crosshair.js';
 import { Hitmarkers } from './hitmarkers.js';
@@ -67,6 +68,7 @@ export class UiSystem {
   async init(ctx) {
     this.ctx = ctx;
     this.rng = ctx.rng.fork();
+    installHudFont();
     installStyles();
 
     const host = document.getElementById('ui') ?? document.body;
@@ -654,5 +656,6 @@ export class UiSystem {
     this.menu.dispose();
     this.root.remove();
     removeStyles();
+    removeHudFont();
   }
 }

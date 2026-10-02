@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Arm, HAND_POSES } from './hands.js';
+import { Arm } from './hands.js';
 import { buildClips, makeSampleResult } from './clips.js';
 import { triCount } from './geometry.js';
 import {
@@ -145,22 +145,22 @@ export class Viewmodel {
     // bought by cheating the bones 10% long instead — see hands.js L_UPPER.
     this.armL = new Arm(-1, handMats, {
       scale: 0.97,
-      shoulderX: 0.24,
-      shoulderY: -0.26,
-      shoulderZ: 0.06,
+      shoulderX: 0.26,
+      shoulderY: -0.28,
+      shoulderZ: 0.0,
       pose: 'clamp',
     });
     // Elbow hangs low and outboard: the forearm rises steeply from the bottom
     // edge to the handguard, the way a shooter's support arm actually reads,
     // instead of reaching across the frame.
-    this.armL.pole.set(-0.6, -0.75, 0.2).normalize();
+    this.armL.pole.set(-0.75, -0.6, -0.2).normalize();
     this.rig.add(this.armR.root);
     this.rig.add(this.armL.root);
     /**
      * The arms get the SAME curvature-mask treatment the weapon does. Without
      * this every wear/grime/AO number in `sleeve`, `glove`, `glove_pad` and
      * `glove_seam` is dead code — see Arm.bakeSurfaceMasks. It has to happen
-     * before `_fitSupportHand` runs, because that adds contact AO into the same
+     * before `_graspHands` runs, because that adds contact AO into the same
      * attribute with Math.max and would otherwise be overwritten.
      */
     const bakeArms = this.mats.lib?.bakeMasks?.bind(this.mats.lib) ?? null;
@@ -171,7 +171,7 @@ export class Viewmodel {
     // Body-fixed shoulders, expressed in camera space and re-based into rig
     // space every frame so the elbows do not swing when the gun moves.
     this.shoulderR = new THREE.Vector3(0.205, -0.2, 0.06);
-    this.shoulderL = new THREE.Vector3(-0.24, -0.26, 0.06);
+    this.shoulderL = new THREE.Vector3(-0.26, -0.28, 0.0);
 
     // ---- reticle ----------------------------------------------------------
     this.reticle = new THREE.Object3D();
@@ -410,6 +410,8 @@ export class Viewmodel {
     if (parts.trigger && n.triggerPivot) applyNode(parts.trigger, n.triggerPivot);
     if (parts.selector && n.selectorPivot) applyNode(parts.selector, n.selectorPivot);
 
+    const grasp = this._graspHands(model);
+
     const entry = {
       id: model.id,
       def,
@@ -438,84 +440,58 @@ export class Viewmodel {
       triggerPull: model.nodes.triggerPull ?? -0.3,
       magLen: model.magSize?.len ?? 0.2,
       shell: model.shell,
-      lhandPose: model.id === 'pistol' ? 'cup' : 'clamp',
+      lhandPose: grasp.lPose ?? (model.id === 'pistol' ? 'cup' : 'clamp'),
+      rhandPose: grasp.rPose ?? 'grip',
     };
-    this._fitSupportHand(entry);
-    this._fitShootingHand(entry);
+    // Contact AO on both sides of every grasp. The glove side is baked for the
+    // rifle only: the arms are shared by every weapon, and AO baked into the
+    // glove for one weapon's grip would sit on the wrong knuckles on the next.
+    if (grasp.lContacts.length) {
+      if (model.id === 'rifle') this.armL.bakeContactAO(grasp.lContacts, 0.012, 0.75);
+      this._bakeContactAOOnWeapon(entry, grasp.lContacts, 0.014, 0.9);
+    }
+    if (grasp.rContacts.length) {
+      if (model.id === 'rifle') this.armR.bakeContactAO(grasp.rContacts, 0.012, 0.6);
+      this._bakeContactAOOnWeapon(entry, grasp.rContacts, 0.012, 0.8);
+    }
     this.weapons.set(model.id, entry);
     return entry;
   }
 
   /**
-   * GROUND THE SUPPORT HAND ON THE HANDGUARD — once, at build time.
+   * PUT THE HANDS ON THE WEAPON — once, at build time.
    *
-   * Two halves, and both are needed: geometry alone still reads as two floating
-   * objects, and AO alone cannot close a 10 mm gap.
-   *
-   *  1. `Arm.fitToCylinder` searches each distal joint for the rotation that puts
-   *     that fingertip's contact patch on the handguard surface (<=1 mm off, up
-   *     to 1.5 mm buried), measured through the real transform chain rather than
-   *     derived analytically — see the note there for why the analytic version
-   *     was 8-14 mm out in every frame despite the maths being right.
-   *  2. The contact points that come back are then used to bake a contact-AO
-   *     gradient into BOTH sides of the interface: the handguard here, the glove
-   *     in `Arm.bakeContactAO`. 0.55 multiply at the contact, easing to 1.0 over
-   *     12 mm.
-   *
-   * The AO mask lives in vColor.b, which the library's shader turns into
-   * `orm.r *= 1 - vColor.b * wear[2]`; wear[2] is 0.5 on every weapon material,
-   * so a mask of 0.9 is the 0.55 multiply asked for.
+   * Each weapon describes its two grasps as cylinders (`nodes.graspL`,
+   * `nodes.graspR`: the handguard and the pistol grip on the rifle) plus where
+   * on them the palm bears. `Arm.graspCylinder` places the palm on the surface
+   * and closes every finger to first contact (see the note there). The solved
+   * wrist is written back over `nodes.gripL` / `nodes.gripR`, so the reload and
+   * inspect clips — which start and end at those nodes — return the hand to
+   * exactly the grip it left.
    */
-  _fitSupportHand(w) {
-    const hg = w.model.nodes.handguard;
-    const gL = w.gripL;
-    if (!hg || !gL || w.id === 'pistol') return;
-    this._handPosL.fromArray(gL.pos);
-    handBasis(this._handQuatL, gL.finger ?? [0.82, 0.5, -0.28], gL.back ?? [-0.5, 0.32, -0.8]);
-    const poseName = `clamp:${w.id}`;
-    this.armL.setPose('clamp');
-    const contacts = this.armL.fitToCylinder(
-      this._handPosL,
-      this._handQuatL,
-      hg.axis,
-      hg.dir,
-      hg.r,
-      { clearance: 0.001, poseName }
-    );
-    w.lhandPose = poseName;
-    // Only keep contacts that actually landed on the handguard's own extent —
-    // a fingertip that overshot past the end cap must not paint AO on the barrel.
-    const z0 = Math.max(hg.z0, hg.z1);
-    const z1 = Math.min(hg.z0, hg.z1);
-    const kept = contacts.filter((p) => p.z <= z0 + 0.012 && p.z >= z1 - 0.012);
-    this.armL.bakeContactAO(kept, 0.012, 0.7);
-    this._bakeContactAOOnWeapon(w, kept, 0.012, 0.9);
-    this.armL.setPose(poseName);
-  }
-
-  /**
-   * Wrap the shooting hand round the pistol grip and put the index pad on the
-   * trigger face — the same build-time search as the support hand, against the
-   * grip's own axis. Needs `nodes.grip` (and optionally `nodes.triggerFace`).
-   */
-  _fitShootingHand(w) {
-    const g = w.model.nodes.grip;
-    const gR = w.gripR;
-    if (!g || !gR) return;
-    this._handPos.fromArray(gR.pos);
-    handBasis(this._handQuat, gR.finger, gR.back);
-    const poseName = `grip:${w.id}`;
-    this.armR.setPose('grip');
-    const contacts = this.armR.fitToCylinder(this._handPos, this._handQuat, g.axis, g.dir, g.r, {
-      clearance: 0.001,
-      poseName,
-      skip: [0],
-      axialMin: 0.006,
-      trigger: w.model.nodes.triggerFace ?? null,
-    });
-    this.armR.bakeContactAO(contacts, 0.012, 0.6);
-    w.rhandPose = poseName;
-    this.armR.setPose(poseName);
+  _graspHands(model) {
+    const n = model.nodes;
+    const out = { lPose: null, rPose: null, lContacts: [], rContacts: [] };
+    if (n.graspL) {
+      const poseName = `grasp:${model.id}:L`;
+      const r = this.armL.graspCylinder(n.graspL.cyl, { ...n.graspL, poseName });
+      n.gripL = { pos: r.pos.toArray(), finger: r.finger, back: r.back };
+      out.lPose = poseName;
+      out.lContacts = r.contacts;
+    }
+    if (n.graspR) {
+      const poseName = `grasp:${model.id}:R`;
+      const r = this.armR.graspCylinder(n.graspR.cyl, {
+        ...n.graspR,
+        poseName,
+        skip: n.triggerFace ? [0] : [],
+        trigger: n.triggerFace ?? null,
+      });
+      n.gripR = { pos: r.pos.toArray(), finger: r.finger, back: r.back };
+      out.rPose = poseName;
+      out.rContacts = r.contacts;
+    }
+    return out;
   }
 
   /**
@@ -562,7 +538,7 @@ export class Viewmodel {
     this.magInHand = 0;
     this.magVisible = true;
     this.armR.setPose(w.rhandPose ?? 'grip');
-    // The FITTED clamp for this weapon, not the authored one — see _fitSupportHand.
+    // The FITTED clamp for this weapon, not the authored one — see _graspHands.
     this.armL.setPose(w.lhandPose ?? (id === 'pistol' ? 'cup' : 'clamp'));
     return w;
   }
@@ -985,7 +961,9 @@ export class Viewmodel {
       pos = res.lhand.pos;
       finger = res.lhand.finger;
       back = res.lhand.back;
-      pose = res.lhand.pose;
+      // 'wrap' in a clip means "on the weapon": the solved grasp, not the
+      // generic authored curl.
+      pose = res.lhand.pose === 'wrap' ? w.lhandPose : res.lhand.pose;
     }
     this._handPosL.set(pos[0], pos[1], pos[2]);
     handBasis(this._handQuatL, finger, back);

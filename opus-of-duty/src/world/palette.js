@@ -96,10 +96,16 @@ export const PALETTE = {
     surface: 'concrete',
     opts: {
       vertexMasks: true,
-      tint: 0xa5a096,
+      // Barriers are the dirtiest concrete on a street: road spray to knee
+      // height, tyre scuffs on the foot, cracked and chipped arrises. At the
+      // old clean value they were the brightest objects in the hero frame.
+      tint: 0x958f86,
       scale: 0.9,
       normalStrength: 1.3,
-      weather: [0.45, 0.5, 0.35, 0.55],
+      weather: [0.5, 0.7, 0.6, 0.62],
+      wear: [0.75, 1.15, 0.6, 0],
+      damage: [0.8, 0, 0, 0],
+      macroBig: [2.2, 0.16, 0.12, 0],
       graffiti: [0.5, 0.22, 0.86, 1.6],
     },
   },
@@ -168,13 +174,15 @@ export const PALETTE = {
       // No edge wear on a road. The vertex wear mask exists to rub through the
       // arris of a prop; on a 100 m plane it just brightens every stone crown.
       wear: [0, 0.5, 0.45, 0],
-      macroBig: [1, 0, 0.03, 0.55],
+      macroBig: [1, 0, 0.03, 0.42],
+      // oil drips and dried spills: the street is not one evenly dusty plane
+      damage: [0, 0, 0.6, 0],
     },
   },
   asphalt: {
     name: 'asphalt',
     surface: 'concrete',
-    opts: { vertexMasks: true, tint: 0x9d968a, scale: 3.2, detile: 0.6, wear: [0, 0.55, 0.45, 0] },
+    opts: { vertexMasks: true, tint: 0x9d968a, scale: 3.2, detile: 0.6, wear: [0, 0.55, 0.45, 0], damage: [0, 0, 0.75, 0] },
   },
   /**
    * The driving line: tarmac polished bare by tyres and stained with oil. A
@@ -191,17 +199,18 @@ export const PALETTE = {
       detile: 0.7,
       weather: [0.3, 0.5, 0.15, 0.28],
       wear: [0, 0.55, 0.45, 0],
+      damage: [0, 0, 0.8, 0],
     },
   },
   sand: {
     name: 'sand',
     surface: 'sand',
-    opts: { vertexMasks: true, scale: 2.6, detile: 0.7, wear: [0, 0.45, 0.45, 0] },
+    opts: { vertexMasks: true, scale: 2.6, detile: 0.7, wear: [0, 0.45, 0.45, 0], damage: [0, 0, 0.45, 0] },
   },
   dirt: {
     name: 'dirt',
     surface: 'dirt',
-    opts: { vertexMasks: true, scale: 2.4, detile: 0.8, wear: [0, 0.5, 0.45, 0] },
+    opts: { vertexMasks: true, scale: 2.4, detile: 0.8, wear: [0, 0.5, 0.45, 0], damage: [0, 0, 0.4, 0] },
   },
   gravel: {
     name: 'gravel',
@@ -261,6 +270,32 @@ export const PALETTE = {
     name: 'metal_painted',
     surface: 'metal',
     opts: { vertexMasks: true, tint: 0x4a4a48, scale: 1.0 },
+  },
+  /** Meter boxes and junction boxes: utility grey enamel. */
+  metal_painted_grey: {
+    name: 'metal_painted',
+    surface: 'metal',
+    opts: { vertexMasks: true, tint: 0x8d8f8a, scale: 0.6 },
+  },
+  /**
+   * Polythene bin bags. Painted-metal's glossy enamel is the closest bake to a
+   * film; the wear mask is turned off so no edge ever turns metallic.
+   */
+  plastic_black: {
+    name: 'metal_painted',
+    surface: 'rubber',
+    opts: { vertexMasks: true, tint: 0x262626, scale: 0.7, wear: [0, 0.8, 0.6, 0], roughness: [0.75, 0.0, 0.18] },
+  },
+  plastic_white: {
+    name: 'metal_painted',
+    surface: 'rubber',
+    opts: { vertexMasks: true, tint: 0xc9c6bc, scale: 0.7, wear: [0, 0.9, 0.6, 0], roughness: [0.8, 0.02, 0.22] },
+  },
+  /** Service cable: weathered black PVC. */
+  cable: {
+    name: 'rubber',
+    surface: 'rubber',
+    opts: { vertexMasks: true, scale: 0.25, tint: 0xcfcac2 },
   },
   steel: { name: 'metal_brushed', surface: 'metal', opts: { vertexMasks: true, scale: 0.9 } },
   corrugated: { name: 'corrugated', surface: 'metal', opts: { vertexMasks: true, scale: 2.2 } },
@@ -332,7 +367,29 @@ export const PALETTE = {
   burlap: {
     name: 'burlap',
     surface: 'fabric',
-    opts: { vertexMasks: true, tint: 0xa2957a, scale: 0.16, weather: [0.5, 0.3, 0.4, 0.5] },
+    opts: { vertexMasks: true, tint: 0x9a927f, scale: 0.16, weather: [0.5, 0.3, 0.4, 0.5] },
+  },
+  /** Brown packing tape: glossy film over the kraft. */
+  tape: {
+    name: 'metal_painted',
+    surface: 'wood',
+    opts: { vertexMasks: true, tint: 0x9c7a4c, scale: 0.4, wear: [0, 0.6, 0.3, 0], roughness: [0.6, 0.0, 0.14] },
+  },
+  /** Flattened cardboard: plaster's fine tooth reads as paper fibre lying flat. */
+  cardboard: {
+    name: 'plaster',
+    surface: 'wood',
+    opts: {
+      vertexMasks: true,
+      tint: 0xa9895f,
+      scale: 0.9,
+      parallax: 0,
+      detile: 0,
+      weather: [0.35, 0, 0, 0.45],
+      damage: [0, 0, 0, 0],
+      patch: [0, 2.6, 0.12, -0.08],
+      wearColor: 0xc8b48c,
+    },
   },
   rubber: { name: 'rubber', surface: 'rubber', opts: { vertexMasks: true, scale: 0.45 } },
   glass: { name: 'glass', surface: 'glass', opts: { scale: 2.0 } },

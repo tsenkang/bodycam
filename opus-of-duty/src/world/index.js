@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Assembler } from './builder.js';
 import { BUILDINGS, STREET, SET_PIECES, GATE } from './layout.js';
 import { buildGround } from './ground.js';
+import { registerClutterProps, dressClutter } from './clutter.js';
 import { buildBuilding, collapseRoof } from './buildings.js';
 import { registerProps } from './props.js';
 import {
@@ -110,6 +111,12 @@ export class WorldSystem {
     // 1. prototypes first: the level references them by id while it builds
     registerProps(A, rng);
     registerDressingProps(A, rng);
+    registerClutterProps(A);
+
+    // Clutter density by quality tier: the chromebook preset keeps the wall-foot
+    // line and the cable runs, at about half the items.
+    const quality = ctx.config?.quality ?? 'ultra';
+    this.clutterDensity = quality === 'chromebook' || quality === 'low' ? 0.5 : quality === 'medium' ? 0.75 : 1;
 
     // 2. ground, then the shells, then what people put in and on them
     buildGround(A, rng);
@@ -132,6 +139,7 @@ export class WorldSystem {
     dressStreet(A, rng);
     dressBuildings(A, rng, infos);
     scatterDebris(A, rng);
+    dressClutter(A, infos, this.clutterDensity);
 
     this._addLights(A);
 
@@ -175,7 +183,11 @@ export class WorldSystem {
       // from a black hole, so it has to actually carry the room.
       // Intensity is re-driven every update() off the solar altitude; this is
       // the daylight value so a frame captured before the first update is right.
-      const l = new THREE.PointLight(0xffc07a, 5, 13, 2);
+      // 0xffc07a is ~1900 K once it is linearised — candle light — and it
+      // painted every interior wall terracotta whatever its paint. 0xffd3a6 is
+      // a ~3000 K bare bulb seen through a daylight white balance: still
+      // clearly warm against the skylight, but the distemper reads as off-white.
+      const l = new THREE.PointLight(0xffd3a6, 4, 13, 2);
       l.position.set(b.x, b.y, b.z);
       l.castShadow = false;
       A.light(l, { range: 13, priority: 2 });
@@ -326,7 +338,7 @@ export class WorldSystem {
       // interior read as pure tungsten (B-R -93) and sit level with the sunlit
       // street instead of 1.5-2.5 stops under it. Gate the bulb on solar
       // altitude: a weak practical by day, the room's only light after dark.
-      for (let i = 0; i < this.bulbs.length; i++) this.bulbs[i].intensity = 5 + 17 * mix;
+      for (let i = 0; i < this.bulbs.length; i++) this.bulbs[i].intensity = 4 + 18 * mix;
     }
   }
 

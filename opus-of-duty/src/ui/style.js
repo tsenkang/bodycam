@@ -330,13 +330,19 @@ const CSS = `
 }
 .ow-sc-emblem svg { width: calc(44px * var(--k)); height: calc(48px * var(--k)); display:block;
   filter: drop-shadow(0 1px 2px rgba(0,0,0,.55)); }
-.ow-sc-nums { display:flex; flex-direction:column; gap: calc(1px * var(--k)); }
-.ow-sc-nums b { font-family: var(--fd); font-size: calc(24px * var(--k)); font-weight:400; line-height:1;
-  text-shadow: var(--sh); }
+.ow-sc-nums { display:flex; flex-direction:column; gap: calc(3px * var(--k)); }
+.ow-sc-row { display:flex; align-items:center; gap: calc(8px * var(--k)); }
+.ow-sc-row b { font-family: var(--fd); font-size: calc(27px * var(--k)); font-weight:700; line-height:.95;
+  min-width: calc(30px * var(--k)); text-shadow: var(--sh-o1); }
 .ow-sc-nums .us { color: #f4f6f7; }
-.ow-sc-nums .them { color: rgba(214,220,224,.62); }
-.ow-sc-clock { grid-column:1; font-family: var(--fd); font-size: calc(17px * var(--k)); font-weight:400;
-  color: rgba(236,240,242,.88); text-shadow: var(--sh); text-align:center; }
+.ow-sc-nums .them { color: #f4f6f7; }
+.ow-sc-track { position:relative; display:block; width: calc(132px * var(--k)); height: calc(5px * var(--k));
+  background: rgba(8,12,15,.5); box-shadow: 0 0 0 calc(1px * var(--k)) rgba(0,0,0,.25); overflow:hidden; }
+.ow-sc-fill { position:absolute; left:0; top:0; bottom:0; width:100%; display:block; transform-origin:left center; }
+.ow-sc-row.us .ow-sc-fill { background: linear-gradient(to right, #2f8fdc, #58b7ff); }
+.ow-sc-row.them .ow-sc-fill { background: linear-gradient(to right, #c8321f, #ff5a3c); }
+.ow-sc-clock { grid-column:1; font-family: var(--fd); font-size: calc(19px * var(--k)); font-weight:600;
+  color: rgba(240,243,245,.94); text-shadow: var(--sh-o1); text-align:center; letter-spacing:.04em; }
 .ow-hud.vitals .ow-score { bottom: calc(var(--pad) + 48px * var(--k)); }
 .ow-match { display:none; }
 

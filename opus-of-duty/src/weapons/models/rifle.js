@@ -477,6 +477,48 @@ export function buildRifle() {
         z0: hgZ0,
         z1: hgZ1,
       },
+      /**
+       * GRASPS (Viewmodel._graspHands -> Arm.graspCylinder). These, not gripL /
+       * gripR above, decide where the hands are: the palm is laid on each
+       * cylinder at clock angle `phi` (0 = +x, pi/2 = D x ref) and the fingers
+       * are closed to first contact. gripL / gripR are overwritten with the
+       * solved wrists so the clips start and end on the real grip.
+       *
+       * Support hand, as in the Warzone reference: palm on the LEFT flank of
+       * the rear handguard, back of the glove turned to the camera, fingers
+       * curling up and over the top (the top rail is split around this section
+       * for exactly that, see topFrom/topTo) and the thumb under the tube. The
+       * hipfire camera looks at the handguard almost end-on from above and
+       * behind, so any grip that hangs the hand UNDER the tube hides it behind
+       * its own forearm; this one presents the knuckle row and four curled
+       * fingers, and the forearm rises into the hand from the lower left.
+       */
+      graspL: {
+        cyl: { axis: [0, bore, 0], dir: [0, 0, 1], r: hgR + 0.0036, ref: [1, 0, 0] },
+        phi: 3.3,
+        along: -0.205,
+        wrap: -1,
+        rake: -0.38,
+        roll: 0.6,
+        standoff: -0.004,
+        thumbBase: [0.2, -0.95, -0.5],
+        thumbScan: [1.4, 1.4, 1.6],
+        thumbSide: [0.25, -1, 0],
+        thumbDir: [0.5, 0, -1],
+      },
+      graspR: {
+        cyl: { axis: [0, 0.035, 0.015], dir: [0, -0.9287, 0.3709], r: 0.0175, ref: [1, 0, 0] },
+        phi: 0.85,
+        along: 0.05,
+        wrap: -1,
+        rake: 0.0,
+        roll: 0,
+        standoff: 0.0,
+        thumbBase: [0.25, -0.9, -0.5],
+        thumbScan: [1.3, 1.0, 0.9],
+        thumbSide: [-1, 0.3, 0],
+        thumbDir: [0, -0.35, -1],
+      },
       magSeat: { pos: [0, 0.061, magZ], rot: [magTilt, 0, 0] },
       magDrop: [0, -0.4, 0.02],
       chargeRest: { pos: [0, bore + rUpper - 0.0075, zUpperRear - 0.024], rot: [0, 0, 0] },

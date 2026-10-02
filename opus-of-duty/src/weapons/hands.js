@@ -517,8 +517,6 @@ const _bm = new THREE.Matrix4();
 const _fitInv = new THREE.Matrix4();
 const _fitP = new THREE.Vector3();
 const _fitD = new THREE.Vector3();
-const _fitAxis = new THREE.Vector3();
-const _fitAx0 = new THREE.Vector3();
 const _fitM = new THREE.Matrix4();
 
 /**
@@ -679,283 +677,282 @@ export class Arm {
   }
 
   /**
-   * BUILD-TIME CONTACT SOLVE: clamp every fingertip onto a cylinder.
+   * BUILD-TIME GRASP: put the hand ON a cylinder and close it.
    *
-   * The authored `clamp` curls were derived analytically from a 47 mm tube and
-   * one nominal contact clock angle, and on paper they put the PIP, DIP and tip
-   * all 8.2 mm off the surface. On screen they did not: in hero, detail, weapon
-   * and ads the distal segments visibly stood clear of the handguard, because the
-   * analytic solve ignored (a) the 0.88 Y-scale on the finger capsules, (b) the
-   * -6 mm palmar offset of the MCP row, (c) the fan-out rotation on each finger
-   * root and (d) the fact that the four fingers start at four different X, so
-   * they meet the cylinder at four different clock angles.
+   * Replaces the old "author a wrist target, then search the finger curls"
+   * fit. That approach could not work, because the wrist was authored first:
+   * the palm ended up beside the handguard with the knuckle row 21 mm off it
+   * and pointed at the top rail, so the only curl that did not bury a finger
+   * was no curl at all — the ring and little fingers came out straight and the
+   * support hand read as a paddle held up next to the gun.
    *
-   * Rather than push more algebra at it, MEASURE it: pose the hand, walk the real
-   * transform chain to each fingertip's contact patch, and search the distal
-   * joint's own rotation for the value that lands the patch on the surface. That
-   * is a raycast against the collision profile in all but name, and it is exact
-   * by construction because it uses the same matrices the renderer will.
+   * Here the cylinder decides everything, in the order a real hand does it:
    *
-   * The thumb is fitted the same way but wraps to the OPPOSITE side of the tube:
-   * a C-clamp whose thumb is on the same side as the fingers is a fist held next
-   * to the gun, not a grip on it.
+   *  1. PLACE. The palm is laid on the surface at clock angle `phi` (around the
+   *     axis, measured from `ref` toward D x ref), `along` metres down the axis.
+   *     Palm normal = -surface normal; the metacarpals run along the surface
+   *     tangent in the wrap direction `wrap` (+1/-1), raked `rake` radians
+   *     toward the axis direction. The contact patch is the distal palm, just
+   *     behind the knuckle row — that is where a gripping hand bears.
+   *  2. CLOSE. Each finger closes joint by joint, proximal first, and every
+   *     joint stops at FIRST CONTACT of its own segment with the surface: the
+   *     same thing a physical grasp does. No cost function, no search over
+   *     coupled parameters, nothing to converge on the wrong root.
+   *  3. THUMB. The thumb base is scanned (two axes) for the orientation whose
+   *     closed thumb lies along the surface on the opposite side of the wrap,
+   *     then closed the same way.
    *
-   * @param {THREE.Vector3}  handPos    wrist target, arm-root space
-   * @param {THREE.Quaternion} handQuat wrist orientation
-   * @param {number[]} axisPoint  a point on the cylinder axis, arm-root space
-   * @param {number[]} axisDir    the cylinder axis direction
-   * @param {number}   radius     cylinder radius
-   * @param {object}   opts       { clearance, poseName }
-   * @returns {THREE.Vector3[]}   contact points, arm-root space (for baked AO)
+   * Everything is measured through the real transform chain, in arm-root
+   * space (== weapon space: the arm root and the weapon group are both
+   * identity children of the rig), so it is exact by construction.
+   *
+   * @param {object} cyl  { axis:[x,y,z], dir:[x,y,z], r, ref:[x,y,z] }
+   * @param {object} o    { phi, along, wrap, rake, roll, standoff, poseName,
+   *                        trigger:[x,y,z]|null, skip:[fingerIdx], thumbBase,
+   *                        thumbScan:[dy,dz], relax:[mcp,pip,dip] }
+   * @returns {{ pos: THREE.Vector3, quat: THREE.Quaternion, finger: number[],
+   *             back: number[], contacts: THREE.Vector3[] }}
    */
-  fitToCylinder(handPos, handQuat, axisPoint, axisDir, radius, opts = {}) {
-    const clearance = opts.clearance ?? 0.001;
-    const poseName = opts.poseName ?? this.pose;
-    const base = this.poses[poseName] ?? HAND_POSES[poseName] ?? HAND_POSES.clamp;
+  graspCylinder(cyl, o = {}) {
+    const s = this.scale;
+    const A = new THREE.Vector3().fromArray(cyl.axis);
+    const D = new THREE.Vector3().fromArray(cyl.dir).normalize();
+    const e0 = new THREE.Vector3().fromArray(cyl.ref ?? [1, 0, 0]);
+    e0.addScaledVector(D, -e0.dot(D)).normalize();
+    const e1 = new THREE.Vector3().crossVectors(D, e0);
+    const R = cyl.r;
+    const phi = o.phi ?? 0;
+    const wrap = o.wrap ?? 1;
+    const n = e0.clone().multiplyScalar(Math.cos(phi)).addScaledVector(e1, Math.sin(phi));
+    const t = e0.clone().multiplyScalar(-Math.sin(phi)).addScaledVector(e1, Math.cos(phi)).multiplyScalar(wrap);
+    const rake = o.rake ?? 0;
+    const fingerDir = t.clone().multiplyScalar(Math.cos(rake)).addScaledVector(D, Math.sin(rake)).normalize();
+    // back of the hand = surface normal, optionally rolled about the finger axis
+    const back = n.clone();
+    if (o.roll) back.applyAxisAngle(fingerDir, o.roll);
+    // hand basis: +Z = -finger, +Y = back (orthogonalised), +X = Y x Z
+    const hz = fingerDir.clone().negate();
+    const hy = back.clone().addScaledVector(hz, -back.dot(hz)).normalize();
+    const hx = new THREE.Vector3().crossVectors(hy, hz).normalize();
+    const quat = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(hx, hy, hz));
 
-    this.hand.position.copy(handPos);
-    this.hand.quaternion.copy(handQuat);
+    // Contact patch on the palm (hand-local): distal palm, palmar surface.
+    const pc = new THREE.Vector3(0, -(o.palmDepth ?? 0.0165) * s, (o.palmZ ?? -0.084) * s);
+    const contact = A.clone()
+      .addScaledVector(D, o.along ?? 0)
+      .addScaledVector(n, R + (o.standoff ?? 0));
+    const pos = contact.clone().sub(pc.applyQuaternion(quat));
+
+    this.hand.position.copy(pos);
+    this.hand.quaternion.copy(quat);
     this.root.updateMatrixWorld(true);
-    // Everything is measured in the ARM ROOT's space, so the result is
-    // independent of wherever the rig happens to be this frame.
     _fitInv.copy(this.root.matrixWorld).invert();
-    _fitAxis.set(axisDir[0], axisDir[1], axisDir[2]).normalize();
-    const ax0 = _fitAx0.set(axisPoint[0], axisPoint[1], axisPoint[2]);
 
-    /** Signed distance from a joint-local point to the cylinder surface. */
+    /** Distance from a joint-local point to the cylinder SURFACE (arm space). */
     const gapAt = (joint, lx, ly, lz, out) => {
-      joint.updateWorldMatrix(true, true);
+      joint.updateWorldMatrix(true, false);
       _fitP.set(lx, ly, lz).applyMatrix4(joint.matrixWorld).applyMatrix4(_fitInv);
       if (out) out.copy(_fitP);
-      _fitD.copy(_fitP).sub(ax0);
-      _fitD.addScaledVector(_fitAxis, -_fitD.dot(_fitAxis));
-      return _fitD.length() - radius;
+      _fitD.copy(_fitP).sub(A);
+      _fitD.addScaledVector(D, -_fitD.dot(D));
+      return _fitD.length() - R;
     };
 
     /**
-     * Scan a joint's flexion for the angle that puts `local` on the surface.
-     *
-     * A scan, not a bisection: the gap is not monotonic in curl (past ~110 deg
-     * the tip starts coming back OUT the far side of the tube), so a bisection
-     * can converge on the wrong root. 40 samples over the anatomical range is
-     * 2.5 deg of resolution, which is 0.4 mm at the fingertip.
+     * Close one joint until its own segment touches. `rs` are the radii at the
+     * segment's two ends; samples run along the segment axis and are allowed to
+     * sink 20% of the local radius into the surface, which is a glove squeezing
+     * a handguard rather than a capsule hovering over it.
+     * @returns {number} the flexion angle, or -1 if the segment never touched
      */
-    const fitJoint = (joint, local, lo, hi, standoff = 0) => {
-      let best = joint.rotation.x;
-      let bestCost = Infinity;
-      for (let i = 0; i <= 48; i++) {
-        const a = lo + ((hi - lo) * i) / 48;
-        joint.rotation.x = a;
-        const g = gapAt(joint, local[0], local[1], local[2]) - standoff;
-        // Target: on the surface, up to `clearance` proud, at most 1.5 mm buried.
-        const cost = Math.abs(g - clearance * 0.5) + (g < -0.0015 ? (-g - 0.0015) * 8 : 0);
-        if (cost < bestCost) {
-          bestCost = cost;
-          best = a;
+    const closeJoint = (joint, len, r0, r1, lo, hi) => {
+      const N = 64;
+      let prev = lo;
+      let closest = lo;
+      let closestG = Infinity;
+      for (let i = 0; i <= N; i++) {
+        const a = lo + ((hi - lo) * i) / N;
+        joint.rotation.x = -a;
+        // Only the DISTAL part of the segment is tested: the root of a segment
+        // sits on the joint, which may already rest on the surface (the MCP row
+        // does, on a palm laid flat on the tube), and counting that as contact
+        // freezes the finger straight.
+        let touch = false;
+        for (let k = 0; k < 3 && !touch; k++) {
+          const u = 0.6 + k * 0.2;
+          const rr = r0 + (r1 - r0) * u;
+          if (gapAt(joint, 0, 0, -len * u) < rr * 0.8) touch = true;
         }
+        if (touch) {
+          joint.rotation.x = -prev;
+          return prev;
+        }
+        const ge = gapAt(joint, 0, 0, -len);
+        if (ge < closestG) {
+          closestG = ge;
+          closest = a;
+        }
+        prev = a;
       }
-      joint.rotation.x = best;
-      return best;
+      // Never touched: a gripping finger keeps closing toward the part, so stop
+      // at the point of closest approach rather than falling back to a relaxed
+      // (straight) curl. Only a segment that turns AWAY from the part at every
+      // angle (closest == lo) reports a miss.
+      if (closest > lo) {
+        joint.rotation.x = -closest;
+        return closest;
+      }
+      return -1;
     };
 
-    /**
-     * Wrap all three joints, PROXIMAL FIRST.
-     *
-     * Fitting only the distal joint cannot wrap a cylinder: if the MCP and PIP
-     * are authored for a different contact clock angle the finger traces the
-     * wrong spiral, and the distal joint is then asked to close a gap it is 22 mm
-     * long and physically cannot reach. Solving the chain outward — each joint
-     * placing the NEXT joint's origin one finger-radius off the surface, then the
-     * distal joint placing the actual contact patch on it — is what a finger does,
-     * and it is stable because each stage only has one degree of freedom.
-     */
+    const relax = o.relax ?? [0.45, 0.55, 0.35];
     const fingers = [];
     const contacts = [];
-    const skip = opts.skip ?? [];
+    const skip = o.skip ?? [];
     let triggerRest = null;
+    const LIM = [
+      [-0.15, 1.6],
+      [0.05, 1.75],
+      [0.05, 1.25],
+    ];
     for (let i = 0; i < 4; i++) {
       const f = this.fingers[i];
-      const curl = base.fingers[i].slice();
-      for (let j = 0; j < 3; j++) f.joints[j].rotation.x = -curl[j];
-      if (skip.includes(i)) {
-        /**
-         * The trigger finger does not wrap: its distal pad goes ON the trigger
-         * face. Same two-parameter search, scored by distance to that point.
-         */
-        if (opts.trigger && i === 0) {
-          const ll0 = this._segLength[0];
-          const rr0 = this._segRadius[0];
-          const tp = new THREE.Vector3().fromArray(opts.trigger); // build time only
-          let best = [0.55, 0.72, 0.34];
-          let bestD = Infinity;
-          for (let km = 0; km <= 30; km++) {
-            const m = -0.2 + (km / 30) * 1.4;
-            f.joints[0].rotation.x = -m;
-            for (let k = 0; k <= 30; k++) {
-              const a = (k / 30) * 1.6;
-              f.joints[1].rotation.x = -a;
-              f.joints[2].rotation.x = -a * 0.6;
-              f.joints[2].updateWorldMatrix(true, false);
-              _fitP.set(0, -rr0[3] * 1.05, -ll0[2] * 0.5).applyMatrix4(f.joints[2].matrixWorld).applyMatrix4(_fitInv);
-              const d = _fitP.distanceTo(tp) + Math.abs(m - a * 0.6) * 0.002;
-              if (d < bestD) {
-                bestD = d;
-                best = [m, a, a * 0.6];
-              }
+      const rr = this._segRadius[i];
+      const ll = this._segLength[i];
+      if (skip.includes(i) && o.trigger) {
+        // Trigger finger: distal pad onto the trigger face, nothing buried.
+        const tp = new THREE.Vector3().fromArray(o.trigger);
+        let best = [0.4, 0.8, 0.45];
+        let bestD = Infinity;
+        for (let km = 0; km <= 28; km++) {
+          const m = -0.25 + (km / 28) * 1.5;
+          f.joints[0].rotation.x = -m;
+          for (let k = 0; k <= 28; k++) {
+            const a = 0.05 + (k / 28) * 1.6;
+            f.joints[1].rotation.x = -a;
+            f.joints[2].rotation.x = -a * 0.62;
+            gapAt(f.joints[2], 0, -rr[3] * 0.95, -ll[2] * 0.55, _hp);
+            const d = _hp.distanceTo(tp) + Math.abs(m - a * 0.55) * 0.003;
+            if (d < bestD) {
+              bestD = d;
+              best = [m, a, a * 0.62];
             }
           }
-          triggerRest = best;
-          for (let j = 0; j < 3; j++) f.joints[j].rotation.x = -best[j];
-          fingers.push(best.slice());
-        } else {
-          fingers.push(curl);
         }
+        triggerRest = best;
+        for (let j = 0; j < 3; j++) f.joints[j].rotation.x = -best[j];
+        fingers.push(best.slice());
         continue;
       }
-      const rr = this._segRadius?.[i] ?? [0.01, 0.0094, 0.0084, 0.006];
-      const ll = this._segLength?.[i] ?? [0.046, 0.029, 0.022];
-      /**
-       * Wrap search. A finger closes on a tube with the PIP and DIP coupled
-       * (DIP ~0.7 x PIP) and the MCP free, so scan those two parameters and
-       * score the whole chain: every sample along the finger wants to
-       * be one local radius off the surface, burying is punished hard, and the
-       * fingertip pad counts double. Fitting the joints one at a time instead
-       * converges on kinked, anatomically impossible curls.
-       */
-      const local = [0, -rr[3] * 1.05, -ll[2] * 0.5];
-      let bestM = 0;
-      let bestA = 0;
-      let bestC = Infinity;
-      const N = 36;
-      for (let km = 0; km <= N; km++) {
-        const m = (km / N) * 1.5;
-        f.joints[0].rotation.x = -m;
-        for (let k = 0; k <= N; k++) {
-          const a = (k / N) * 1.6;
-          f.joints[1].rotation.x = -a;
-          f.joints[2].rotation.x = -a * 0.7;
-          let cost = 0;
-          for (let j = 0; j < 3; j++) {
-            for (const u of [0.5, 1]) {
-              const g = gapAt(f.joints[j], 0, 0, -ll[j] * u) - rr[j + (u === 1 ? 1 : 0)] * 0.95;
-              cost += g < 0 ? -g * 12 : g * (j === 0 ? 0.4 : 1);
-            }
-          }
-          const gt = gapAt(f.joints[2], local[0], local[1], local[2]);
-          cost += gt < -0.001 ? (-gt - 0.001) * 12 : Math.abs(gt) * 2;
-          // mild preference for a relaxed, even curl
-          cost += Math.abs(m - a * 0.8) * 0.002;
-          if (cost < bestC) {
-            bestC = cost;
-            bestM = m;
-            bestA = a;
-          }
-        }
-      }
-      const R = [bestM, bestA, bestA * 0.7];
+      const curl = [0, 0, 0];
+      for (let j = 0; j < 3; j++) f.joints[j].rotation.x = 0;
       for (let j = 0; j < 3; j++) {
-        curl[j] = R[j];
-        f.joints[j].rotation.x = -curl[j];
+        let a = closeJoint(f.joints[j], ll[j], rr[j], rr[j + 1], LIM[j][0], LIM[j][1]);
+        // Never touched (finger hangs past the end of the part): a relaxed curl.
+        if (a < 0) a = relax[j] * (1 + i * 0.12);
+        // DIP is mechanically coupled to the PIP in a real finger.
+        if (j === 2) a = Math.min(a, curl[1] * 0.92 + 0.12);
+        curl[j] = a;
+        f.joints[j].rotation.x = -a;
       }
       fingers.push(curl);
       const p = new THREE.Vector3();
-      gapAt(f.joints[2], local[0], local[1], local[2], p);
+      gapAt(f.joints[2], 0, -rr[3], -ll[2] * 0.5, p);
       contacts.push(p);
+      const p2 = new THREE.Vector3();
+      gapAt(f.joints[1], 0, -rr[2], -ll[1] * 0.5, p2);
+      contacts.push(p2);
     }
 
-    /**
-     * ---- thumb: over the top and down the FAR side --------------------------
-     *
-     * THE THUMB BASE IS SOLVED TOO, and it has to be.
-     *
-     * MEASURED on the shipped build by walking the real transform chain: the four
-     * fingertips landed 0.4-0.7 mm off the handguard — a genuine grip — and the
-     * THUMB TIP was 13.5 mm clear of it. The thumb is the part of the support hand
-     * that lies across the top of the handguard and therefore the part the camera
-     * sees most of in the hipfire pose, so that 13.5 mm was most of "fingers do not
-     * wrap the grip, they float beside it with a visible gap".
-     *
-     * The cause is that the two flexion joints were being fitted against a base
-     * rotation that was AUTHORED, not solved. The thumb's carpometacarpal joint is
-     * a saddle with two useful degrees of freedom and the authored abduction was
-     * aimed for a different contact clock angle; with the metacarpal pointing past
-     * the tube, 68 mm of thumb flexing on two hinges cannot reach it, and the scan
-     * just parks both joints at their limits.
-     *
-     * So the base's Y (abduction — the axis that swings the thumb across the palm)
-     * is scanned first, coarsely, for the value that brings the tip closest, and
-     * only then are the two flexion joints fitted. One extra degree of freedom,
-     * 24 samples, build time only.
-     */
-    const thumbBase = (base.thumbBase ?? [0, 0, 0]).slice();
-    const thumb = (base.thumb ?? [0.3, 0.24]).slice();
-    this.thumb.root.rotation.fromArray(thumbBase);
-    this.thumb.joints[0].rotation.x = -thumb[0];
-    this.thumb.joints[1].rotation.x = -thumb[1];
-    const tr = THUMB.r2 * this.scale;
-    const tlen = THUMB.l1 * this.scale;
-    const tLocal = [0, -tr * 1.05, -tlen * 0.55];
-    {
-      // Mid-flex the two hinges while the base is searched, so the scan measures
-      // where a naturally curled thumb would land rather than where a straight
-      // one would.
-      this.thumb.joints[0].rotation.x = -0.55;
-      this.thumb.joints[1].rotation.x = -0.45;
-      const y0 = thumbBase[1];
-      const z0 = thumbBase[2];
-      let bestY = y0;
-      let bestZ = z0;
-      let bestCost = Infinity;
-      // Two axes, not one. MEASURED: scanning abduction alone still left the tip
-      // 13.2 mm clear, because from a metacarpal root sitting 40-55 mm off a 54 mm
-      // tube a 68 mm thumb only reaches if it is aimed at the surface in BOTH the
-      // across-the-palm and the up-off-the-palm sense. 21 x 15 samples, build time.
-      for (let i = 0; i <= 20; i++) {
-        const yy = y0 - 1.3 + (2.6 * i) / 20;
-        for (let k = 0; k <= 14; k++) {
-          const zz = z0 - 0.9 + (1.8 * k) / 14;
-          this.thumb.root.rotation.y = yy;
-          this.thumb.root.rotation.z = zz;
-          const g = gapAt(this.thumb.joints[1], tLocal[0], tLocal[1], tLocal[2], _hp);
-          // The cylinder is infinite; the part is not. `axialMin` keeps the thumb
-          // on the grip itself rather than over whatever sits above its axis.
-          const ax = _hp.sub(ax0).dot(_fitAxis);
-          // Prefer just-touching; punish burying much harder than standing off, and
-          // add a small pull toward the authored pose so the solve stays plausible.
-          const cost =
-            Math.abs(g - clearance) +
-            (g < -0.002 ? (-g - 0.002) * 10 : 0) +
-            (opts.axialMin != null && ax < opts.axialMin ? (opts.axialMin - ax) * 10 : 0) +
-            (Math.abs(yy - y0) + Math.abs(zz - z0)) * 0.0009;
-          if (cost < bestCost) {
-            bestCost = cost;
-            bestY = yy;
-            bestZ = zz;
-          }
+    // ---- thumb ---------------------------------------------------------------
+    const tb = (o.thumbBase ?? [0.2, -0.95, -0.5]).slice();
+    const scan = (o.thumbScan ?? [0.9, 0.7, 0.8]).slice();
+    if (scan[2] === undefined) scan[2] = 0.8;
+    const tl0 = THUMB.l0 * s;
+    const tl1 = THUMB.l1 * s;
+    const tr0 = THUMB.r0 * s;
+    const tr1 = THUMB.r1 * s;
+    const tr2 = THUMB.r2 * s;
+    let bestCost = Infinity;
+    let bestB = tb.slice();
+    let bestJ = [0.3, 0.3];
+    const tjs = this.thumb.joints;
+    const thumbSide = o.thumbSide ? new THREE.Vector3().fromArray(o.thumbSide).normalize() : null;
+    const thumbDir = o.thumbDir ? new THREE.Vector3().fromArray(o.thumbDir).normalize() : null;
+    // Three axes: x tilts the thumb toward the palm side (the one that lets it
+    // OPPOSE the fingers), y swings it across the palm, z rolls it.
+    for (let ix = 0; ix <= 6; ix++) {
+      for (let iy = 0; iy <= 10; iy++) {
+       for (let iz = 0; iz <= 6; iz++) {
+        const bx = tb[0] - scan[2] + (2 * scan[2] * ix) / 6;
+        const by = tb[1] - scan[0] + (2 * scan[0] * iy) / 10;
+        const bz = tb[2] - scan[1] + (2 * scan[1] * iz) / 6;
+        this.thumb.root.rotation.set(bx, by, bz);
+        tjs[0].rotation.x = 0;
+        tjs[1].rotation.x = 0;
+        let a0 = closeJoint(tjs[0], tl0, tr0, tr1, -0.2, 1.1);
+        if (a0 < 0) a0 = 0.35;
+        tjs[0].rotation.x = -a0;
+        let a1 = closeJoint(tjs[1], tl1, tr1, tr2, 0.0, 1.2);
+        if (a1 < 0) a1 = 0.4;
+        tjs[1].rotation.x = -a1;
+        // Score: the pad of the distal segment ON the surface, the proximal
+        // segment close to it, and not wildly off the authored base.
+        const gTip = gapAt(tjs[1], 0, -tr2, -tl1 * 0.55, _hp);
+        const gMid = gapAt(tjs[0], 0, -tr1, -tl0 * 0.7);
+        // Which side of the part the thumb should end up on (opposite the
+        // fingers): a thumb pad pressed onto the same face the fingers hold is
+        // a mitten, not a grip.
+        let side = 0;
+        // Measured in the cross-section: where along the axis the tip lands is
+        // irrelevant to which side of the part it is on.
+        if (thumbSide) {
+          _hp.sub(A);
+          _hp.addScaledVector(D, -_hp.dot(D));
+          side = Math.max(0, 0.02 - _hp.dot(thumbSide)) * 2;
         }
+        // Which way the thumb points: a thumb laid back along the part toward
+        // the wrist is hyper-abducted, and reads as a hitch-hiker's thumb.
+        let dirCost = 0;
+        if (thumbDir) {
+          gapAt(tjs[1], 0, 0, -tl1, _t);
+          gapAt(this.thumb.root, 0, 0, 0, _dir);
+          _t.sub(_dir).normalize();
+          dirCost = Math.max(0, 0.7 - _t.dot(thumbDir)) * 0.012;
+        }
+        const cost =
+          Math.abs(gTip) +
+          dirCost +
+          Math.max(0, gMid - 0.004) * 0.6 +
+          (gTip < -tr2 ? 1 : 0) +
+          side +
+          (Math.abs(bx - tb[0]) + Math.abs(by - tb[1]) + Math.abs(bz - tb[2])) * 0.004;
+        if (globalThis.__DBG_THUMB && ix % 2 === 0 && iy % 2 === 0 && iz % 2 === 0) console.log('T', bx.toFixed(2), by.toFixed(2), bz.toFixed(2), 'gTip', gTip.toFixed(4), 'gMid', gMid.toFixed(4), 'side', side.toFixed(3), 'cost', cost.toFixed(4));
+        if (cost < bestCost) {
+          bestCost = cost;
+          bestB = [bx, by, bz];
+          bestJ = [a0, a1];
+        }
+       }
       }
-      this.thumb.root.rotation.y = bestY;
-      this.thumb.root.rotation.z = bestZ;
-      thumbBase[1] = bestY;
-      thumbBase[2] = bestZ;
     }
-    const a0 = fitJoint(
-      this.thumb.joints[0],
-      [0, 0, -THUMB.l0 * this.scale],
-      -1.45,
-      -0.02,
-      THUMB.r1 * this.scale
-    );
-    thumb[0] = -a0;
-    const a1 = fitJoint(this.thumb.joints[1], tLocal, -1.6, -0.05, 0);
-    thumb[1] = -a1;
+    this.thumb.root.rotation.fromArray(bestB);
+    tjs[0].rotation.x = -bestJ[0];
+    tjs[1].rotation.x = -bestJ[1];
     const tp = new THREE.Vector3();
-    gapAt(this.thumb.joints[1], tLocal[0], tLocal[1], tLocal[2], tp);
+    gapAt(tjs[1], 0, -tr2, -tl1 * 0.5, tp);
     contacts.push(tp);
 
-    this.poses[poseName] = { fingers, thumb, thumbBase, triggerRest };
+    const poseName = o.poseName ?? 'grasp';
+    this.poses[poseName] = { fingers, thumb: bestJ.slice(), thumbBase: bestB, triggerRest };
     this.pose = poseName;
-    return contacts;
+    return {
+      pos,
+      quat,
+      finger: fingerDir.toArray(),
+      back: hy.toArray(),
+      contacts,
+    };
   }
 
   /**

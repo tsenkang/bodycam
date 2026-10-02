@@ -252,6 +252,7 @@ export class SkySystem {
       // Driven off the beam luminance every time the sun moves — see skRolloff.
       uSkyRolloff: { value: new THREE.Vector2(0.30, 1.5) },
       uSkyGain: { value: 1 },
+      uNight: { value: 0 },
 
       uStarParams: { value: new THREE.Vector4(0, 0.5, 0, 0) },
       uCelestial: { value: new THREE.Matrix3() },
@@ -527,7 +528,7 @@ export class SkySystem {
   _applyFog() {
     const f = this._fog;
     this.shared.uFog.value.set(f.scatter, 1 / f.heightScale, f.baseY, f.maxDistance);
-    this.shared.uFog2.value.set(f.extinction, f.shaftGain, f.ambientGain, f.noise);
+    this.shared.uFog2.value.set(f.extinction, f.shaftGain * (this._shaftBoost ?? 1), f.ambientGain, f.noise);
     this.shared.uFogExt.value.copy(f.extinctionTint).multiplyScalar(f.extinction);
     this.shared.uPhase.value.set(
       f.phaseForward,
@@ -665,11 +666,12 @@ export class SkySystem {
     s.uMoonIrradiance.value.set(moonIrr * cool[0], moonIrr * cool[1], moonIrr * cool[2]);
 
     // Day: a pale disc a little above the daytime sky, which is what the moon
-    // actually looks like at 16:30. Night: far enough above the night sky to
-    // clip to white and bloom, the way every photograph of a moon does.
-    // Both numbers are *ratios to the sky the LUT produces*, so they moved with
-    // the pi correction in atmosphere.js rather than being retuned by eye.
-    const moonDisc = THREE.MathUtils.lerp(0.35, 3.5, nightRamp);
+    // actually looks like at 16:30. Night: NOT clipped. At 3.5 it sat ~6 stops
+    // over the night exposure (EV100 floor -4.3, x16) and read as a flat white
+    // blob (round-0 critic). 0.11 lands it just under display white at that
+    // exposure, so the maria in skMoonDisc stay legible; the corona and glow
+    // around it come from the halo term in dome.js instead of from clipping.
+    const moonDisc = THREE.MathUtils.lerp(0.35, 0.11, nightRamp);
     s.uMoonDiscRadiance.value.set(moonDisc, moonDisc * 0.985, moonDisc * 0.95);
 
     // ---- ambient colour (published, not used for lighting) -----------------
@@ -692,7 +694,11 @@ export class SkySystem {
     // colour. At a full swing every shadow in the 19:12 frame took the sun's
     // own orange (street 63/28/7, B-R -55) and the frame read as one sepia
     // wash; warm light / cool shadow is the separation golden hour is for.
-    const warm = 0.4 * (1 - THREE.MathUtils.smoothstep(altDeg, 1, 22)) * beamAlive;
+    // 0.4 -> 0.2: still too much. With the IBL and the fog both carrying the
+    // horizon's amber, a 0.4 swing left the 19:12 frame one sepia wash (r0
+    // critic). The shade side of a golden-hour street is lit by the blue
+    // overhead; the warmth belongs to the beam.
+    const warm = 0.2 * (1 - THREE.MathUtils.smoothstep(altDeg, 1, 22)) * beamAlive;
     const night = 1 - beamAlive;
     const nh = NIGHT_AMBIENT_HUE;
     const ar = THREE.MathUtils.lerp(
@@ -761,7 +767,8 @@ export class SkySystem {
     this.exposureBias =
       // 1.35 -> 0.8: at 1.35 the street crushed to brown-black (critic: "no
       // readable detail at 5-8%"); the sky roll-off now carries the gradient.
-      0.8 * (1 - THREE.MathUtils.smoothstep(altDeg, 1.0, 13.0)) * beamAlive +
+      // 0.8 -> 0.45: the street was still crushed to brown-black at 0.8.
+      0.45 * (1 - THREE.MathUtils.smoothstep(altDeg, 1.0, 13.0)) * beamAlive +
       // ...and half a stop after dark. The meter is (correctly) weighted onto
       // the geometry, and once the only key is a moon plus twenty-two sodium
       // lamps it opens up until a midnight street reads as an overcast evening.
@@ -780,6 +787,13 @@ export class SkySystem {
       beamAlive
     );
 
+    // ---- shafts at golden hour --------------------------------------------
+    // A low sun is a long, nearly horizontal path through the street's haze and
+    // it is the one time of day shafts are the subject of the frame. The fog's
+    // key gain rises toward the horizon (x2.1 at 3 degrees, x1 above 20).
+    this._shaftBoost = 1 + 1.1 * (1 - THREE.MathUtils.smoothstep(altDeg, 3.0, 20.0)) * beamAlive;
+    this.shared.uFog2.value.y = this._fog.shaftGain * this._shaftBoost;
+
     // ---- stars -------------------------------------------------------------
     // Calibrated against the moonlit sky the LUT actually produces: the
     // brightest first-magnitude stars sit about two stops above the zenith
@@ -792,6 +806,7 @@ export class SkySystem {
     // points in it is what makes a night sky read as deep rather than grey.
     const skyGain = THREE.MathUtils.lerp(1, 0.38, nightRamp);
     s.uSkyGain.value = skyGain;
+    s.uNight.value = nightRamp;
     s.uStarParams.value.x = (0.07 * nightRamp) / Math.sqrt(skyGain);
     s.uStarParams.value.y = 0.55;
     s.uStarParams.value.w = 0.16 * nightRamp;

@@ -22,7 +22,7 @@ import { csmShaderChunk } from './csm.js';
  * patched material means a single write per frame updates all of them.
  */
 
-const PATCH_VERSION = 9;
+const PATCH_VERSION = 10;
 
 /** Max coarse interior volumes the indirect gate can hold (see OW_ROOMS). */
 export const MAX_ROOMS = 10;
@@ -65,6 +65,12 @@ export class MaterialPatcher {
       // Coarse interior volumes in level space: (cx, cz, hx, hz) / (y0, y1,,).
       owRooms: { value: makeVec4Array(MAX_ROOMS) },
       owRoomsY: { value: makeVec4Array(MAX_ROOMS) },
+      // Viewmodel irradiance floor (see RenderSystem._updateViewRig): rgb is an
+      // irradiance in units of 1/exposure, w = 1 only while the viewmodel pass
+      // draws. Read against the live exposure so it means "never darker than
+      // N stops under mid-grey", whatever the scene's absolute level is.
+      owViewFloor: { value: new THREE.Vector4(0, 0, 0, 0) },
+      owExposureTex: { value: null },
     };
 
     this.chunk = csmShaderChunk(opts.cascades, opts.quality);
@@ -190,9 +196,31 @@ export class MaterialPatcher {
           // metered the same as the sunlit exterior framed in its own doorway.
           irradiance += owGroundFill *
             ( owSunBounce( owWN ) * owFillGain.y * owFillAo * owIndoor );
+
+          // --- viewmodel floor -------------------------------------------------
+          // Exposure-relative minimum for the weapon and hands only. Indoors and
+          // after dark the world model has no GI to light a held object with, and
+          // a near-black gun on a correctly exposed frame is the one thing every
+          // shipping shooter refuses to show. Shaped by the normal so the floor
+          // still has a top and a bottom instead of reading as an unlit flat.
+          if ( owViewFloor.w > 0.5 ) {
+            float owE = max( texture2D( owExposureTex, vec2( 0.5 ) ).r, 1e-3 );
+            vec3 owFloor = owViewFloor.rgb / owE * ( 0.72 + 0.28 * owUp );
+            irradiance = max( irradiance, owFloor - iblIrradiance );
+          }
         }
         #endif
         #if defined( STANDARD ) && defined( RE_IndirectSpecular ) && defined( USE_ENVMAP )
+        // The PMREM is a SKY probe: no buildings, no street, no room. On a
+        // world surface SSR and AO correct for that; the weapon gets neither,
+        // so every glancing face of a black rifle mirrored pure Rayleigh blue
+        // and the gun read as blue plastic. A real local probe around a
+        // shooter is mostly walls and ground — far less chromatic — so the
+        // viewmodel's reflection keeps the sky's LEVEL and loses most of its hue.
+        if ( owViewFloor.w > 0.5 ) {
+          float owRl = dot( radiance, vec3( 0.2126, 0.7152, 0.0722 ) );
+          radiance = mix( vec3( owRl ) * vec3( 1.02, 1.0, 0.97 ), radiance, 0.3 );
+        }
         if ( owFeat.z > 0.5 && material.roughness < 0.62 ) {
           vec4 owSsr = texture2D( owSsrTex, gl_FragCoord.xy * owScreenTexel );
           float owW = owSsr.a * smoothstep( 0.62, 0.14, material.roughness );
@@ -243,6 +271,8 @@ uniform vec4 owIndirect;
 uniform vec4 owRoomXf;
 uniform vec4 owRooms[ OW_ROOMS ];
 uniform vec4 owRoomsY[ OW_ROOMS ];
+uniform vec4 owViewFloor;
+uniform sampler2D owExposureTex;
 
 /**
  * 1 outdoors, -> owIndirect.y deep inside a coarse interior volume.

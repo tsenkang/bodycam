@@ -216,6 +216,29 @@ if (VIEW === 'board') {
     camera.lookAt(-3.2, 1.15, 0.35);
   }
   camera.updateProjectionMatrix();
+} else if (VIEW === 'facade' || VIEW === 'facade_close') {
+  // A long rendered street wall over a concrete plinth, sun raking across it:
+  // judges the render-damage layer (cracks, spalls), runoff and base grime at
+  // street distance and at 0.5 m.
+  groundPlane('sand', 60);
+  const M = { vertexMasks: true, tint: 0xcfc0a4, scale: 2.35, weather: [0.4, 0.5, 1.4, 0.55] };
+  const wall = new THREE.BoxGeometry(0.4, 7, 16, 2, 14, 32);
+  materials.bakeMasks(wall, { wear: 1, grime: 1 });
+  mesh(wall, materials.get('plaster', M), [-2, 3.5 + 0.42, 0]);
+  const plinth = new THREE.BoxGeometry(0.54, 0.42, 16.2, 2, 2, 32);
+  materials.bakeMasks(plinth, { wear: 1, grime: 1 });
+  mesh(plinth, materials.get('concrete', { vertexMasks: true, tint: 0xa9a49a, scale: 2.5 }), [-2, 0.21, 0]);
+  sun.position.set(14, 9, -6);
+  if (VIEW === 'facade') {
+    camera.fov = 60;
+    camera.position.set(4.5, 1.7, 6.5);
+    camera.lookAt(-2, 1.6, -1.5);
+  } else {
+    camera.fov = 50;
+    camera.position.set(-1.2, 1.2, 0.3);
+    camera.lookAt(-2, 1.0, -0.1);
+  }
+  camera.updateProjectionMatrix();
 } else if (VIEW === 'interior' || VIEW === 'interior_close') {
   // A room corner: two painted walls, a concrete floor and ceiling, a doorway,
   // lit by one warm bulb and the daylight through the door.

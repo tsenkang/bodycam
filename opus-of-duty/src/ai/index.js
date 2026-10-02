@@ -1002,6 +1002,7 @@ export class AiSystem {
         const lateral = ex * rx + ez * rz;
         const ndc = lateral / (depth * tanH);
         // must be visible: chest and head
+        let blocked = 0;
         if (this.phys) {
           chest.set(x, fy + 1.25, z);
           if (!this.phys.lineOfSight(cam.position, chest, this.phys.MASK.SIGHT)) continue;
@@ -1010,12 +1011,11 @@ export class AiSystem {
           // and both shoulders and the hips: a pole or post in line with the
           // body's centre used to pass the two centre rays and still split
           // the man in half on screen
-          let clear = true;
+          blocked = 0;
           for (const [s, h] of [[-0.28, 1.35], [0.28, 1.35], [0, 0.95], [-0.2, 0.95], [0.2, 0.95]]) {
             chest.set(x + rx * s, fy + h, z + rz * s);
-            if (!this.phys.lineOfSight(cam.position, chest, this.phys.MASK.SIGHT)) { clear = false; break; }
+            if (!this.phys.lineOfSight(cam.position, chest, this.phys.MASK.SIGHT)) blocked++;
           }
-          if (!clear) continue;
         }
         let score = Math.abs(ndc - ndcX) * 9 + Math.abs(depth - wantDepth) * 0.5;
         // the viewmodel owns the lower right of the frame: a man whose body
@@ -1028,6 +1028,7 @@ export class AiSystem {
           const behindGun = lowX > -0.08 && lowY < 0.05;
           const headBehindGun = pj.x > 0.12 && pj.y < 0.25;
           if (behindGun || headBehindGun) score += 40;
+          score += blocked * 6;
           if (Math.abs(pj.x) > 0.92) score += 40;
         }
         // prefer standing next to something solid

@@ -221,9 +221,9 @@ const CSS = `
 .ow-ammo-wpn { display:flex; flex-direction:column; align-items:center; gap: calc(4px * var(--k)); }
 .ow-ammo-wpn svg { width: calc(118px * var(--k)); height: calc(39px * var(--k)); display:block;
   filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
-.ow-ammo-name { font-size: calc(15px * var(--k)); font-weight:400; letter-spacing:.04em;
+.ow-ammo-name { font-size: calc(18px * var(--k)); font-weight:600; letter-spacing:.04em;
   color: rgba(236,240,242,.86); text-shadow: var(--sh); white-space:nowrap; text-transform:uppercase; }
-.ow-ammo-mode { font-size: calc(17px * var(--k)); font-weight:400; color: rgba(236,240,242,.9); text-shadow: var(--sh); }
+.ow-ammo-mode { font-size: calc(18px * var(--k)); font-weight:600; color: rgba(236,240,242,.9); text-shadow: var(--sh); }
 .ow-ammo-nums { display:flex; flex-direction:column; align-items:center; min-width: calc(62px * var(--k)); }
 .ow-ammo-cur {
   font-family: var(--fd);
@@ -263,7 +263,7 @@ const CSS = `
 .ow-kf-row {
   position:relative;
   display:flex; align-items:center; gap: calc(9px * var(--k));
-  font-size: calc(17px * var(--k)); font-weight:400; letter-spacing:0;
+  font-size: calc(19px * var(--k)); font-weight:600; letter-spacing:.01em;
   padding: calc(3px * var(--k)) calc(30px * var(--k)) calc(3px * var(--k)) calc(8px * var(--k));
   background: linear-gradient(to right, rgba(8,11,14,.42) 0%, rgba(8,11,14,.3) 60%, rgba(8,11,14,0) 100%);
   text-shadow: 0 1px 1px rgba(0,0,0,.55);

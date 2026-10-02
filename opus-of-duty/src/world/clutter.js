@@ -42,7 +42,7 @@ const _m = new THREE.Matrix4();
  */
 function binBag(rng, s = 0.5) {
   // welded, so the film shades smooth between its creases instead of faceted
-  const ico = new THREE.IcosahedronGeometry(0.5, 3);
+  const ico = new THREE.IcosahedronGeometry(0.5, 2);
   ico.deleteAttribute('normal');
   ico.deleteAttribute('uv');
   const g = mergeVertices(ico, 1e-4);

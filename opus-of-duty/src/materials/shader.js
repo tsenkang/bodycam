@@ -937,13 +937,16 @@ const MAIN_FRAGMENT = /* glsl */ `
     // but nothing at the scale of a fold, so the shading normal is tilted by the
     // gradient of the macro band — the cloth then catches the sun in ridges.
     if ( owClothP.z > 0.0 ) {
-      vec2 fUv = vec2( vOwWPos.x + vOwWPos.z * 0.63, vOwWPos.y * 0.7 + vOwWPos.z * 0.4 ) * 3.4;
+      // 0.5 maps the macro tile over 2 m, so its mid band lands at 10-15 cm.
+      // At 3.4 the "fold" field was 2 cm blotches with a x9 normal tilt: the
+      // felt / 90s-carpet noise every critic called out on the canopies.
+      vec2 fUv = vec2( vOwWPos.x + vOwWPos.z * 0.63, vOwWPos.y * 0.7 + vOwWPos.z * 0.4 ) * 0.5;
       float f0 = texture2D( owMacroTex, fUv ).b;
       float fx = texture2D( owMacroTex, fUv + vec2( 0.05, 0.0 ) ).b;
       float fy = texture2D( owMacroTex, fUv + vec2( 0.0, 0.05 ) ).b;
-      vec3 tiltC = vec3( -( fx - f0 ), -( fy - f0 ), 0.0 ) * owClothP.z * 9.0;
+      vec3 tiltC = vec3( -( fx - f0 ), -( fy - f0 ), 0.0 ) * owClothP.z * 6.0;
       nShade = normalize( nShade + vec3( tiltC.x, tiltC.y, 0.0 ) );
-      alb.rgb *= 1.0 - ( f0 - 0.5 ) * owClothP.z * 0.9;
+      alb.rgb *= 1.0 - ( f0 - 0.5 ) * owClothP.z * 0.7;
     }
   #endif
 

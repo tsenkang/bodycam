@@ -131,6 +131,8 @@ export const GRIPS = {
 };
 
 const FINGERS = ['Index', 'Mid', 'Ring', 'Pinky'];
+const SIDES = ['R', 'L'];
+const TRUNK = ['Spine', 'Spine1', 'Spine2', 'Neck'];
 
 /** Arm segment lengthening, see SoldierSkin. */
 const ARM_STRETCH = 1.07;
@@ -634,7 +636,7 @@ export class SoldierSkin {
     hb.parent.updateWorldMatrix(true, false);
 
     // ---- leg targets: the model's ankle where the procedural ankle anchor is
-    for (const k of ['R', 'L']) {
+    for (const k of SIDES) {
       const L = this.legs[k];
       L.target.copy(L.endLocal).applyMatrix4(L.pE.matrixWorld);
     }
@@ -649,7 +651,7 @@ export class SoldierSkin {
     if (this.pelvis) this._refresh(this.pelvis);
     // a leg that cannot reach its ankle pulls the hips straight down
     let drop = 0;
-    for (const k of ['R', 'L']) {
+    for (const k of SIDES) {
       const L = this.legs[k];
       this._refresh(L.upper);
       const th = _v.setFromMatrixPosition(L.upper.matrixWorld);
@@ -672,7 +674,7 @@ export class SoldierSkin {
 
     // ---- trunk, head, clavicles: rotation copy
     const p = this.pair;
-    for (const name of ['Spine', 'Spine1', 'Spine2', 'Neck']) {
+    for (const name of TRUNK) {
       const pr = p[name];
       this._setWorldQuat(pr.bone, worldQuat(pr.proc, _q2).multiply(pr.offset));
     }
@@ -680,7 +682,7 @@ export class SoldierSkin {
     this._setWorldQuat(p.Head.bone, worldQuat(p.Head.proc, _q2).multiply(p.Head.offset));
 
     // ---- legs
-    for (const k of ['R', 'L']) {
+    for (const k of SIDES) {
       const L = this.legs[k];
       this._limb(L, L.target, this._pole(L, L.pole));
       this._setWorldQuat(L.footPair.bone, worldQuat(L.footPair.proc, _q2).multiply(L.footPair.offset));
@@ -688,7 +690,7 @@ export class SoldierSkin {
     }
 
     // ---- arms
-    for (const k of ['R', 'L']) this._arm(k);
+    for (const k of SIDES) this._arm(k);
   }
 
   _arm(k) {

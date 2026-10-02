@@ -770,8 +770,8 @@ export class SkySystem {
     this.exposureBias =
       // 1.35 -> 0.8: at 1.35 the street crushed to brown-black (critic: "no
       // readable detail at 5-8%"); the sky roll-off now carries the gradient.
-      // 0.8 -> 0.45: the street was still crushed to brown-black at 0.8.
-      0.45 * (1 - THREE.MathUtils.smoothstep(altDeg, 1.0, 13.0)) * beamAlive +
+      // 0.8 -> 0.1: at 0.45 the iter3 shade side still measured L9-15.
+      0.1 * (1 - THREE.MathUtils.smoothstep(altDeg, 1.0, 13.0)) * beamAlive +
       // ...and half a stop after dark. The meter is (correctly) weighted onto
       // the geometry, and once the only key is a moon plus twenty-two sodium
       // lamps it opens up until a midnight street reads as an overcast evening.
@@ -789,7 +789,7 @@ export class SkySystem {
     // at the daylight value.
     this.indirectScale = THREE.MathUtils.lerp(
       2.2,
-      THREE.MathUtils.lerp(0.45, 1.0, THREE.MathUtils.smoothstep(altDeg, 0.0, 14.0)),
+      THREE.MathUtils.lerp(0.75, 1.0, THREE.MathUtils.smoothstep(altDeg, 0.0, 14.0)),
       beamAlive
     );
 

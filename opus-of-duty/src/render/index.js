@@ -446,7 +446,7 @@ export class RenderSystem {
       // (albedo 0.04) under it lands about 3 stops under mid-grey: dark, never
       // a hole. Daylight outdoors the world's own bands already beat it, so it
       // only binds indoors, after dark and in deep shade.
-      viewFloor: 2.0,
+      viewFloor: 3.2,
       // EV the meter opens up by when the CAMERA is inside an interior volume.
       // A centre-weighted meter looking out of a doorway exposes for the street
       // and leaves the room it is standing in as mush (r1 critic: the exterior

@@ -209,7 +209,10 @@ vec3 skSample( vec3 rayDir, int quality ) {
   // lunar halo ends up the same *fraction* of the moonlit sky as the solar
   // aureole is of the daylit sky — it scales with the night's exposure for free.
   col += skAureole( rayDir, uSunDir, uSunIrradiance, cosS );
-  col += skAureole( rayDir, uMoonDir, uMoonIrradiance, cosM );
+  // x0.3: the moon is a stylised 0.3-unit key (25x real), so its aerosol
+  // aureole washed half the night dome to dusk (r1/iter3 night). The halo
+  // term after the roll-off carries the moon's glow instead.
+  col += skAureole( rayDir, uMoonDir, uMoonIrradiance, cosM ) * mix( 1.0, 0.3, uNight );
 
   // ---- clouds -------------------------------------------------------------
   // The two decks sit at very different altitudes, so they see very different

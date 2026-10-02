@@ -1152,7 +1152,22 @@ export class FxSystem {
     rc.far = maxDist;
     const hits = (this._rcHits ??= []);
     hits.length = 0;
-    rc.intersectObjects(list, false, hits);
+    // Hung cloth is single-sided and often faces away from the camera, which
+    // the raycaster then skips: test both faces (dev path only, restored).
+    const sides = (this._rcSides ??= []);
+    sides.length = 0;
+    for (const o of list) {
+      const m = o.material;
+      if (m && !Array.isArray(m)) {
+        sides.push(m.side);
+        m.side = THREE.DoubleSide;
+      } else sides.push(-1);
+    }
+    try {
+      rc.intersectObjects(list, false, hits);
+    } finally {
+      for (let i = 0; i < list.length; i++) if (sides[i] !== -1) list[i].material.side = sides[i];
+    }
     return hits.length > 0;
   }
 

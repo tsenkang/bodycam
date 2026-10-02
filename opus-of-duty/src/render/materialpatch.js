@@ -271,9 +271,10 @@ const SPEC_AA = /* glsl */ `
   vec3 owNdx = dFdx( normal );
   vec3 owNdy = dFdy( normal );
   float owNVar = 0.25 * ( dot( owNdx, owNdx ) + dot( owNdy, owNdy ) );
-  // Capped low: at 0.18 the widened lobe turned the sun highlight on every
-  // up-facing face of a black rifle into a near-white sheet (iter2 weapon).
-  float owKern = min( owNVar, 0.045 );
+  // Measured: 0.045 vs 0.18 moved the sunlit receiver by 4%; the brightness
+  // there is the material's own specular. 0.11 is what the muzzle-flash point
+  // light needs to stop sparkling on the anodising grain.
+  float owKern = min( 1.5 * owNVar, 0.11 );
   float owA2 = pow( material.roughness, 4.0 );
   material.roughness = clamp( sqrt( sqrt( owA2 + owKern ) ), material.roughness, 1.0 );
 }

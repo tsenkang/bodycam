@@ -174,7 +174,7 @@ export const PALETTE = {
       // No edge wear on a road. The vertex wear mask exists to rub through the
       // arris of a prop; on a 100 m plane it just brightens every stone crown.
       wear: [0, 0.5, 0.45, 0],
-      macroBig: [1, 0, 0.03, 0.42],
+      macroBig: [1, 0, 0.03, 0.25],
       // oil drips and dried spills: the street is not one evenly dusty plane
       damage: [0, 0, 0.6, 0],
     },

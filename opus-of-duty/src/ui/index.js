@@ -442,6 +442,10 @@ export class UiSystem {
       this.hit.clear();
       this.markers.clear();
       this.clearPrompt();
+      // snap, do not fade: shots are applied back to back and the previous
+      // shot's prompt and kill banner were still ghosting into the next frame
+      this.prompt.shown = 0;
+      this.banner.t = 1;
       return { state: 'clean' };
     }
     if (name === 'menu') {
@@ -590,7 +594,9 @@ export class UiSystem {
     this.markers.updateDamage(dt, ctx.camera, this.vw, this.vh, this.k);
 
     // ---- minimap ---------------------------------------------------------
-    if (!this.minimap.bakeDone && ++this._bakeFrame > 6 && this._bakeFrame % 20 === 0) {
+    // First try on frame 2: the vector bake needs only world layout, and a
+    // lockstep capture that pumps ~9 frames per shot photographed an empty disc.
+    if (!this.minimap.bakeDone && (++this._bakeFrame === 2 || this._bakeFrame % 12 === 0)) {
       this.minimap.tryBake(ctx);
     }
     this._blipView.length = this._blipCount;

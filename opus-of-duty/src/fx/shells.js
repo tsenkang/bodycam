@@ -36,7 +36,7 @@ const VIEW_AGE = 0.45;
  * and reads as a popsicle stick (r1 critic). Shooters draw it smaller than
  * life; physics keeps the real dimensions.
  */
-const DRAW_SCALE = 0.6;
+const DRAW_SCALE = 0.5;
 const VIEW_RANGE = 1.5;
 
 function caseProfile() {
@@ -101,7 +101,7 @@ export class ShellSystem {
     // the same cut the weapon's metals do or it clips to a white stick.
     this.viewMaterial = mat.clone();
     this.viewMaterial.name = 'fx-brass-view';
-    this.viewMaterial.color.multiplyScalar(0.4);
+    this.viewMaterial.color.multiplyScalar(0.22);
     this.viewMesh = new THREE.InstancedMesh(geo, this.viewMaterial, CAPACITY);
     this.viewMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.viewMesh.frustumCulled = false;

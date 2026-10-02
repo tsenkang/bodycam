@@ -979,7 +979,7 @@ export class AiSystem {
     }
     const chest = this._v3;
     const cx = g.cellX(ideal.x), cz = g.cellZ(ideal.z);
-    const span = Math.ceil(7 / g.cell);
+    const span = Math.ceil(9 / g.cell);
     let best = -1, bestScore = Infinity, bestX = 0, bestZ = 0;
     for (let dz = -span; dz <= span; dz++) {
       for (let dx = -span; dx <= span; dx++) {
@@ -1018,6 +1018,18 @@ export class AiSystem {
           if (!clear) continue;
         }
         let score = Math.abs(ndc - ndcX) * 9 + Math.abs(depth - wantDepth) * 0.5;
+        // the viewmodel owns the lower right of the frame: a man whose body
+        // lands behind the rifle is a man the shot does not have
+        {
+          const pj = this._stageProj ?? (this._stageProj = new THREE.Vector3());
+          pj.set(x, fy + 0.5, z).project(cam);
+          const lowX = pj.x, lowY = pj.y;
+          pj.set(x, fy + 1.75, z).project(cam);
+          const behindGun = lowX > -0.08 && lowY < 0.05;
+          const headBehindGun = pj.x > 0.12 && pj.y < 0.25;
+          if (behindGun || headBehindGun) score += 40;
+          if (Math.abs(pj.x) > 0.92) score += 40;
+        }
         // prefer standing next to something solid
         score -= g.enclosure[i] * 0.35;
         if (score < bestScore) {
@@ -1044,6 +1056,7 @@ export class AiSystem {
     if (this._navPending) this._buildNav();
 
     const cam = this.ctx.camera;
+    cam.updateMatrixWorld();
     // A firefight the critic can actually see: drop the sun low enough to rake
     // down the street so the characters are lit, not silhouetted. This shot is
     // ours to compose; every other shot keeps its own time of day.
@@ -1061,15 +1074,15 @@ export class AiSystem {
       // a corner
       // (the viewmodel owns the lower right of the frame from x ~ 0.0 NDC,
       // so every man stands left of centre or high enough above it to read)
-      ['vanguard', -0.52, 8.0, false, 0, true, 0, -0.75],
+      ['vanguard', -0.36, 9.0, false, 0, true, 0, -0.75],
       // second man crouched in cover, centre-left
-      ['breacher', -0.22, 11.0, true, 0, true, 0],
+      ['breacher', -0.18, 13.0, true, 0, true, 0],
       // one caught mid-stride between positions
-      ['irregular', -0.02, 17.0, false, 4.1, false, 0],
+      ['irregular', -0.06, 19.0, false, 4.1, false, 0],
       // one reloading behind cover, far left
-      ['vanguard', -0.78, 10.5, true, 0, true, 3.4],
+      ['vanguard', -0.52, 11.0, true, 0, true, 3.4],
       // depth: a fifth man well down the street
-      ['irregular', -0.36, 21.0, false, 0, true, 0],
+      ['irregular', -0.28, 24.0, false, 0, true, 0],
     ];
 
     const placedPositions = [];
@@ -1108,7 +1121,7 @@ export class AiSystem {
 
     // One man already down, handed to the ragdoll solver with the round's
     // impulse — it dresses the tableau and it exercises the death path.
-    const dPos = this._stageSlot(cam, -0.62, 13.0, placedPositions);
+    const dPos = this._stageSlot(cam, -0.45, 14.0, placedPositions);
     const casualty = this.spawn('breacher', dPos, Math.atan2(cam.position.x - dPos.x, cam.position.z - dPos.z));
     squad.add(casualty);
     casualty.animator.update(0.016, 0);

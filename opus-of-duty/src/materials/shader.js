@@ -698,7 +698,7 @@ const MAIN_FRAGMENT = /* glsl */ `
     // the parapet; the bias is gentle so mid-wall spalls still happen
     float footBias = ( 1.0 - smoothstep( 0.0, 1.3, hG ) ) * 0.09;
     float sN = zA * 0.62 + zB * 0.30 + zD * 0.14 + footBias;
-    float sT = 0.80 - owDamageP.y * 0.17;
+    float sT = 0.74 - owDamageP.y * 0.17;
     float spall = smoothstep( sT, sT + 0.0035, sN ) * iv;
     float rim = ( smoothstep( sT - 0.022, sT, sN ) * iv - spall );
     if ( spall > 0.001 || rim > 0.001 ) {
@@ -745,13 +745,16 @@ const MAIN_FRAGMENT = /* glsl */ `
     // what settlement cracking looks like — and their width in METRES comes
     // from the field's gradient, which is two extra taps.
     float cz = texture2D( owMacroTex, q * 0.17 + vec2( 0.71, 0.29 ) ).b;
-    float cZone = smoothstep( 0.50 - owDamageP.x * 0.12, 0.62 - owDamageP.x * 0.12, cz + footBias * 0.8 ) * iv;
+    // cracks live in a few stressed zones per facade, not across the whole wall
+    float cZone = smoothstep( 0.60 - owDamageP.x * 0.08, 0.68 - owDamageP.x * 0.08, cz + footBias * 0.8 ) * iv;
     if ( cZone > 0.001 ) {
       const float E = 0.012;
       vec2 cq = q * 0.47 + vec2( 0.13, 0.37 );
       vec2 wq = q * 2.3;
       float jag = texture2D( owMacroTex, wq ).a - 0.5;
-      float n0 = texture2D( owMacroTex, cq ).g + jag * 0.035;
+      // jag must stay far below the field's own slope or every near-0.5
+      // patch sprouts a ring of tiny closed loops (the 'scribble' read)
+      float n0 = texture2D( owMacroTex, cq ).g + jag * 0.006;
       float nx = texture2D( owMacroTex, cq + vec2( E * 0.47, 0.0 ) ).g;
       float ny = texture2D( owMacroTex, cq + vec2( 0.0, E * 0.47 ) ).g;
       vec2 grad = ( vec2( nx, ny ) - texture2D( owMacroTex, cq ).g ) / E;
@@ -765,7 +768,7 @@ const MAIN_FRAGMENT = /* glsl */ `
       float crack = ( 1.0 - smoothstep( hwe * 0.6, hwe * 1.4, d ) ) * ( hw / hwe ) * open;
       // a second, finer generation branching off the first
       vec2 cq2 = q * 1.31 + vec2( 0.77, 0.53 );
-      float m0 = texture2D( owMacroTex, cq2 ).b + jag * 0.02;
+      float m0 = texture2D( owMacroTex, cq2 ).b + jag * 0.004;
       float mx = texture2D( owMacroTex, cq2 + vec2( E * 1.31, 0.0 ) ).b;
       float my = texture2D( owMacroTex, cq2 + vec2( 0.0, E * 1.31 ) ).b;
       vec2 g2 = ( vec2( mx, my ) - texture2D( owMacroTex, cq2 ).b ) / E;
@@ -778,7 +781,7 @@ const MAIN_FRAGMENT = /* glsl */ `
       // dirt washes into a crack and stains a few mm either side of it
       float halo = ( 1.0 - smoothstep( 0.0, 0.012 + hw * 3.0, d ) ) * open * cZone * 0.22 * ( 1.0 - spall );
       alb.rgb *= 1.0 - halo;
-      alb.rgb = mix( alb.rgb, owGrimeCol * 0.55 / max( owTintCol, vec3( 0.05 ) ), cr * 0.92 );
+      alb.rgb = mix( alb.rgb, owGrimeCol * 0.6 / max( owTintCol, vec3( 0.05 ) ), cr * 0.8 );
       orm.r *= 1.0 - cr * 0.75;
       orm.g = clamp( orm.g + cr * 0.1 + halo * 0.15, 0.0, 1.0 );
       owHeightS = clamp( owHeightS - cr * 0.4, 0.0, 1.0 );
@@ -849,7 +852,7 @@ const MAIN_FRAGMENT = /* glsl */ `
     #endif
     // A wet-then-dried run on render is a real 20-35% drop in albedo: at 10% it
     // is invisible from across the street, which is the whole point of a streak.
-    vec3 runCol = mix( alb.rgb * 0.72, owGrimeCol, 0.26 );
+    vec3 runCol = mix( alb.rgb * 0.62, owGrimeCol, 0.3 );
     // Rust bleed under metal fixings — brackets, rebar ends, gutter straps.
     // strongest right under the fixing, thinning as it runs down
     float rust = clamp( step( 0.86, runoff.y ) * 0.9 + orm.b * 0.5, 0.0, 1.0 )
@@ -869,7 +872,9 @@ const MAIN_FRAGMENT = /* glsl */ `
     splash *= 0.55 + 0.45 * smoothstep( 0.25, 0.72, mac1.b * 0.7 + mac2.g * 0.4 );
     // Dust and rain-thrown dirt, not soot: a blend of the two weathering colours.
     vec3 splashCol = mix( owGrimeCol, owDustCol * 0.9, 0.35 );
-    alb.rgb = mix( alb.rgb * ( 1.0 - splash * 0.35 ), splashCol, splash * 0.42 );
+    // MW-era walls carry a heavy, broken dirt band to knee height: at 0.35/0.42
+    // it was invisible in a sunlit frame
+    alb.rgb = mix( alb.rgb * ( 1.0 - splash * 0.45 ), splashCol, splash * 0.5 );
     orm.g = clamp( orm.g + splash * 0.16 - band * vert * 0.10, 0.0, 1.0 );
     orm.r *= 1.0 - splash * 0.18;
     orm.b *= 1.0 - splash * 0.7;

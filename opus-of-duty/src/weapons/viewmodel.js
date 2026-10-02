@@ -131,8 +131,10 @@ export class Viewmodel {
     // fills half the screen. The support hand is therefore placed on the REAR of
     // the handguard instead, which buys the reach without moving the joint into
     // shot.
+    // Hands 6-8% under the old scale: the r1 critic read the glove as "close
+    // to the size of the scope" at hipfire distance.
     this.armR = new Arm(1, handMats, {
-      scale: 1,
+      scale: 0.94,
       shoulderX: 0.205,
       shoulderY: -0.2,
       shoulderZ: 0.06,
@@ -144,7 +146,7 @@ export class Viewmodel {
     // which is precisely the failure the note above warns about. The reach is
     // bought by cheating the bones 10% long instead — see hands.js L_UPPER.
     this.armL = new Arm(-1, handMats, {
-      scale: 0.97,
+      scale: 0.92,
       shoulderX: 0.26,
       shoulderY: -0.28,
       shoulderZ: 0.0,

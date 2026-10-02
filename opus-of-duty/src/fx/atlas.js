@@ -184,7 +184,7 @@ const PARTICLE_PAINTERS = [
     // round the root, keep the tip off the tile edge
     a *= smoothstep(-1.0, -0.84, x) * smoothstep(0.98, 0.66, u);
     // white-hot choke at the root
-    a += Math.exp(-((x + 0.78) * (x + 0.78) * 9.0 + y * y * 14.0)) * 0.9;
+    a += Math.exp(-((x + 0.7) * (x + 0.7) * 12.0 + y * y * 14.0)) * 0.9 * smoothstep(-1.0, -0.86, x);
     // colour: yellow-white at the choke, orange body, deep red-brown tips/edges
     const heat = clamp01(1.0 - uu * 1.25 - Math.abs(q) * 0.45 + (body - 0.5) * 0.6);
     out[0] = clamp01(0.62 + 0.38 * Math.sqrt(heat));

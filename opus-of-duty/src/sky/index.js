@@ -810,7 +810,7 @@ export class SkySystem {
     // Night sky gain (dome.js). Stars are inside the gained term, so their
     // level is raised by part of the inverse: a darker dome with the same
     // points in it is what makes a night sky read as deep rather than grey.
-    const skyGain = THREE.MathUtils.lerp(1, 0.38, nightRamp);
+    const skyGain = THREE.MathUtils.lerp(1, 0.3, nightRamp);
     s.uSkyGain.value = skyGain;
     s.uNight.value = nightRamp;
     s.uStarParams.value.x = (0.07 * nightRamp) / Math.sqrt(skyGain);

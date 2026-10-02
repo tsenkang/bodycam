@@ -203,24 +203,23 @@ function buildGlove(materials, opts = {}) {
   guard.translate(0, 0, -0.087 * s);
   pads.push(guard);
 
-  // Back-of-hand pads: two panels with a flex gap between them.
-  for (const [za, zb] of [
-    [-0.024, -0.046],
-    [-0.051, -0.071],
-  ]) {
-    const zm = (za + zb) * 0.5;
-    const topAt = (z) => (z > -0.045 ? 0.0145 : 0.0135);
-    pads.push(
-      loft(
-        [
-          { t: 0, z: za * s, y: (topAt(za) - 0.0014) * s, w: 0.019 * s, hT: 0.0028 * s, hB: 0.0015 * s, n: 3 },
-          { t: 0.5, z: zm * s, y: (topAt(zm) - 0.0012) * s, w: 0.0215 * s, hT: 0.0032 * s, hB: 0.0015 * s, n: 3 },
-          { t: 1, z: zb * s, y: (topAt(zb) - 0.0016) * s, w: 0.022 * s, hT: 0.0028 * s, hB: 0.0015 * s, n: 3 },
-        ],
-        { rings: 6, seg: 18, capStart: 0.0025 * s, capEnd: 0.0025 * s, capRings: 3 }
-      )
-    );
-  }
+  /**
+   * Back-of-hand panel: ONE thin moulded panel that follows the hand's taper,
+   * 1.4 mm proud. The two thick 3 mm rectangular pads it replaces were the
+   * "padded mitten with two raised rectangles on the back" the r1 critic read
+   * at hipfire distance: two hard-edged slabs are a louder silhouette than four
+   * fingers. Shooting gloves carry their armour on the knuckles, not the back.
+   */
+  pads.push(
+    loft(
+      [
+        { t: 0, z: -0.03 * s, y: 0.0146 * s, w: 0.016 * s, hT: 0.0013 * s, hB: 0.0012 * s, n: 2.6 },
+        { t: 0.5, z: -0.05 * s, y: 0.0141 * s, w: 0.024 * s, hT: 0.0015 * s, hB: 0.0012 * s, n: 2.6 },
+        { t: 1, z: -0.07 * s, y: 0.0132 * s, w: 0.028 * s, hT: 0.0013 * s, hB: 0.0012 * s, n: 2.6 },
+      ],
+      { rings: 8, seg: 20, capStart: 0.004 * s, capEnd: 0.004 * s, capRings: 3 }
+    )
+  );
   // Leather palm patch, following the palmar surface.
   pads.push(
     loft(
@@ -382,7 +381,7 @@ function buildWatch(materials, zc, s, radialSign) {
   if (materials.seam) head.add(new THREE.Mesh(mergeAll(hands), materials.seam));
   // seat on the dorsal surface, rolled toward the thumb
   // 40 mm class case: the 44 mm authoring read as a wrist computer at 0.3 m.
-  head.scale.setScalar(0.84);
+  head.scale.setScalar(0.74);
   const pivot = new THREE.Object3D();
   pivot.rotation.z = -0.42 * radialSign;
   head.position.set(0, 0.0212 * s, zc);

@@ -306,7 +306,7 @@ vec3 skSample( vec3 rayDir, int quality ) {
   // (the inner core) and off the disc level (the glow) so it tracks exposure.
   if ( uNight > 0.001 && uMoonDir.y > -0.02 ) {
     float th = thetaM;
-    float halo = 3.2 * exp( -th / 0.035 ) + 1.1 * exp( -th / 0.16 );
+    float halo = 3.2 * exp( -th / 0.035 ) + 0.45 * exp( -th / 0.16 );
     float vis = smoothstep( -0.02, 0.06, uMoonDir.y ) * ( 1.0 - 0.6 * clamp( cl.a, 0.0, 1.0 ) );
     col += vec3( 0.80, 0.88, 1.0 ) * ( skyL * uSkyGain * halo
            + uMoonDiscRadiance.x * 0.010 * exp( -th / 0.05 ) ) * vis * uNight;

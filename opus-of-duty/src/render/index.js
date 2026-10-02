@@ -421,10 +421,10 @@ export class RenderSystem {
       // them buys most of both, and it is applied here rather than at the
       // source because the balance is a lighting decision, not an art one.
       practicalGain: 0.55,
-      practicalNight: 1.5,
+      practicalNight: 1.1,
       // Extra cull reach for street lamps after dark, as a fraction of their
       // registered range (22 m -> 48 m at 1.2). See _cullLights.
-      lampNightReach: 1.2,
+      lampNightReach: 0.8,
       // ---- viewmodel (see VIEWMODEL LIGHTING CONTRACT, _updateViewRig) -----
       // Fraction of the world's sky band a shouldered weapon receives: the
       // shooter's head, shoulders and chest take the rest of the upper dome.
@@ -1166,6 +1166,13 @@ export class RenderSystem {
     const gate = THREE.MathUtils.lerp(1, u.owIndirect.value.y, indoor);
 
     const sky = this._viewFillSky.copy(u.owSkyFill.value).multiplyScalar(s.viewSkyOcclusion * gate);
+    // Half the sky band's chroma. The shooter's own body, sleeves and the
+    // walls around him sit in that upper hemisphere too; at full Rayleigh hue
+    // every shaded face of a black rifle came out navy (iter2 weapon/night).
+    {
+      const l = 0.2126 * sky.x + 0.7152 * sky.y + 0.0722 * sky.z;
+      sky.set(l + (sky.x - l) * 0.5, l + (sky.y - l) * 0.5, l + (sky.z - l) * 0.5);
+    }
     const gnd = this._viewFillGnd.copy(u.owGroundFill.value).multiplyScalar(s.viewGroundOcclusion * gate);
 
     // Practicals: irradiance at the camera, three's own distance falloff.
@@ -1571,9 +1578,9 @@ export class RenderSystem {
       const pu = this.patcher.uniforms;
       pu.owExposureTex.value = this.exposure.texture;
       pu.owViewFloor.value.set(
-        this.settings.viewFloor * 0.96,
+        this.settings.viewFloor * 1.02,
         this.settings.viewFloor,
-        this.settings.viewFloor * 1.04,
+        this.settings.viewFloor * 0.95,
         1
       );
 
@@ -1644,6 +1651,28 @@ export class RenderSystem {
       this._pingIndex ^= 1;
     }
 
+    // ---- 15. metering (WORLD only, before the viewmodel goes in) -----------
+    // The gun covers a third of the frame and is lit by its own floor; metering
+    // it meant that making the rifle readable in a shaded street darkened the
+    // street (iter2 sunset: shade went from L27 to L11). The eye adapts to the
+    // world, and CoD's viewmodel never pumps the exposure.
+    const s = this.settings;
+    const exposureTex = this.exposure.update(
+      renderer,
+      color,
+      this.screenSize.width,
+      this.screenSize.height,
+      s.autoExposure ? dt : 1e3,
+      // The sky publishes a metering compensation for the current sun elevation:
+      // a street canyon under a four-degree sun is entirely in shade, and a meter
+      // weighted onto that geometry opens up two stops and flattens the sky it is
+      // lit by. See SkySystem.exposureBias.
+      s.exposureBias + this._skyExposureBias - s.indoorExposureLift * this._viewIndoor,
+      s.exposureKey,
+      this.needsPrepass ? this.depthTexture : null
+    );
+    this.exposureTexture = exposureTex;
+
     // ---- 14. viewmodel composite -----------------------------------------
     // After the registered passes on purpose: the volumetric fog and haze pass
     // are depth-driven and the gbuffer now holds the WORLD depth at the gun's
@@ -1665,24 +1694,6 @@ export class RenderSystem {
       color = out.texture;
       this._pingIndex ^= 1;
     }
-
-    // ---- 15. metering -----------------------------------------------------
-    const s = this.settings;
-    const exposureTex = this.exposure.update(
-      renderer,
-      color,
-      this.screenSize.width,
-      this.screenSize.height,
-      s.autoExposure ? dt : 1e3,
-      // The sky publishes a metering compensation for the current sun elevation:
-      // a street canyon under a four-degree sun is entirely in shade, and a meter
-      // weighted onto that geometry opens up two stops and flattens the sky it is
-      // lit by. See SkySystem.exposureBias.
-      s.exposureBias + this._skyExposureBias - s.indoorExposureLift * this._viewIndoor,
-      s.exposureKey,
-      this.needsPrepass ? this.depthTexture : null
-    );
-    this.exposureTexture = exposureTex;
 
     // ---- 16. bloom --------------------------------------------------------
     let bloomTex = null;

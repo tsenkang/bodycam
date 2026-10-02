@@ -271,7 +271,9 @@ const SPEC_AA = /* glsl */ `
   vec3 owNdx = dFdx( normal );
   vec3 owNdy = dFdy( normal );
   float owNVar = 0.25 * ( dot( owNdx, owNdx ) + dot( owNdy, owNdy ) );
-  float owKern = min( 2.0 * owNVar, 0.18 );
+  // Capped low: at 0.18 the widened lobe turned the sun highlight on every
+  // up-facing face of a black rifle into a near-white sheet (iter2 weapon).
+  float owKern = min( owNVar, 0.045 );
   float owA2 = pow( material.roughness, 4.0 );
   material.roughness = clamp( sqrt( sqrt( owA2 + owKern ) ), material.roughness, 1.0 );
 }

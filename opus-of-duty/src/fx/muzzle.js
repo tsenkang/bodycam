@@ -199,6 +199,45 @@ export function muzzleFlash(fx, o) {
   s.seed = rng.float();
   emitAdd(s);
 
+  // --- flamelets: the fireball body ---------------------------------------
+  // A handful of turbulent fire puffs scattered around the crown fill the
+  // space between the tongues, so the silhouette is a lumpy fireball with a
+  // few licks out of it (MW2019's flash), never a spoked star.
+  const nFl = Math.max(3, Math.round(5 * Math.min(1, fx.pScale + 0.3)));
+  for (let i = 0; i < nFl; i++) {
+    s = resetSpawn();
+    const ang = rng.float() * TWO_PI;
+    const rad = rng.range(0.015, 0.05) * sc;
+    const fwd = rng.range(0.0, 0.05) * sc;
+    // offset in the bore-normal plane (basis is built below; use a cheap
+    // perpendicular from the cross with world up)
+    let px = -d.z, pz = d.x, py = 0;
+    const pl = Math.hypot(px, pz) || 1;
+    px /= pl; pz /= pl;
+    const qx = d.y * pz - d.z * py, qy = d.z * px - d.x * pz, qz = d.x * py - d.y * px;
+    const c = Math.cos(ang) * rad, sn = Math.sin(ang) * rad;
+    s.x = p.x + d.x * fwd + px * c + qx * sn;
+    s.y = p.y + d.y * fwd + py * c + qy * sn;
+    s.z = p.z + d.z * fwd + pz * c + qz * sn;
+    s.vx = (px * c + qx * sn) * 18 + d.x * 1.5;
+    s.vy = (py * c + qy * sn) * 18 + d.y * 1.5;
+    s.vz = (pz * c + qz * sn) * 18 + d.z * 1.5;
+    s.tile = i % 2 ? P.FIRE : P.FLASH_CORE;
+    s.size0 = rng.range(0.04, 0.07) * sc;
+    s.size1 = rng.range(0.08, 0.13) * sc;
+    s.sizeCurve = 0.4;
+    s.life = rng.range(0.035, 0.055);
+    s.drag = 10;
+    s.rot = rng.float() * TWO_PI;
+    s.spin = rng.signed() * 3;
+    s.r0 = cr; s.g0 = cg * 0.95; s.b0 = cb * 0.85; s.i0 = rng.range(7, 12) * gain;
+    s.r1 = gr; s.g1 = gg; s.b1 = gb; s.i1 = 1.5 * gain;
+    s.alphaCurve = 0.7;
+    s.soft = 0.15;
+    s.seed = rng.float();
+    emitAdd(s);
+  }
+
   // --- petals: one tongue of burning gas per muzzle-device port -------------
   // A brake with three ports throws three petals, every shot, in the same
   // places — that is what makes a flash read as *this weapon's* flash rather
@@ -215,12 +254,14 @@ export function muzzleFlash(fx, o) {
   // baseline capture showed. A flash hider vents its gas RADIALLY through its
   // prongs, so the petals leave the crown 55-80 deg off the bore: from behind
   // the weapon they spread into the lopsided 4-5 point star players know.
-  const ports = Math.min(6, Math.max(5, prof.lobes + 2 + (rng.float() < 0.4 ? 1 : 0)));
+  // 3-5 tongues, not 5-6: five equal petals evenly spread is a star however
+  // ragged each one is (r1 critic: 'clip-art six-point star').
+  const ports = Math.min(5, Math.max(3, prof.lobes + (rng.float() < 0.5 ? 1 : 0)));
   const rollBase = rng.float() * TWO_PI;
   const weak = rng.int(0, ports - 1); // one port always gets less gas
   const big = rng.int(0, ports - 1); // and one always gets the long tongue
   for (let i = 0; i < ports; i++) {
-    const roll = rollBase + (i / ports) * TWO_PI + rng.signed() * 0.32;
+    const roll = rollBase + (i / ports) * TWO_PI + rng.signed() * 0.6;
     const pitch = rng.range(0.95, 1.4); // 55-80 degrees off the bore
     const cp = Math.cos(pitch);
     const sp = Math.sin(pitch);
@@ -230,7 +271,7 @@ export function muzzleFlash(fx, o) {
     LOBE.y = d.y * cp + BORE.ty * rc + BORE.by * rs;
     LOBE.z = d.z * cp + BORE.tz * rc + BORE.bz * rs;
     const choke =
-      i === weak ? rng.range(0.42, 0.6) : i === big ? rng.range(1.1, 1.3) : rng.range(0.66, 1.02);
+      i === weak ? rng.range(0.35, 0.55) : i === big ? rng.range(1.05, 1.25) : rng.range(0.5, 0.95);
     const push = rng.range(0.6, 2.2) * choke;
     s = resetSpawn();
     s.tile = P.FLASH_LOBE;
@@ -255,7 +296,7 @@ export function muzzleFlash(fx, o) {
     // *ratio* survives the tone curve as amber rather than as more white.
     // Born at the crown's temperature: the sprite's own ramp (atlas.js) cools
     // each tongue to orange along its length, so the root stays white-yellow.
-    s.r0 = cr; s.g0 = cg * 0.92; s.b0 = cb * 0.8; s.i0 = (11 + rng.float() * 6) * gain * choke;
+    s.r0 = cr; s.g0 = cg * 0.92; s.b0 = cb * 0.8; s.i0 = (14 + rng.float() * 8) * gain * choke;
     s.r1 = gr; s.g1 = gg; s.b1 = gb; s.i1 = 2.4 * gain * choke;
     s.alphaCurve = 0.75;
     s.soft = 0.15;

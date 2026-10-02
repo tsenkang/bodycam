@@ -1133,7 +1133,7 @@ export class FxSystem {
     const list = [];
     this.ctx.scene.traverseVisible((o) => {
       if (!o.isMesh || o.isSkinnedMesh) return;
-      if (o.name?.startsWith('fx') || o.material?.transparent || o.material?.depthWrite === false) return;
+      if (o.name?.startsWith('fx') || o.material?.depthWrite === false || (o.material?.transparent && (o.material.opacity ?? 1) < 0.5)) return;
       const g = o.geometry;
       if (!g) return;
       if (!g.boundingSphere) g.computeBoundingSphere();
@@ -1214,7 +1214,9 @@ export class FxSystem {
         // A grazing hit on a thin prop makes a poor showcase.
         const face = -this._tmpB.dot(hit.normal);
         if (d < 1.2 || face < 0.3) continue;
-        if (this._occluded(this._camPos, this._tmpB, d - 0.12, occluders)) continue;
+        // 5 cm, not 12: a rug hung flush on the pillar sat inside the old 12 cm
+        // margin, so the whole burst was walked behind it (r1 impacts).
+        if (this._occluded(this._camPos, this._tmpB, d - 0.05, occluders)) continue;
         const b = np * 8;
         probes[b] = hit.point.x;
         probes[b + 1] = hit.point.y;

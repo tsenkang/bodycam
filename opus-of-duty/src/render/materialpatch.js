@@ -131,7 +131,7 @@ export class MaterialPatcher {
       );
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <lights_fragment_begin>',
-        dirBegin
+        SPEC_AA + dirBegin
       );
 
       // AO on indirect only, SSR into the IBL specular.
@@ -254,6 +254,29 @@ function makeVec4Array(n) {
   for (let i = 0; i < n; i++) a[i] = new THREE.Vector4(0, 0, 0, 0);
   return a;
 }
+
+/**
+ * Geometric specular antialiasing (Kaplanyan & Hoffman 2016, Tokuyoshi's
+ * variant): widen the GGX lobe by the screen-space variance of the shading
+ * normal. A knurled optic ring or a rail with a fine normal map has normals
+ * that swing more inside one pixel than its roughness admits, so a 0.35-rough
+ * lobe catches the sun on one sample and not the next — the white speckle over
+ * the whole rifle in the round-0 `muzzle` frame. The viewmodel has no TAA to
+ * average it out and the chromebook tier has none at all, so it is fixed at
+ * the source: same energy, wider lobe, only where the normal is aliasing.
+ */
+const SPEC_AA = /* glsl */ `
+#ifdef STANDARD
+{
+  vec3 owNdx = dFdx( normal );
+  vec3 owNdy = dFdy( normal );
+  float owNVar = 0.25 * ( dot( owNdx, owNdx ) + dot( owNdy, owNdy ) );
+  float owKern = min( 2.0 * owNVar, 0.18 );
+  float owA2 = pow( material.roughness, 4.0 );
+  material.roughness = clamp( sqrt( sqrt( owA2 + owKern ) ), material.roughness, 1.0 );
+}
+#endif
+`;
 
 const EXTRA_PARS = /* glsl */ `
 #define OW_ROOMS ${MAX_ROOMS}

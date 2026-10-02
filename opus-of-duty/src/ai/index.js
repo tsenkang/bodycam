@@ -124,6 +124,9 @@ export class AiSystem {
     this._sweep = new THREE.Sphere();
     this._sun = new THREE.Vector3(0, 1, 0);
     this._lodStats = { irrelevant: 0 };
+    const cb = ctx.config?.q?.name === 'chromebook' || ctx.config?.quality === 'chromebook';
+    this._shadowDist = cb ? 24 : 35;
+    this._syncHalfDist = cb ? 22 : 40;
 
     this._wireEvents(ctx);
     console.info(
@@ -215,6 +218,9 @@ export class AiSystem {
           if (m && !seen.has(m)) { seen.add(m); mats.push(m); }
         }
       }
+      // the authored body's materials (src/ai/glbsoldier.js)
+      const glb = this.soldierModel;
+      if (glb) for (const m of glb.materials) if (!seen.has(m)) { seen.add(m); mats.push(m); }
       // the thrown grenade's mesh is built on the first throw, mid-firefight
       this._ensureGrenade();
       out.materials = mats.length + 1;
@@ -251,8 +257,26 @@ export class AiSystem {
         mesh.material = depth;
         await compile(this.ctx.scene);
       }
-      // the grenade is a plain (unskinned) mesh, so it needs its own object
       scene.remove(mesh);
+      // the authored body: its real meshes (skinned, tangents, uv1 on the
+      // boots), forward and cascade-depth variants. The template is never
+      // drawn in game; it is borrowed for the compile and handed back.
+      if (glb) {
+        const h = glb.holder;
+        const parent = h.parent;
+        scene.add(h);
+        const parts = [];
+        h.traverse((o) => { if (o.isSkinnedMesh) parts.push([o, o.material]); });
+        await compile(this.ctx.scene);
+        if (depth) {
+          for (const [o] of parts) o.material = depth;
+          await compile(this.ctx.scene);
+        }
+        for (const [o, m] of parts) o.material = m;
+        scene.remove(h);
+        if (parent) parent.add(h);
+      }
+      // the grenade is a plain (unskinned) mesh, so it needs its own object
       const g = new THREE.Mesh(this._grenadeGeo, this._grenadeMat);
       scene.add(g);
       await compile(this.ctx.scene);
@@ -772,13 +796,17 @@ export class AiSystem {
     this.stats.alive = alive;
   }
 
-  lateUpdate() {
+  lateUpdate(dt, ctx) {
     const g = this.ground;
     g.begin();
     for (let i = 0; i < this.agents.length; i++) {
       const a = this.agents[i];
       a.syncHitboxes();
-      a.skin?.sync();
+      if (a.skin && !a.lodIrrelevant) {
+        // nothing of an irrelevant actor reaches a pixel; a distant one (a few
+        // dozen pixels tall) is re-posed every other frame
+        if (!(a.lodDist > this._syncHalfDist && ((ctx.time?.frame ?? 0) + a.id) & 1)) a.skin.sync();
+      }
       // Dead men keep their contact: a ragdoll on the floor needs it most.
       g.addActor(a);
     }
@@ -853,6 +881,8 @@ export class AiSystem {
       const s = this._sphere.copy(bs).applyMatrix4(a.mesh.matrixWorld);
       s.radius += 4;
       let visible = this._frustum.intersectsSphere(s);
+      a.lodInView = visible;
+      a.lodDist = s.center.distanceTo(cam.position);
       if (!visible) {
         const sweep = this._sweep;
         const tMax = Math.min(320, (s.center.y - floorY) / sunY);
@@ -866,6 +896,15 @@ export class AiSystem {
       a.lodIrrelevant = !visible;
       if (!visible) irrelevant++;
       a.mesh.userData.owNoShadow = !visible;
+      if (a.skin) {
+        // Authored body: shadow casting stops past a distance where a man's
+        // shadow is a few texels of the far cascade (and the frame's biggest
+        // shadow-pass cost is these skinned draws).
+        const cast = visible && a.lodDist < this._shadowDist;
+        a.skin.castShadow = cast;
+        if (a.weaponMesh) a.weaponMesh.userData.owNoShadow = !cast;
+        a.skin.visible = visible;
+      }
     }
     this._lodStats.irrelevant = irrelevant;
     this.stats.lodIrrelevant = irrelevant;

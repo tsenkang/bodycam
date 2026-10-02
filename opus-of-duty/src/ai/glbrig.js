@@ -108,7 +108,7 @@ export const GRIPS = {
       Mid: [78, 92, 40],
       Ring: [84, 90, 40],
       Pinky: [88, 84, 38],
-      Thumb: [42, 18, 26],
+      Thumb: [75, 20, 30],
     },
   },
   L: {

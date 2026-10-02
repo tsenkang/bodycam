@@ -773,7 +773,10 @@ export class SkySystem {
       // the geometry, and once the only key is a moon plus twenty-two sodium
       // lamps it opens up until a midnight street reads as an overcast evening.
       // Every night frame ever shot is underexposed on purpose.
-      0.55 * (1 - beamAlive);
+      // 0.55 -> 1.2: r1 night still metered like an overcast dusk (bright
+      // blue dome, every wall readable); a CoD night map sits well under that
+      // and lets the practicals carry the frame.
+      1.2 * (1 - beamAlive);
 
     // Released — and then some — once the beam is gone. After dark the moonlit
     // sky is the ONLY fill there is, the warm ground bounce that made the daytime

@@ -125,7 +125,9 @@ function spark(fx, x, y, z, dx, dy, dz, speed, o) {
  */
 function bulletHole(fx, p, n, o) {
   const rng = fx.rng;
-  const size = rng.range(o.min, o.max) * (0.9 + (o.e ?? 1) * 0.1);
+  // The painted bore + spall ring fill only ~40 % of the tile, so the tile is
+  // drawn at 1.6x the crater size: at 5 m a 6 cm decal was a 5 px dot.
+  const size = rng.range(o.min, o.max) * (0.9 + (o.e ?? 1) * 0.1) * 1.6;
   fx.addDecal(p, n, {
     tile: o.tile,
     size,
@@ -165,7 +167,7 @@ function concrete(fx, p, n, inc, e) {
   let s = resetSpawn();
   s.x = p.x + n.x * 0.01; s.y = p.y + n.y * 0.01; s.z = p.z + n.z * 0.01;
   s.tile = P.FLASH_CORE;
-  s.size0 = 0.045 * e; s.size1 = 0.19 * e; s.sizeCurve = 0.42;
+  s.size0 = 0.04 * e; s.size1 = 0.13 * e; s.sizeCurve = 0.42;
   s.life = 0.07; s.drag = 6;
   s.r0 = 1; s.g0 = 0.72; s.b0 = 0.4; s.i0 = 10 * e;
   s.r1 = 1; s.g1 = 0.4; s.b1 = 0.12; s.i1 = 0;
@@ -311,7 +313,7 @@ function concrete(fx, p, n, inc, e) {
     s.spin = rng.signed() * 0.5;
     s.r0 = 0.55; s.g0 = 0.49; s.b0 = 0.40;
     s.r1 = 0.46; s.g1 = 0.41; s.b1 = 0.34;
-    s.alpha = rng.range(0.28, 0.46);
+    s.alpha = rng.range(0.16, 0.28);
     s.alphaCurve = 1.35;
     s.soft = 0.14;
     s.turb = 0.14; s.turbFreq = 1.1; s.seed = rng.float();
@@ -365,7 +367,7 @@ function plaster(fx, p, n, inc, e) {
     const lit = 0.68 + 0.74 * Math.max(0, V2.x * PSUN.x + V2.y * PSUN.y + V2.z * PSUN.z);
     s.r0 = 0.74 * lit; s.g0 = 0.63 * lit; s.b0 = 0.465 * lit;
     s.r1 = 0.63 * lit; s.g1 = 0.53 * lit; s.b1 = 0.385 * lit;
-    s.alpha = rng.range(0.42, 0.72) * (band === 2 ? 0.7 : 1); s.alphaCurve = 1.6;
+    s.alpha = rng.range(0.3, 0.55) * (band === 2 ? 0.5 : 1); s.alphaCurve = 1.6;
     s.soft = 0.09; s.turb = 0.06; s.turbFreq = 2; s.seed = rng.float();
     fx.emitLit(s);
   }

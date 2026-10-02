@@ -123,7 +123,10 @@ export class Agent {
     // mesh of its own on the same skeleton.
     if (ai.soldierModel && def.weaponGeometry) {
       this.group.updateMatrixWorld(true);
-      this.skin = new SoldierSkin(bones, RIG.names, this.group);
+      this.skin = new SoldierSkin(bones, RIG.names, this.group, {
+        weaponMatrix: def.weapon?.matrix,
+        foregrip: def.weapon?.foregrip,
+      });
       this.mesh.visible = false;
       this.weaponMesh = new THREE.SkinnedMesh(def.weaponGeometry, def.weaponMaterials);
       this.weaponMesh.castShadow = true;

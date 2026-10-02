@@ -918,7 +918,7 @@ export class Arm {
           gapAt(tjs[1], 0, 0, -tl1, _t);
           gapAt(this.thumb.root, 0, 0, 0, _dir);
           _t.sub(_dir).normalize();
-          dirCost = Math.max(0, 0.7 - _t.dot(thumbDir)) * 0.012;
+          dirCost = Math.max(0, 0.8 - _t.dot(thumbDir)) * 0.03;
         }
         const cost =
           Math.abs(gTip) +

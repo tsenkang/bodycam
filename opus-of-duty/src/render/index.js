@@ -344,7 +344,7 @@ export class RenderSystem {
       vignette: 0.24,
       // Closes in while the sights are up: the frame has to tell you your eye is
       // behind a tube, not just that the gun moved.
-      adsVignette: 0.62,
+      adsVignette: 0.95,
       // Near-weapon defocus while ADS, px at 1080p (see composite.js).
       adsViewBlur: 7.0,
       grain: 0.010,
@@ -354,7 +354,7 @@ export class RenderSystem {
       // the pass — stays pin sharp.
       // 3.3 px at 1080p, down 40%: at 5.5 the near and mid ground of an ADS frame
       // was a watercolour smear that hid the very thing the sights are pointed at.
-      dofMaxCoc: 3.3,
+      dofMaxCoc: 4.6,
       dofNearRatio: 0.38,
       dofFocusMin: 3.0,
       dofFocusMax: 18.0,
@@ -1728,11 +1728,41 @@ export class RenderSystem {
    * remembered for a velocity difference.
    */
   _visitView(o) {
-    if (o.isMesh === true) {
+    if (o.isMesh === true || o.isPoints === true || o.isSprite === true) {
       const m = o.material;
-      if (Array.isArray(m)) for (let i = 0; i < m.length; i++) this.patcher.patch(m[i]);
-      else if (m) this.patcher.patch(m);
+      if (Array.isArray(m)) {
+        for (let i = 0; i < m.length; i++) {
+          this.patcher.patch(m[i]);
+          this._fixViewAdditive(m[i]);
+        }
+      } else if (m) {
+        this.patcher.patch(m);
+        this._fixViewAdditive(m);
+      }
     }
+  }
+
+  /**
+   * Additive materials in the viewmodel must not write COVERAGE.
+   *
+   * The view target is composited as premultiplied `world*(1-a) + rgb`, and
+   * three's AdditiveBlending is blendFunc(SRC_ALPHA, ONE) on alpha too, so an
+   * additive quad whose texture is opaque black outside its glow (the red-dot
+   * emitter glow) wrote a = 1 over its whole quad — a black square punched
+   * through the sight picture in the r1 `ads` frame. Light adds; it does not
+   * occlude. Same colour equation, alpha left untouched.
+   */
+  _fixViewAdditive(m) {
+    if (m.blending !== THREE.AdditiveBlending || m.userData.owViewAdditive === true) return;
+    m.userData.owViewAdditive = true;
+    m.blending = THREE.CustomBlending;
+    m.blendEquation = THREE.AddEquation;
+    m.blendSrc = m.premultipliedAlpha ? THREE.OneFactor : THREE.SrcAlphaFactor;
+    m.blendDst = THREE.OneFactor;
+    m.blendEquationAlpha = THREE.AddEquation;
+    m.blendSrcAlpha = THREE.ZeroFactor;
+    m.blendDstAlpha = THREE.OneFactor;
+    m.needsUpdate = true;
   }
 
   /**

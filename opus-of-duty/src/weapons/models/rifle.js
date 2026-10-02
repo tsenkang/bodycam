@@ -517,7 +517,7 @@ export function buildRifle() {
         thumbBase: [0.25, -0.9, -0.5],
         thumbScan: [1.3, 1.0, 0.9],
         thumbSide: [-1, 0.3, 0],
-        thumbDir: [0, -0.35, -1],
+        thumbDir: [0, -0.55, -1],
       },
       magSeat: { pos: [0, 0.061, magZ], rot: [magTilt, 0, 0] },
       magDrop: [0, -0.4, 0.02],

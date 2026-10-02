@@ -62,9 +62,12 @@ export class ShellSystem {
     const tex = buildBrassTextures(fx.rng.fork(), 128);
     this.textures = tex;
     const mat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(0.78, 0.62, 0.31), // brass F0
+      // Deeper than tabulated brass F0: tarnished, lacquered steel-case-looking
+      // brass reads golden in motion, while the textbook value under a bright
+      // sky went cream-white and flat (pale cardboard sticks in r1/impacts).
+      color: new THREE.Color(0.62, 0.43, 0.17),
       metalness: 1,
-      roughness: 1,
+      roughness: 0.55,
       roughnessMap: tex.orm,
       aoMap: tex.orm,
       normalMap: tex.normal,

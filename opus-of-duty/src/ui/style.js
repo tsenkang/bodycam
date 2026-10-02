@@ -285,7 +285,7 @@ const CSS = `
    hairline bars. No band behind it. */
 .ow-compass {
   position:absolute; left:50%; top:calc(var(--pad) * .55);
-  width: calc(640px * var(--k)); height: calc(38px * var(--k));
+  width: calc(640px * var(--k)); height: calc(44px * var(--k));
   transform: translateX(-50%);
   -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 12%, #000 44.5%, transparent 45.5%, transparent 54.5%, #000 55.5%, #000 88%, transparent 100%);
           mask-image: linear-gradient(to right, transparent 0%, #000 12%, #000 44.5%, transparent 45.5%, transparent 54.5%, #000 55.5%, #000 88%, transparent 100%);
@@ -296,24 +296,24 @@ const CSS = `
 .ow-compass-strip { position:absolute; left:0; top:0; height:100%; }
 .ow-tick {
   position:absolute; top: calc(4px * var(--k));
-  width: calc(1.5px * var(--k)); background: rgba(236,240,242,.55);
-  height: calc(4px * var(--k));
+  width: calc(2px * var(--k)); background: rgba(236,240,242,.7);
+  height: calc(6px * var(--k));
   box-shadow: 0 0 calc(2px * var(--k)) rgba(0,0,0,.45);
 }
-.ow-tick.maj { height: calc(8px * var(--k)); top: calc(2px * var(--k)); background: rgba(236,240,242,.85); }
+.ow-tick.maj { height: calc(11px * var(--k)); top: calc(1px * var(--k)); background: rgba(240,244,246,.95); }
 .ow-tick-l {
-  position:absolute; top: calc(14px * var(--k)); transform: translateX(-50%);
-  font-size: calc(16px * var(--k)); letter-spacing:.02em; font-weight:400;
-  color: rgba(236,240,242,.88); text-shadow: var(--sh);
+  position:absolute; top: calc(15px * var(--k)); transform: translateX(-50%);
+  font-size: calc(21px * var(--k)); letter-spacing:.02em; font-weight:600;
+  color: rgba(244,246,248,.97); text-shadow: var(--sh-o1);
 }
 .ow-tick-l.sub { }
-.ow-tick-l.num { color: rgba(226,232,236,.74); font-size: calc(15px * var(--k)); top: calc(15px * var(--k)); }
+.ow-tick-l.num { color: rgba(232,236,240,.86); font-size: calc(18px * var(--k)); top: calc(17px * var(--k)); font-weight:400; }
 .ow-compass-base, .ow-compass-caret, .ow-compass-gap { display:none; }
 .ow-compass-hdg {
   position:absolute; left:50%; top:calc(var(--pad) * .55 + 6px * var(--k));
   transform: translateX(-50%);
-  font-family: var(--fd); font-size: calc(25px * var(--k)); font-weight:400; line-height:1;
-  color: #f0b04a; text-shadow: var(--sh);
+  font-family: var(--fd); font-size: calc(31px * var(--k)); font-weight:700; line-height:1;
+  color: #f4b23e; text-shadow: var(--sh-o1);
   padding: 0 calc(9px * var(--k));
   border-left: calc(1.5px * var(--k)) solid rgba(236,240,242,.8);
   border-right: calc(1.5px * var(--k)) solid rgba(236,240,242,.8);

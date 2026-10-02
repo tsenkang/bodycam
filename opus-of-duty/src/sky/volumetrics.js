@@ -378,7 +378,12 @@ void main() {
     float odS = max( 0.0, od - odNear * 0.5 );
     float mono = 1.0 - exp( -uFog2.x * odS );
     float cosKey = dot( dir, uKeyDir );
-    vec3 inscatter = ( uKeyIrr * ( skFogInscatterPhase( cosKey ) * 0.55 )
+    // 0.55 -> 0.2. With no cascade lookup there is no shadowing at all, so
+    // the shaft-gained forward lobe lit every ray toward the sun as if the
+    // whole street were in open sun: the chromebook frame wore a milky veil
+    // over the sunward half. A street canyon is mostly shade; 0.2 is roughly
+    // the marched path's average visibility at street level.
+    vec3 inscatter = ( uKeyIrr * ( skFogInscatterPhase( cosKey ) * 0.2 )
                      + skFogAmbient( cosKey ) * uFog2.z )
                      * ( uFog.x / max( 1.0e-6, uFog2.x ) ) * mono;
   #else

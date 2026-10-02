@@ -52,7 +52,10 @@ const SUN_KEY_GAIN = 1.55;
 const SKY_AMBIENT_FRACTION = 0.15;
 
 /** Cool night hue for the published ambient — moonlight after the Purkinje shift. */
-const NIGHT_AMBIENT_HUE = [0.35, 0.5, 1.0];
+// Desaturated from (0.35, 0.5, 1.0): through AgX and the 1.2 grade saturation
+// that hue came out VIOLET on every moonlit grey surface (r1 critic: "violet
+// barriers"). Night should read blue-grey, not purple.
+const NIGHT_AMBIENT_HUE = [0.58, 0.70, 1.0];
 
 /**
  * OVERWATCH sky, atmosphere and global lighting.

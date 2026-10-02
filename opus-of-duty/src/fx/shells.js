@@ -30,6 +30,13 @@ const CASE_LEN = 0.045;
  * re-expressed in viewCamera space and drawn over the weapon instead.
  */
 const VIEW_AGE = 0.45;
+/**
+ * Drawn size relative to the physical case. Brass leaves the port inside half
+ * a metre of the eye, where a true-scale 45 mm case covers 60-100 px at 720p
+ * and reads as a popsicle stick (r1 critic). Shooters draw it smaller than
+ * life; physics keeps the real dimensions.
+ */
+const DRAW_SCALE = 0.6;
 const VIEW_RANGE = 1.5;
 
 function caseProfile() {
@@ -266,7 +273,7 @@ export class ShellSystem {
     }
     for (let i = 0; i < this.slots.length; i++) {
       const slot = this.slots[i];
-      let sc = slot.alive ? slot.scale : 0;
+      let sc = slot.alive ? slot.scale * DRAW_SCALE : 0;
       const inView =
         vm && sc > 0 && slot.age < VIEW_AGE && slot.pos.distanceToSquared(this._eye) < VIEW_RANGE * VIEW_RANGE;
       this._s.set(sc, sc, sc);

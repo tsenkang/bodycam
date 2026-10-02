@@ -216,6 +216,26 @@ if (VIEW === 'board') {
     camera.lookAt(-3.2, 1.15, 0.35);
   }
   camera.updateProjectionMatrix();
+} else if (VIEW === 'cloth') {
+  // Hanging cloth and hessian at 2-5 m in sun: judges the felt/carpet noise.
+  groundPlane('sand', 40);
+  const keys = [
+    ['fabric', { vertexMasks: true, tint: 0xa2564a, scale: 0.26, three: { side: 2 } }],
+    ['fabric', { vertexMasks: true, tint: 0x5f8a8c, scale: 0.26, three: { side: 2 } }],
+    ['fabric', { vertexMasks: true, tint: 0xbcb298, scale: 0.26, three: { side: 2 } }],
+    ['burlap', { vertexMasks: true, tint: 0x9a927f, scale: 0.26, normalStrength: 1.5 }],
+  ];
+  keys.forEach(([n, o], i) => {
+    const g = new THREE.PlaneGeometry(1.6, 2.2, 16, 22);
+    const pa = g.getAttribute('position');
+    for (let k = 0; k < pa.count; k++) pa.setZ(k, Math.sin(pa.getX(k) * 9 + i) * 0.03 + Math.sin(pa.getY(k) * 3) * 0.02);
+    g.computeVertexNormals();
+    mesh(g, materials.get(n, o), [-3 + i * 2, 1.4, -i * 0.6], [0, 0.35, 0]);
+  });
+  camera.fov = 50;
+  camera.position.set(0.5, 1.6, 4.2);
+  camera.lookAt(0, 1.3, -1);
+  camera.updateProjectionMatrix();
 } else if (VIEW === 'facade' || VIEW === 'facade_close') {
   // A long rendered street wall over a concrete plinth, sun raking across it:
   // judges the render-damage layer (cracks, spalls), runoff and base grime at

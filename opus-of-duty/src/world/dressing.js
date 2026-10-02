@@ -958,8 +958,10 @@ export function sandbagWall(A, rng, x, z, ry, len, courses = 3, baseY = null) {
   for (let c = 0; c < courses; c++) {
     // load from the bags above: the bottom of a five-high wall carries most of it
     const load = (courses - 1 - c) / Math.max(1, courses - 1);
-    const squash = 1 - load * 0.19; // vertical
-    const spread = 1 + load * 0.07; // and it bulges out sideways
+    // Squash is modest: at 19% the lower courses went flat and wide and the
+    // whole wall read as a stack of pancakes.
+    const squash = 1 - load * 0.1; // vertical
+    const spread = 1 + load * 0.04; // and it bulges out sideways
     // 2-4 cm of row-pitch jitter, so course seams never stack vertically
     const pitch = BAG_W - rng.range(0.02, 0.04);
     const per = Math.max(2, Math.round(len / pitch));

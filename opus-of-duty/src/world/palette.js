@@ -367,7 +367,13 @@ export const PALETTE = {
   burlap: {
     name: 'burlap',
     surface: 'fabric',
-    opts: { vertexMasks: true, tint: 0x9a927f, scale: 0.16, weather: [0.5, 0.3, 0.4, 0.5] },
+    opts: { vertexMasks: true, tint: 0x9a927f, scale: 0.26, normalStrength: 1.5, weather: [0.5, 0.3, 0.4, 0.5] },
+  },
+  /** Stencil paint on crates: flat black, sun-faded. */
+  stencil: {
+    name: 'metal_painted',
+    surface: 'wood',
+    opts: { vertexMasks: true, tint: 0x2c2b28, scale: 0.3, wear: [0.4, 0.8, 0.3, 0], roughness: [1.0, 0.25, 0.6], wearColor: 0x6b5a44 },
   },
   /** Brown packing tape: glossy film over the kraft. */
   tape: {

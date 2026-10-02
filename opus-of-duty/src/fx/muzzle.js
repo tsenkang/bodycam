@@ -426,7 +426,7 @@ export function muzzleFlash(fx, o) {
     s.spin = rng.signed() * 1.6;
     s.r0 = 0.5; s.g0 = 0.49; s.b0 = 0.47;
     s.r1 = 0.42; s.g1 = 0.41; s.b1 = 0.4;
-    s.alpha = rng.range(0.10, 0.20) * (0.6 + prof.smoke * 0.5) * emberGain;
+    s.alpha = rng.range(0.16, 0.3) * (0.6 + prof.smoke * 0.5) * emberGain;
     s.alphaCurve = 1.8;
     s.soft = 0.25;
     s.turb = 0.06;
@@ -463,10 +463,12 @@ export function muzzleFlash(fx, o) {
       lp.y + d.y * 0.1,
       lp.z + d.z * 0.1,
       cr, cg, cb,
-      prof.light * lightGain * 0.18,
+      // 0.18 -> 0.3 and 5 -> 6.5 m: the r1 critic still saw no orange pop on
+      // the sandbags 2-3 m out. Below the 0.5+ that clipped them to white.
+      prof.light * lightGain * 0.3,
       0.09,
       16,
-      5 * sc,
+      6.5 * sc,
       2
     );
   }

@@ -288,7 +288,10 @@ export const LIBRARY = {
     bake: { size: 512, worldSize: 0.7, relief: 0.008, seed: 43, tintA: 0x5a5445, tintB: 0x3a3830 },
     mat: {
       scale: 0.7,
-      detail: [6, 0.42, 0.28, 10],
+      // The shared micro set is AGGREGATE (grit, tooth): at 0.28 albedo it put
+      // +/-40% speckle on every canopy — the "felt / 90s carpet" read. Fabric
+      // keeps its micro as relief only.
+      detail: [6, 0.42, 0.05, 10],
       // 1.4 m macro at real contrast: sun-bleached panels and damp panels
       macro: [0.12, 0.34, 0.12, 0.3],
       macroBig: [1.8, 0.07, 0.09, 0],
@@ -311,7 +314,7 @@ export const LIBRARY = {
     mat: {
       scale: 0.5,
       parallax: 0.003,
-      detail: [6, 0.4, 0.28, 9],
+      detail: [6, 0.4, 0.07, 9],
       macro: [0.14, 0.32, 0.12, 0.35],
       macroBig: [1.7, 0.06, 0.11, 0],
       weather: [0.4, 0.15, 0.35, 0.4],
@@ -320,7 +323,8 @@ export const LIBRARY = {
       // a filled bag transmits far less than a stretched canvas
       cloth: [0.06, 0.86, 0.10, 0],
     },
-    three: { physical: true, sheen: 0.4, sheenRoughness: 0.95, sheenColor: 0x9c8b68 },
+    // a low sheen only: at 0.4 the bags picked up a plastic glaze in the sun
+    three: { physical: true, sheen: 0.15, sheenRoughness: 1.0, sheenColor: 0x8a7d62 },
   },
   foliage: {
     glsl: FOLIAGE,

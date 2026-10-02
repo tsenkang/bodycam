@@ -298,12 +298,18 @@ function dressWalls(A, rng, r) {
         fray: 0.014,
         rng,
       });
-      A.addOnce(rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']), cl, LL(IDENT, hx, hy, hz, s.yaw), {
-        masks: [0.35, 0.6, 0.3],
-      });
-      A.add('metal_dark', BOX_FINE(A), LL(IDENT, hx, hy + 0.34, hz, s.yaw, 0.02, 0.02, 0.05), {
-        masks: [0.7, 0.5, 0],
-      });
+      const ck = rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']);
+      // Not on the shopfront piers: there the cloth sits against the bright
+      // opening, unlit by the bulb, and read as a shapeless black slab in the
+      // interior shot. The rng draws above still happen so nothing re-rolls.
+      if (isOpening) {
+        cl.dispose();
+      } else {
+        A.addOnce(ck, cl, LL(IDENT, hx, hy, hz, s.yaw), { masks: [0.35, 0.6, 0.3] });
+        A.add('metal_dark', BOX_FINE(A), LL(IDENT, hx, hy + 0.34, hz, s.yaw, 0.02, 0.02, 0.05), {
+          masks: [0.7, 0.5, 0],
+        });
+      }
     }
   }
 }

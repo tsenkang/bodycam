@@ -17,6 +17,10 @@ import { CombatDemo } from './demo.js';
 
 const MAX_BLIPS = 48;
 
+/** Callsigns for unnamed actors (original, invented tags). */
+const HOSTILE_TAGS = ['Krause_91', 'Dragunov', 'Vasko', 'Orel.K', 'Tarkhan', 'Belov', 'Saber_22', 'Kazan', 'Zorin', 'Petrak', 'Yamal', 'Grom'];
+const FRIENDLY_TAGS = ['Holt', 'Reyes_07', 'Mercer', 'Talon', 'Okafor', 'Haskins', 'Brandt', 'Wolfe'];
+
 /**
  * ===========================================================================
  * HUD / UI subsystem
@@ -222,7 +226,7 @@ export class UiSystem {
         this._lastKillAt = ctx.time.elapsed;
         this.killfeed.push({
           attacker: this.playerName,
-          victim: e.target?.name ?? e.name ?? 'Enemy',
+          victim: this._nameFor(e.target, true),
           headshot: !!e.headshot,
           mine: true,
         });
@@ -253,8 +257,8 @@ export class UiSystem {
       queueMicrotask(() => {
         if (ctx.time.elapsed - this._lastKillAt < 0.3) return; // already credited
         this.killfeed.push({
-          attacker: e?.by?.name ?? 'ENEMY',
-          victim: e?.actor?.name ?? 'OPERATOR',
+          attacker: this._nameFor(e?.by, true),
+          victim: this._nameFor(e?.actor, false),
           attackerFriendly: false,
         });
       });
@@ -286,6 +290,25 @@ export class UiSystem {
     if (!w) return null;
     const s = typeof w.getHudState === 'function' ? w.getHudState() : w.hudState ?? null;
     return s && typeof s === 'object' ? s : null;
+  }
+
+  /**
+   * A stable callsign for an actor that carries no name of its own, so the
+   * killfeed never prints placeholder "ENEMY killed OPERATOR" rows.
+   */
+  _nameFor(actor, hostile) {
+    if (actor && this._isPlayerTarget(actor)) return this.playerName;
+    if (!actor || typeof actor !== 'object') return hostile ? HOSTILE_TAGS[0] : this.playerName;
+    if (typeof actor.name === 'string' && actor.name && !/^(enemy|operator|actor|bot)\b/i.test(actor.name)) return actor.name;
+    const map = (this._names ??= new WeakMap());
+    let n = map.get(actor);
+    if (!n) {
+      const pool = hostile ? HOSTILE_TAGS : FRIENDLY_TAGS;
+      const i = (this._nameCursor = ((this._nameCursor ?? this.rng.int(0, 97)) + 7) % 997);
+      n = pool[i % pool.length];
+      map.set(actor, n);
+    }
+    return n;
   }
 
   /** True when a `damage:dealt` payload is aimed at the local player. */

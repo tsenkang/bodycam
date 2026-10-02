@@ -31,6 +31,12 @@ export function spawnTracer(fx, from, to, speed, opts) {
   const v = Math.min(MAX_SPEED, Math.max(MIN_SPEED, speed || 260));
   const life = dist / v;
   const warm = opts?.warm ?? 1;
+  // The shader draws len = size * (1 + stretch * speed). Authoring `stretch`
+  // as a constant made the streak scale with the 55-340 m/s visual speed: at
+  // 300 m/s the afterglow was 16 m long and every tracer read as a laser line
+  // spanning the whole street (r1 critic). Solve for a fixed world length
+  // instead: a 1.4 m hot core and a 2.6 m afterglow, ~10 % of a street.
+  const stretchFor = (size, len) => Math.max(0, (len / size - 1) / v);
   // Start a little out of the bore so the tracer is not born inside the flash.
   const ox = from.x + dx * 0.25;
   const oy = from.y + dy * 0.25;
@@ -43,7 +49,7 @@ export function spawnTracer(fx, from, to, speed, opts) {
   s.tile = P.STREAK;
   s.size0 = 0.055;
   s.size1 = 0.04;
-  s.stretch = 0.26;
+  s.stretch = stretchFor(0.05, Math.min(1.4, dist * 0.12));
   s.life = life;
   s.drag = 0.02;
   s.gravity = -1.2;
@@ -61,7 +67,7 @@ export function spawnTracer(fx, from, to, speed, opts) {
   s.tile = P.STREAK;
   s.size0 = 0.09;
   s.size1 = 0.07;
-  s.stretch = 0.6;
+  s.stretch = stretchFor(0.08, Math.min(2.6, dist * 0.2));
   s.life = life;
   s.drag = 0.02;
   s.gravity = -1.2;

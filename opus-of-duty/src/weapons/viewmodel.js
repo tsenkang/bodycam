@@ -849,8 +849,9 @@ export class Viewmodel {
     /* -------- moving parts -------------------------------------------- */
     this._updateParts(w, dt, s, res);
 
-    /* -------- reticle -------------------------------------------------- */
+    /* -------- reticle + glass ------------------------------------------ */
     this._updateReticle(w, ads);
+    this._updateGlass(ads);
 
     /* -------- viewmodel FOV ------------------------------------------- */
     const fovBase = 60;
@@ -1045,6 +1046,23 @@ export class Viewmodel {
     // The halo is a bloom seed, not a glow: 6% at 1.6x the core radius adds ~1 px
     // of soft falloff and nothing else.
     this.dotHalo.material.opacity = alpha * 0.06;
+  }
+
+  /**
+   * The lens is a dark coated mirror from outside the eyebox and clear glass
+   * from behind it. The env map is bound to the material itself so its
+   * envMapIntensity (the reflection strength) is honoured; render owns
+   * viewScene.environment and may swap it, so it is re-checked every frame.
+   */
+  _updateGlass(ads) {
+    const g = this.mats.get('glass');
+    const env = this.ctx.viewScene.environment ?? null;
+    if (g.envMap !== env) {
+      g.envMap = env;
+      g.needsUpdate = true;
+    }
+    g.opacity = lerp(0.6, 0.06, ads);
+    g.envMapIntensity = lerp(1.6, 0.35, ads);
   }
 
   /* ====================================================================== */

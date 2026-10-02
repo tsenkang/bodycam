@@ -191,12 +191,14 @@ void owSurface(vec2 uv, out vec3 alb, out float h, out float rough, out float me
   h -= wearField * 0.05;
 
   float pulled = owScratches(p * 3.0, P * 3.0, 18.0, 1.0, 0.68);
-  h += pulled * 0.05;
-  c *= 1.0 - pulled * 0.10;
+  // Pulled threads are relief, barely colour: as an albedo term they turned
+  // every canopy into directional fur at 3-5 m.
+  h += pulled * 0.04;
+  c *= 1.0 - pulled * 0.025;
 
   // ---- stains and dust ----
   float stain = smoothstep(0.55, 0.9, owFbm01(owWarp(p * 1.5 + 7.0, P * 1.5, 1.0, 3), P * 1.5, 5, 0.6));
-  c = mix(c, c * 0.42 + owSRGB(vec3(0.09, 0.08, 0.06)), stain * 0.55);
+  c = mix(c, c * 0.6 + owSRGB(vec3(0.05, 0.045, 0.035)), stain * 0.4);
   rough += stain * 0.05;
 
   float dust = smoothstep(0.4, 0.85, owFbm01(p * 6.0, P * 6.0, 4, 0.5));
@@ -239,9 +241,10 @@ void owSurface(vec2 uv, out vec3 alb, out float h, out float rough, out float me
   vec3 cPale = owSRGB(vec3(0.615, 0.575, 0.470));
   vec3 cSoil = owSRGB(vec3(0.230, 0.180, 0.120));
   vec3 c = mix(cJute, cPale, owHash12(cell + 3.0) * 0.5 + fibre * 0.15);
-  c *= 0.855 + 0.235 * (weave * 0.5 + 0.5);
+  // the weave IS hessian's identity: let it carry real value contrast
+  c *= 0.76 + 0.40 * (weave * 0.5 + 0.5);
   c *= 0.90 + 0.18 * macro;
-  c = mix(c, cSoil, smoothstep(0.42, 0.85, dirt) * 0.60);
+  c = mix(c, cSoil, smoothstep(0.5, 0.9, dirt) * 0.38);
 
   h = 0.50 + weave * 0.38 + (fibre - 0.5) * 0.05;
   rough = 0.90 + (1.0 - weave) * 0.06;
@@ -256,7 +259,7 @@ void owSurface(vec2 uv, out vec3 alb, out float h, out float rough, out float me
   // loose fibres standing off the surface
   float loose = owScratches(p * 4.0, P * 4.0, 10.0, 2.0, 0.70);
   h += loose * 0.06;
-  c = mix(c, cPale, loose * 0.3);
+  c = mix(c, cPale, loose * 0.1);
 
   // spilled sand caught in the weave
   float sand = smoothstep(0.5, 0.85, owFbm01(p * 12.0, P * 12.0, 4, 0.5)) * (1.0 - smoothstep(0.2, 0.7, weave));

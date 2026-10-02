@@ -1030,73 +1030,73 @@ export function catenaryTube(from, to, sagAmt, radius, opts = {}) {
  * of cover in the level read at the wrong scale.
  */
 export function sackGeometry(rng, w = 0.5, h = 0.17, d = 0.3, opts = {}) {
-  const { variant = 0, box = 3.1, lump = 1 } = opts;
-  const g = new THREE.SphereGeometry(0.5, 26, 14);
+  const { variant = 0, lump = 1 } = opts;
+  // 20 height rings so the perimeter seam band has vertices to live on
+  const g = new THREE.SphereGeometry(0.5, 32, 20);
   const pa = g.getAttribute('position');
   const seed = rng.float() * 50;
-  // per-bag phases for the wrinkle field, from the seed (no extra rng draws)
   const wPh = seed * 1.7;
+  /**
+   * A SUPERQUADRIC, not an Lp ball: a filled bag is rectangular in plan (two
+   * flat panels sewn round their edge) but pillowed in section. The old
+   * isotropic Lp shape plus 26% outline noise gave an oval, lobed plan and a
+   * domed section — the "pancake / cookie" read. Plan exponent 7 keeps the
+   * corners square-ish; section exponent 2.4 keeps the faces soft.
+   */
+  const EP = 7.0;
+  const ES = variant === 2 ? 2.9 : 2.4;
   for (let i = 0; i < pa.count; i++) {
-    _v0.fromBufferAttribute(pa, i);
-    // unit direction -> Lp ball: the boxy silhouette of a filled bag
-    let ux = _v0.x * 2;
-    let uy = _v0.y * 2;
-    let uz = _v0.z * 2;
-    const p = box;
-    const q =
-      Math.abs(ux) ** p + Math.abs(uy) ** p + Math.abs(uz) ** p;
-    const f = q > 1e-6 ? 1 / q ** (1 / p) : 1;
-    ux *= f;
-    uy *= f;
-    uz *= f;
-    // the top of a bag under load is flatter than the bottom
-    const flat = uy > 0 ? 1 - uy * uy * 0.2 : 1;
-    const n = fbm3(ux * 3.4 + seed, uy * 3.4 + seed, uz * 3.4 + seed, 3) - 0.5;
-    const n2 = fbm3(ux * 9 + seed * 2, uy * 8 + seed, uz * 9 + seed * 3, 2) - 0.5;
-    let x = ux * w * 0.5 * (1 + n * 0.09 * lump);
-    let z = uz * d * 0.5 * flat * (1 + n * 0.26 * lump + n2 * 0.11 * lump);
-    let y = uy * h * 0.5 * (1 + n * 0.24 * lump + n2 * 0.1 * lump);
-    const t = x / (w * 0.5); // -1..1 along the bag
-    // Tied, folded ends. A bag is gathered and FLATTENED at the seams, not
-    // pinched to a point: pinched ends are what make a stack read as ravioli.
-    const neck = Math.max(0, Math.abs(t) - 0.7) / 0.3;
-    z *= 1 - neck * neck * 0.3;
+    _v0.fromBufferAttribute(pa, i).multiplyScalar(2);
+    const ax = Math.abs(_v0.x);
+    const ay = Math.abs(_v0.y);
+    const az = Math.abs(_v0.z);
+    const plan = (ax ** EP + az ** EP) ** (ES / EP);
+    const N = plan + ay ** ES;
+    const r = N > 1e-9 ? N ** (-1 / ES) : 1;
+    let ux = _v0.x * r;
+    let uy = _v0.y * r;
+    let uz = _v0.z * r;
+    const t = ux; // -1..1 along the bag
+    const tz = uz;
+    // quiet, low-frequency fill variation only — outline noise is what made cookies
+    const n = fbm3(ux * 2.6 + seed, uy * 2.6 + seed, uz * 2.6 + seed, 3) - 0.5;
+    let x = ux * w * 0.5 * (1 + n * 0.035 * lump);
+    let z = uz * d * 0.5 * (1 + n * 0.05 * lump);
+    let y = uy * h * 0.5 * (1 + n * 0.12 * lump);
+    // the perimeter seam: a 6-8 mm lip where top and bottom panels are sewn
+    const band = Math.exp(-((uy / 0.13) ** 2));
+    const lip = 1 + band * 0.028;
+    x *= 1 + (lip - 1) * 0.5;
+    z *= lip;
+    // ears: the four corners are unfilled cloth, flattened and splayed
+    const corner = Math.max(0, Math.abs(t) - 0.72) / 0.28 * Math.max(0, Math.abs(tz) - 0.6) / 0.4;
+    y *= 1 - corner * 0.75;
+    x += Math.sign(t) * corner * w * 0.025;
+    z += Math.sign(tz) * corner * d * 0.03;
+    // tied end at +x: gathered and flattened, with radial pleats into the tie
+    const neck = Math.max(0, t - 0.74) / 0.26;
     y *= 1 - neck * neck * 0.55;
-    // Gathered cloth: radial pleats converge on the tie, so the end of a bag is
-    // a fan of folds rather than a smooth dome.
+    z *= 1 - neck * neck * 0.38;
     const ang = Math.atan2(uy, uz);
-    const pleatZone = Math.max(0, Math.abs(t) - 0.45) / 0.55;
-    const pleat = pleatZone * pleatZone * (0.5 + 0.5 * Math.sin(ang * 7 + wPh + t * 2.0));
-    y *= 1 - pleat * 0.16;
-    z *= 1 - pleat * 0.16;
-    // Crumple creases across the body: thin ridged valleys where the hessian
-    // has buckled under the load, which is what kills the inflated-capsule read.
-    const cr = Math.abs(fbm3(ux * 2.1 + wPh, uy * 1.3 + seed, uz * 2.3 - wPh, 2) - 0.5);
-    const crease = Math.exp(-((cr / 0.05) ** 2)) * (1 - neck) * lump;
-    y *= 1 - crease * 0.07;
-    z *= 1 - crease * 0.05;
-    // the sewn end seam stands out as a small flat lip
-    if (neck > 0.55) y += Math.sign(uy) * h * 0.02 * (neck - 0.55) * 2;
-    // the sewn seam runs the length of the crown on every bag
-    if (uy > 0.15) y += h * 0.05 * Math.exp(-((z / (d * 0.42)) ** 2) * 6) * (1 - neck * 0.8);
-    if (variant === 0) {
-      z *= 1 + 0.06 * Math.cos(t * 2.6);
-    } else if (variant === 1) {
+    y *= 1 - neck * (0.5 + 0.5 * Math.sin(ang * 9 + wPh)) * 0.14;
+    // the sewn end at -x stays square: a flat seam fin
+    if (t < -0.9) y *= 1 - (-t - 0.9) * 2.5;
+    // load creases across the top panel: ridged, shallow
+    if (uy > 0) {
+      const cr = Math.abs(fbm3(ux * 2.3 + wPh, 1.7, uz * 3.1 - wPh, 2) - 0.5);
+      y -= h * 0.06 * Math.exp(-((cr / 0.045) ** 2)) * uy * lump;
+    }
+    if (variant === 1) {
       // slumped: fat at -x, sagging waist, dished top
-      x += w * 0.04 * t;
-      const fatter = 1 + 0.13 * (0.5 - t);
+      const fatter = 1 + 0.1 * (-t);
       z *= fatter;
-      y *= fatter * (1 - 0.16 * Math.exp(-((t / 0.32) ** 2)));
+      y *= fatter * (1 - 0.12 * Math.exp(-((t / 0.32) ** 2)));
       if (uy > 0.3) y -= h * 0.05 * Math.exp(-((t / 0.45) ** 2));
-    } else {
-      // half-empty: crease across the waist, flat folded end at +x
-      const crease = Math.exp(-(((t - 0.1) / 0.16) ** 2));
-      z *= 1 - crease * 0.2;
-      y *= 1 - crease * 0.26;
-      if (t > 0.5) {
-        y *= 1 - (t - 0.5) * 0.5;
-        z *= 1 + (t - 0.5) * 0.22;
-      }
+    } else if (variant === 2) {
+      // under-filled: a crease across the waist and a flatter body
+      const cre = Math.exp(-(((t - 0.1) / 0.14) ** 2));
+      y *= 0.9 * (1 - cre * 0.2);
+      z *= 1 - cre * 0.08;
     }
     pa.setXYZ(i, x, y, z);
   }

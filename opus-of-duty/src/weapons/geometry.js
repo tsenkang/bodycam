@@ -334,7 +334,9 @@ export function picatinny(len, opts = {}) {
     [width / 2, topH - ch],
     [waist / 2, 0],
   ];
-  const tooth = extrude(profile, toothLen, { bevel: 0.00025, bevelSegments: 1 });
+  // 0.6 mm rounded bevel, two segments: with 0.25 mm and one segment every
+  // tooth edge was a knife edge and the rail read as a LEGO brick (r1 critic).
+  const tooth = extrude(profile, toothLen, { bevel: 0.0006, bevelSegments: 2 });
   for (let i = 0; i < teeth; i++) {
     const z = len / 2 - toothLen / 2 - i * pitch;
     if (z - toothLen / 2 < -len / 2) break;

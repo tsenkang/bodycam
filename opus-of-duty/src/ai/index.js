@@ -1007,6 +1007,15 @@ export class AiSystem {
           if (!this.phys.lineOfSight(cam.position, chest, this.phys.MASK.SIGHT)) continue;
           chest.set(x, fy + 1.62, z);
           if (!this.phys.lineOfSight(cam.position, chest, this.phys.MASK.SIGHT)) continue;
+          // and both shoulders and the hips: a pole or post in line with the
+          // body's centre used to pass the two centre rays and still split
+          // the man in half on screen
+          let clear = true;
+          for (const [s, h] of [[-0.28, 1.35], [0.28, 1.35], [0, 0.95], [-0.2, 0.95], [0.2, 0.95]]) {
+            chest.set(x + rx * s, fy + h, z + rz * s);
+            if (!this.phys.lineOfSight(cam.position, chest, this.phys.MASK.SIGHT)) { clear = false; break; }
+          }
+          if (!clear) continue;
         }
         let score = Math.abs(ndc - ndcX) * 9 + Math.abs(depth - wantDepth) * 0.5;
         // prefer standing next to something solid
@@ -1050,15 +1059,17 @@ export class AiSystem {
       // hero: up and firing, left of frame, close enough to read the kit;
       // leaning out toward frame centre (his left) the way a man shoots round
       // a corner
-      ['vanguard', -0.44, 8.0, false, 0, true, 0, -0.75],
-      // second man crouched in cover, right of frame
-      ['breacher', 0.30, 12.0, true, 0, true, 0],
+      // (the viewmodel owns the lower right of the frame from x ~ 0.0 NDC,
+      // so every man stands left of centre or high enough above it to read)
+      ['vanguard', -0.52, 8.0, false, 0, true, 0, -0.75],
+      // second man crouched in cover, centre-left
+      ['breacher', -0.22, 11.0, true, 0, true, 0],
       // one caught mid-stride between positions
-      ['irregular', -0.14, 16.0, false, 4.1, false, 0],
-      // one reloading behind cover on the far right
-      ['vanguard', 0.60, 9.5, true, 0, true, 3.4],
+      ['irregular', -0.02, 17.0, false, 4.1, false, 0],
+      // one reloading behind cover, far left
+      ['vanguard', -0.78, 10.5, true, 0, true, 3.4],
       // depth: a fifth man well down the street
-      ['irregular', -0.26, 22.0, false, 0, true, 0],
+      ['irregular', -0.36, 21.0, false, 0, true, 0],
     ];
 
     const placedPositions = [];
@@ -1097,7 +1108,7 @@ export class AiSystem {
 
     // One man already down, handed to the ragdoll solver with the round's
     // impulse — it dresses the tableau and it exercises the death path.
-    const dPos = this._stageSlot(cam, -0.58, 9.4, placedPositions);
+    const dPos = this._stageSlot(cam, -0.62, 13.0, placedPositions);
     const casualty = this.spawn('breacher', dPos, Math.atan2(cam.position.x - dPos.x, cam.position.z - dPos.z));
     squad.add(casualty);
     casualty.animator.update(0.016, 0);

@@ -76,6 +76,12 @@ export class CascadedShadowMaps {
       owSunDirWorld: { value: new THREE.Vector3(0, 1, 0) },
       // x strength, y tan(sun angular radius), z max filter radius (texels), w temporal rotation
       owCsmParams: { value: new THREE.Vector4(1, 0.022, 9, 0) },
+      // 1 = rotate the PCF/blocker disc per pixel by interleaved gradient noise
+      // (only correct when TAA integrates it away), 0 = fixed disc. The
+      // renderer drops it to 0 for the viewmodel pass (composited after TAA)
+      // and for every pass when TAA is off: un-resolved IGN is the regular
+      // stipple the r1 critic found over every surface of the gun.
+      owCsmNoise: { value: 1 },
     };
 
     this.depthMaterial = new THREE.ShaderMaterial({
@@ -479,6 +485,7 @@ uniform vec2 owCsmMapSize;
 uniform vec3 owSunDirView;
 uniform vec3 owSunDirWorld;
 uniform vec4 owCsmParams;
+uniform float owCsmNoise;
 
 float owIGNoise( vec2 p ) {
   return fract( 52.9829189 * fract( dot( p, vec2( 0.06711056, 0.00583715 ) ) ) );
@@ -554,7 +561,7 @@ float owSunShadow( vec3 lightDirView, vec3 posView, vec3 nrmView ) {
   float NdL = dot( wN, owSunDirWorld );
   if ( NdL <= 0.0 ) return 1.0;
 
-  float rot = owIGNoise( gl_FragCoord.xy + owCsmParams.w ) * 6.2831853;
+  float rot = owCsmNoise > 0.5 ? owIGNoise( gl_FragCoord.xy + owCsmParams.w ) * 6.2831853 : 0.37;
 
   int c = OW_CASCADES - 1;
   for ( int i = 0; i < OW_CASCADES; i ++ ) {

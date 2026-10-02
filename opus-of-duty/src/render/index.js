@@ -447,6 +447,12 @@ export class RenderSystem {
       // a hole. Daylight outdoors the world's own bands already beat it, so it
       // only binds indoors, after dark and in deep shade.
       viewFloor: 2.0,
+      // EV the meter opens up by when the CAMERA is inside an interior volume.
+      // A centre-weighted meter looking out of a doorway exposes for the street
+      // and leaves the room it is standing in as mush (r1 critic: the exterior
+      // was "barely brighter than the interior wall"). The eye adapts to the
+      // room; the street through the opening should clip.
+      indoorExposureLift: 1.1,
       shadowStrength: 1.0,
       sunSoftness: 0.024,
     };
@@ -1469,6 +1475,7 @@ export class RenderSystem {
 
     const feat = this.patcher.uniforms.owFeat.value;
     feat.set(0, 0, 0, 1);
+    this.csm.uniforms.owCsmNoise.value = this.taa ? 1 : 0;
 
     // ---- 5/6/7. AO, contact shadows, reflections --------------------------
     if (this.gtao && this.needsPrepass) {
@@ -1536,6 +1543,7 @@ export class RenderSystem {
       const fContact = feat.y;
       const fSsr = feat.z;
       if (!coherent) this.csm.uniforms.owCsmParams.value.x = 0;
+      this.csm.uniforms.owCsmNoise.value = 0;
       // AO, contact shadows and SSR are WORLD screen-space buffers: at the
       // weapon's pixels they describe the wall behind it. Never for the gun.
       feat.x = 0;
@@ -1584,6 +1592,7 @@ export class RenderSystem {
       renderer.setClearColor(0x000000, 1);
 
       this.csm.uniforms.owCsmParams.value.x = prevStrength;
+      this.csm.uniforms.owCsmNoise.value = this.taa ? 1 : 0;
       feat.x = fAo;
       feat.y = fContact;
       feat.z = fSsr;
@@ -1669,7 +1678,7 @@ export class RenderSystem {
       // a street canyon under a four-degree sun is entirely in shade, and a meter
       // weighted onto that geometry opens up two stops and flattens the sky it is
       // lit by. See SkySystem.exposureBias.
-      s.exposureBias + this._skyExposureBias,
+      s.exposureBias + this._skyExposureBias - s.indoorExposureLift * this._viewIndoor,
       s.exposureKey,
       this.needsPrepass ? this.depthTexture : null
     );

@@ -356,7 +356,7 @@ export class FxSystem {
     // top of the hand in the L 190-235 band on the flash frame, with 1/d^2 giving
     // the warm falloff back to the magwell for free. At the old 0.26 the kick was
     // under a stop and measured as "zero warm gradient anywhere".
-    const peak = Math.max(0.04, key * 0.72 * clamp(strength, 0.05, 2.2));
+    const peak = Math.max(0.04, key * 1.05 * clamp(strength, 0.05, 2.2));
     // Lifted off the bore axis: a source sitting exactly on the axis rakes the
     // top of the receiver at N.L ~ 0.15 and the kick disappears. Real flash gas
     // is a ball around the crown, so 4 cm of height buys the whole top surface.
@@ -1091,6 +1091,18 @@ export class FxSystem {
   _stageShell() {
     const cam = this.ctx.camera;
     cam.updateMatrixWorld();
+    // From the weapon's real ejection port when there is a weapon: brass that
+    // appears from a fixed offset off the eye floated at the screen edge,
+    // nowhere near the receiver (r1 critic).
+    const vm = this.ctx.peek('weapons')?.viewmodel;
+    if (typeof vm?.ejectWorld === 'function' && vm.active) {
+      vm.ejectWorld(this._tmpA);
+      if (typeof vm.ejectVelocity === 'function') vm.ejectVelocity(this._tmpB, this.rng.range(2.3, 3.4));
+      else this._tmpB.set(2.4, 0, 0).transformDirection(cam.matrixWorld).multiplyScalar(2.6);
+      this._tmpB.y += 1.1;
+      this.spawnShell(this._tmpA, this._tmpB);
+      return;
+    }
     this._tmpA.set(0.2, -0.1, -0.45).applyMatrix4(cam.matrixWorld);
     this._tmpB.set(this.rng.range(1.3, 2.1), this.rng.range(1.2, 2.0), this.rng.range(-0.4, 0.4));
     this._tmpB.applyMatrix4(cam.matrixWorld).sub(cam.position);

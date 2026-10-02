@@ -24,6 +24,24 @@ import * as THREE from 'three';
  * Cavity grime (weather.w) is height-driven and stays on.
  */
 
+/**
+ * ROUND-1 PHYSICAL RECALIBRATION — supersedes every "a third of physical",
+ * "x0.1" and "specularIntensity 0.1" note further down.
+ *
+ * Render now lights the viewmodel with the WORLD's light at the camera (see
+ * the VIEWMODEL LIGHTING CONTRACT in render/index.js and shots/look/
+ * CONTRACT.md), so the 20x studio rig those notes compensated for is gone and
+ * albedos are physical. `tint` multiplies the surface's own baked albedo
+ * (rubber bake ~0.033 linear, fabric bakes per their tintA/tintB), so:
+ *   anodised alu ~0.040   black polymer ~0.050   rubber ~0.031
+ *   FDE ~0.20             phosphate F0 ~0.2      black glove ~0.045
+ *   ranger-green sleeve ~0.11
+ * Dielectrics get their specular back (0.45-0.75): with honest lighting the sky
+ * reflection is what defines a black rifle's form, as in the Warzone frame.
+ * Edge wear is BARE ALUMINIUM — a metal at F0 ~0.45-0.5 after tint — so the
+ * rail crowns, chamfers and the optic rim polish through to bright alloy.
+ */
+
 /** Shared base for every weapon surface. */
 const BASE = {
   uvMode: 'triplanar',
@@ -49,6 +67,28 @@ const BASE = {
 };
 
 const c = (r, g, b) => new THREE.Color(r, g, b);
+
+/**
+ * Additive blending that adds COLOUR ONLY and leaves the target's alpha alone.
+ *
+ * The viewmodel is drawn into its own target cleared to transparent and then
+ * composited over the world as premultiplied colour + coverage (render step
+ * 14). THREE.AdditiveBlending also adds into alpha, so every additive quad —
+ * the reticle glow above all, a 2x2 plane — wrote coverage across its whole
+ * square and the composite drew the quad's near-black texels OVER the world:
+ * the opaque dark square behind the red dot in the r1 ADS frame. With alpha
+ * untouched, an additive pixel over empty background composites as pure
+ * light added to the world, which is what an emitter seen through glass is.
+ */
+const ADD_KEEP_ALPHA = {
+  blending: THREE.CustomBlending,
+  blendEquation: THREE.AddEquation,
+  blendSrc: THREE.SrcAlphaFactor,
+  blendDst: THREE.OneFactor,
+  blendEquationAlpha: THREE.AddEquation,
+  blendSrcAlpha: THREE.ZeroFactor,
+  blendDstAlpha: THREE.OneFactor,
+};
 
 /**
  * How much of the sky hemisphere a shouldered weapon actually sees. Applied to
@@ -136,7 +176,7 @@ export const WEAPON_MATERIALS = {
        *
        * The hue is unchanged: 0.285/0.302/0.349 is the same cool blue-grey ratio.
        */
-      tint: c(0.285, 0.302, 0.349),
+      tint: c(1.12, 1.18, 1.32),
       /**
        * `roughness` is [scale, offset, minimum] against the surface's own ORM
        * green channel (see materials/shader.js), so raising the scale raises the
@@ -145,7 +185,7 @@ export const WEAPON_MATERIALS = {
        * roughness modulation is visible as a grain.
        */
       roughness: [0.66, 0.09, 0.24],
-      three: { physical: true, specularIntensity: 0.11 },
+      three: { physical: true, specularIntensity: 0.75 },
       /**
        * normalStrength 0.5 -> 1.05 and the detail layer's amplitudes roughly
        * tripled. Both were tuned when the surface was specular-dominated, where a
@@ -192,8 +232,8 @@ export const WEAPON_MATERIALS = {
        * exposure band; roughness 0.30 -> 0.54 and metalness 1.0 -> 0.8 take the
        * mirror out of it.
        */
-      wearColor: 0x34383d,
-      wearMaterial: [0.54, 0.8, 0, 0.8],
+      wearColor: 0xb4b8bd,
+      wearMaterial: [0.34, 1.0, 0, 1.0],
       grimeColor: 0x0b0a08,
     },
   ],
@@ -226,7 +266,7 @@ export const WEAPON_MATERIALS = {
        // world wall at 169 — a black sight reading as mid-grey plastic. x1.45
        // (0.135) lands it at ~70 with its chamfers still reaching 180+, which is
        // what a Type-III anodised housing looks like with a key on it.
-       tint: c(0.135, 0.144, 0.165),
+       tint: c(1.0, 1.06, 1.18),
       // Same 0.22 floor as `alu`: this material carries the optic body, and the
       // bezel around the objective is exactly where a smooth facet turns into a
       // cream grazing ring in ADS.
@@ -239,8 +279,8 @@ export const WEAPON_MATERIALS = {
       wear: [0.18, 0.5, 0.5, 0],
       // Same argument as `alu`: the turret caps, the clamp rings and the mount are
       // all small convex parts whose every vertex reads as an edge.
-      wearColor: 0x40444a,
-      wearMaterial: [0.5, 0.8, 0, 0.75],
+      wearColor: 0xa9adb2,
+      wearMaterial: [0.36, 1.0, 0, 1.0],
       grimeColor: 0x0b0a08,
       /**
        * In ADS the eye looks straight down the tube, so every ray just outside the
@@ -265,7 +305,7 @@ export const WEAPON_MATERIALS = {
        * sight is no longer aluminium at all, it is a rubber bezel that wraps past
        * the widest point of the housing (see parts.js buildOptic `cup`).
        */
-      three: { physical: true, specularIntensity: 0.08 },
+      three: { physical: true, specularIntensity: 0.45 },
     },
   ],
 
@@ -288,7 +328,7 @@ export const WEAPON_MATERIALS = {
       ...BASE,
       bake: { size: 512, seed: 811, relief: 0.001 },
       scale: 0.03,
-      tint: c(1.9, 1.9, 1.95),
+      tint: c(9.0, 9.0, 9.3),
       roughness: [0.7, 0.08, 0.5],
       normalStrength: 0.4,
       detail: [16, 0.3, 0.3, 3],
@@ -333,7 +373,7 @@ export const WEAPON_MATERIALS = {
        * there is; 0.17 x the brushed base is the bottom of that band and it is what
        * makes a barrel read as parkerised rather than as bare stainless.
        */
-      tint: c(0.17, 0.162, 0.152),
+      tint: c(0.42, 0.4, 0.37),
       /**
        * The metal_brushed ORM runs ~0.30 to ~0.60. The old [1.5, 0.34] mapped
        * that to 0.79-1.0 — i.e. saturated matte over almost the whole range, and
@@ -404,7 +444,7 @@ export const WEAPON_MATERIALS = {
        * ~0.013 linear, level with the anodised receiver, which is what a carbon-
        * caked brake looks like next to the rifle it is screwed to.
        */
-      tint: c(0.022, 0.02, 0.018),
+      tint: c(0.9, 0.85, 0.8),
       /**
        * Floored at 0.80, higher than anything else on the weapon. MEASURED: at
        * 0.62 the brake's top facet still rendered a 25 x 12 px cream highlight at
@@ -447,7 +487,7 @@ export const WEAPON_MATERIALS = {
        * floor from 0.34 to 0.48. It is still visibly the glossiest class on the
        * weapon; it is no longer chrome.
        */
-      tint: c(0.155, 0.155, 0.164),
+      tint: c(0.62, 0.62, 0.65),
       /**
        * Bolt carrier / charging handle / trigger: the shiniest thing on the gun,
        * 0.44-0.57, floor 0.40.
@@ -488,7 +528,7 @@ export const WEAPON_MATERIALS = {
       // Metal, so this is F0 — see the note on `steel`. 0.24 -> 0.19 with the
       // roughness floor up: a nitrided slide is dark but it absolutely has a
       // highlight running down its top edge, and that highlight is the whole read.
-      tint: c(0.155, 0.158, 0.165),
+      tint: c(0.34, 0.345, 0.36),
       roughness: [0.56, 0.14, 0.36],
       normalStrength: 0.95,
       detail: [18, 0.7, 0.3, 5],
@@ -520,7 +560,7 @@ export const WEAPON_MATERIALS = {
       // x2.7 with `alu`, keeping the 15%-darker/warmer offset that is the whole
       // polymer-vs-alloy separation cue: ~0.0075/0.0070/0.0064 linear against the
       // anodising's 0.0095/0.0101/0.0117.
-      tint: c(0.224, 0.211, 0.192),
+      tint: c(1.55, 1.48, 1.38),
       // 0.61-0.75 — semi-matte, a full 0.25 rougher than the anodising, so the
       // two catch the sky at visibly different rates as the gun sways.
       roughness: [0.63, 0.15, 0.3],
@@ -532,13 +572,13 @@ export const WEAPON_MATERIALS = {
       normalStrength: 1.5,
       detail: [26, 1.15, 0.55, 6],
       wear: [0.26, 0.6, 0.5, 0],
-      wearColor: 0x3e4145,
+      wearColor: 0x5a5c60,
       wearMaterial: [0.46, 0.0, 0, 0.5],
       grimeColor: 0x0b0a08,
       // Glass-filled nylon is a low-gloss dielectric: 0.02-0.025 reflectance, not
       // glass's 0.04. Same argument as `alu`, and the handguard panels are the
       // largest single area on the weapon so it matters most here.
-      three: { physical: true, specularIntensity: 0.13 },
+      three: { physical: true, specularIntensity: 0.5 },
     },
   ],
 
@@ -553,7 +593,7 @@ export const WEAPON_MATERIALS = {
       // furniture, dark enough to be paint. Only 1.6x rather than the 2.7x the
       // black polymer got — FDE is already the light material on the gun and it
       // must not become the brightest thing in the frame.
-      tint: c(0.62, 0.498, 0.358),
+      tint: c(6.9, 5.5, 3.9),
       roughness: [0.63, 0.16, 0.3],
       normalStrength: 1.2,
       detail: [24, 1.0, 0.5, 5],
@@ -561,7 +601,7 @@ export const WEAPON_MATERIALS = {
       wearColor: 0x5c5340,
       wearMaterial: [0.44, 0.0, 0, 0.5],
       grimeColor: 0x0f0c08,
-      three: { physical: true, specularIntensity: 0.14 },
+      three: { physical: true, specularIntensity: 0.5 },
     },
   ],
 
@@ -575,7 +615,7 @@ export const WEAPON_MATERIALS = {
       // Rubber overmould: the darkest thing on the weapon, ~0.0049 linear after the
       // recalibration. Very slightly warm rather than dead neutral — moulded EPDM
       // is never blue.
-      tint: c(0.147, 0.137, 0.127),
+      tint: c(0.95, 0.9, 0.85),
       roughness: [0.86, 0.04, 0.55],
       normalStrength: 1.35,
       // 1.2 mm pebble at this tile, at full amplitude. This material now carries
@@ -595,7 +635,7 @@ export const WEAPON_MATERIALS = {
        * the outer circle of the whole ADS frame, so the grazing clamp is not
        * optional here — it is the reason the cream ring is gone.
        */
-      three: { physical: true, specularIntensity: 0.12 },
+      three: { physical: true, specularIntensity: 0.45 },
     },
   ],
 
@@ -707,7 +747,7 @@ export const WEAPON_MATERIALS = {
        * same kit at the same wash; 0.19 lands the shell ~0.35 stop under the
        * sleeve, which is the interval the original note asked for. */
       // Black synthetic-leather shooting glove, as in the MW2019/Warzone refs.
-      tint: c(0.085, 0.08, 0.076),
+      tint: c(1.5, 1.45, 1.4),
       // 0.9+ is non-negotiable: a glove has no gloss lobe at all. The floor
       // stops the fabric ORM dipping into anything that could catch a highlight.
       roughness: [0.92, 0.06, 0.78],
@@ -750,7 +790,7 @@ export const WEAPON_MATERIALS = {
         // 0.45 -> 0.16 with the rest of the viewmodel (see `alu`). Leather's
         // specular reflectance is ~0.02; at 0.04 the back of a gloved hand is a
         // flat Fresnel sheet, which is the "robot armour" read in one number.
-        specularIntensity: 0.16,
+        specularIntensity: 0.5,
       },
       // A glove is not an awning: `fabric` ships a 0.20 sun-transmission term
       // (for canvas canopies) that the library merge was handing to the hand.
@@ -769,7 +809,7 @@ export const WEAPON_MATERIALS = {
       // rather than as bolted-on plate. Recalibrated with the shell (see `glove`):
       // 0.20 -> 0.072 lands the TPR at ~0.0024 linear, half a stop under the
       // glove's 0.0051 — the same interval as before, at a readable exposure.
-      tint: c(0.05, 0.048, 0.047),
+      tint: c(1.45, 1.42, 1.4),
       roughness: [1.0, 0.0, 0.78],
       /**
        * 1.3 -> 0.7. At 1.3 the rubber surface's own relief was deep enough that
@@ -787,7 +827,7 @@ export const WEAPON_MATERIALS = {
       // Moulded TPR is a low-reflectance elastomer, not glass. Same reason as
       // `glove`: the flat 0.04 dielectric lobe on four knuckle caps facing the
       // key is the "robot armour" read.
-      three: { physical: true, specularIntensity: 0.15 },
+      three: { physical: true, specularIntensity: 0.45 },
     },
   ],
 
@@ -809,7 +849,7 @@ export const WEAPON_MATERIALS = {
       // 1.85x the recalibrated shell (0.115): a seam is a doubled, proud,
       // dye-worn edge, and at 1-3 px wide it needs more separation than 1.4x to
       // survive the AA filter. Same warm ratio as the shell.
-      tint: c(0.16, 0.152, 0.145),
+      tint: c(1.8, 1.75, 1.7),
       roughness: [0.9, 0.06, 0.74],
       normalStrength: 1.0,
       detail: [24, 0.6, 0.45, 5],
@@ -822,7 +862,7 @@ export const WEAPON_MATERIALS = {
         sheen: 0.08,
         sheenRoughness: 0.94,
         sheenColor: 0x2a2018,
-        specularIntensity: 0.16,
+        specularIntensity: 0.5,
       },
       cloth: [0, 1, 0, 0],
     },
@@ -856,7 +896,7 @@ export const WEAPON_MATERIALS = {
        * warmest object on the rig.
        */
       // Ranger-green ripstop (was coyote): reads as kit, separates from the sand.
-      tint: c(0.1, 0.112, 0.08),
+      tint: c(1.45, 1.4, 1.35),
       roughness: [0.95, 0.05, 0.8],
       normalStrength: 1.45,
       // ~6 mm ripstop grid at this tile, at full amplitude on both albedo and
@@ -881,7 +921,7 @@ export const WEAPON_MATERIALS = {
         sheenRoughness: 0.96,
         sheenColor: 0x38301f,
         // 0.4 -> 0.14, with the rest of the viewmodel. Ripstop is ~0.016.
-        specularIntensity: 0.14,
+        specularIntensity: 0.5,
       },
       // `fabric` in the library is authored for market awnings and ships a 0.20
       // sun-transmission term plus an underside darkening. A sleeve is opaque.
@@ -1006,7 +1046,7 @@ export class WeaponMaterials {
       color: new THREE.Color(0x9fc4d8).multiplyScalar(intensity),
       transparent: true,
       opacity: 0.5,
-      blending: THREE.AdditiveBlending,
+      ...ADD_KEEP_ALPHA,
       depthWrite: false,
       side: THREE.DoubleSide,
       toneMapped: true,
@@ -1040,47 +1080,30 @@ export class WeaponMaterials {
     // is the *absorption*, so it has to stay low: at 0.3 the sight reads as a
     // smoked lens and the world behind it goes muddy.
     m = new THREE.MeshPhysicalMaterial({
-      color: 0x121c22,
+      // Deep blue-green body. `opacity` is driven per frame by the viewmodel
+      // (Viewmodel._updateGlass): ~0.6 in hipfire, where a coated objective
+      // seen from outside the eyebox is a dark mirror with a coloured
+      // reflection — never the flat grey disc the r1 critic called "dead" — and
+      // ~0.06 in ADS, where the eye is on axis and the glass is near-clear.
+      color: 0x06121a,
       transparent: true,
-      opacity: 0.1,
-      // 0.03: inside the 0.02-0.04 band. Below 0.02 the reflection collapses to
-      // a single pixel-sized sun spot and the lens reads as a hole again.
-      roughness: 0.03,
+      opacity: 0.6,
+      roughness: 0.04,
       metalness: 0,
       ior: 1.52,
-      reflectivity: 0.55,
       specularIntensity: 1,
       // GREEN at normal incidence — the residual an AR stack cannot cancel.
-      specularColor: new THREE.Color(0x59c489),
-      /**
-       * The AR stack. A broadband anti-reflective coating IS a thin film, so the
-       * physically-correct way to get "cyan on axis, magenta at the rim" is
-       * three's iridescence term rather than a hand-authored gradient: the
-       * thickness range below is a real 5-layer MgF2/TiO2 stack (310-560 nm),
-       * which swings the reflected hue from cyan-green through violet to magenta
-       * across the last ~25 degrees of view angle. Without this the lens shows
-       * the raw world and there is no cue that there is any glass in the tube at
-       * all — which is exactly what the critique measured.
-       */
+      specularColor: new THREE.Color(0x6fd49a),
+      // A real thin film for the cyan -> violet -> magenta swing off axis.
       iridescence: 1,
-      iridescenceIOR: 1.4,
-      iridescenceThicknessRange: [220, 560],
-      /**
-       * MAGENTA at grazing — sheen is a pure Fresnel-weighted rim lobe, so it is
-       * ~0 down the axis and dominant by 70 degrees, which is exactly the swing a
-       * coated objective makes as you roll off it.
-       *
-       * 0.85 / roughness 0.08 -> 0.42 / 0.30. MEASURED in the ADS frame: a tight
-       * magenta rim lobe on a curved lens element, sampled against an 8-bit
-       * framebuffer with the composite's grain on top, resolved as a field of
-       * violet chroma speckle across the whole optic — read as compression
-       * artefacts rather than as a coating. Halving the amplitude and quadrupling
-       * the lobe width keeps the hue swing and takes the noise out of it.
-       */
-      sheen: 0.42,
-      sheenColor: new THREE.Color(0xa856b8),
-      sheenRoughness: 0.3,
-      envMapIntensity: 2.4,
+      iridescenceIOR: 1.38,
+      iridescenceThicknessRange: [240, 600],
+      sheen: 0.5,
+      sheenColor: new THREE.Color(0xb050c8),
+      sheenRoughness: 0.35,
+      // Only honoured because the viewmodel binds the env map to this material
+      // directly (scene.environment alone would use environmentIntensity).
+      envMapIntensity: 1.6,
       side: THREE.DoubleSide,
       depthWrite: false,
       premultipliedAlpha: true,
@@ -1216,7 +1239,7 @@ export class WeaponMaterials {
       color: new THREE.Color(color).multiplyScalar(intensity),
       map: this._glowTex,
       transparent: true,
-      blending: THREE.AdditiveBlending,
+      ...ADD_KEEP_ALPHA,
       depthWrite: false,
       depthTest: true,
       side: THREE.DoubleSide,
@@ -1238,7 +1261,7 @@ export class WeaponMaterials {
       color: new THREE.Color(color).multiplyScalar(intensity),
       transparent: true,
       opacity: 1,
-      blending: THREE.AdditiveBlending,
+      ...ADD_KEEP_ALPHA,
       depthWrite: false,
       depthTest: true,
       side: THREE.DoubleSide,

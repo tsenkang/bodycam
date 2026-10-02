@@ -225,7 +225,7 @@ export class Minimap {
     // runs come out exactly axis-aligned in the level frame they were authored
     // in and tile without seams.
     const STEP = 0.5;
-    g.fillStyle = '#63717e';
+    g.fillStyle = '#7b8389';
     for (let lz = -64; lz < 54; lz += STEP) {
       let run = -1;
       for (let lx = -44; lx <= 44 + STEP; lx += STEP) {
@@ -259,6 +259,25 @@ export class Minimap {
       g.fillStyle = 'rgba(3,7,10,.34)';
       g.fillRect(x0, z0 + spec.d - 0.34, spec.w, 0.34);
       g.fillRect(x0 + spec.w - 0.34, z0, 0.34, spec.d);
+      // roof furniture: a parapet line inset from the edge and a few plant
+      // boxes / stair heads, so a block reads as a roof, not a grey tile
+      if (spec.w > 2.5 && spec.d > 2.5) {
+        g.strokeStyle = 'rgba(150,170,186,.28)';
+        g.lineWidth = 0.22;
+        g.strokeRect(x0 + 0.55, z0 + 0.55, spec.w - 1.1, spec.d - 1.1);
+        const rng = this.rng;
+        const nBox = 1 + Math.floor(rng.float() * 3);
+        for (let b = 0; b < nBox; b++) {
+          const bw = 0.9 + rng.float() * 1.4;
+          const bd = 0.9 + rng.float() * 1.2;
+          const bx = x0 + 0.9 + rng.float() * Math.max(0.1, spec.w - bw - 1.8);
+          const bz = z0 + 0.9 + rng.float() * Math.max(0.1, spec.d - bd - 1.8);
+          g.fillStyle = 'rgba(120,138,152,.34)';
+          g.fillRect(bx, bz, bw, bd);
+          g.fillStyle = 'rgba(2,5,8,.35)';
+          g.fillRect(bx + 0.2, bz + bd, bw, 0.22);
+        }
+      }
     }
     g.setTransform(1, 0, 0, 1, 0, 0);
 
@@ -516,15 +535,15 @@ export class Minimap {
         g.translate(dx, dy);
         if (b.kind !== 'friend') {
           g.fillStyle = '#ff3b2a';
-          g.strokeStyle = 'rgba(40,6,4,.85)';
-          g.lineWidth = 1 * u;
+          g.strokeStyle = 'rgba(255,226,220,.9)';
+          g.lineWidth = 1.1 * u;
           g.beginPath();
-          g.arc(0, 0, 3.6 * u, 0, Math.PI * 2);
+          g.arc(0, 0, 5 * u, 0, Math.PI * 2);
           g.fill();
           g.stroke();
         } else {
           g.rotate(((b.heading ?? 0) * Math.PI) / 180);
-          const r = 3.6 * u;
+          const r = 4.6 * u;
           g.fillStyle = '#62b6ff';
           g.strokeStyle = 'rgba(4,16,30,.85)';
           g.lineWidth = 1 * u;

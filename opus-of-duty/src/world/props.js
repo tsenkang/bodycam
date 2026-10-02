@@ -186,6 +186,76 @@ function crateHardware(s = 0.62) {
 }
 
 /**
+ * Stencilled lettering on a crate: block capitals from a 3x5 cell font, each
+ * lit cell a 1 mm-proud quad, with the stencil bridges left as gaps and the
+ * odd cell missing where the paint has flaked. A lot code on the middle slat
+ * and a short number on the bottom one, both long faces. Companion prototype
+ * of `crate()` (same matrix), in a matte black paint material.
+ */
+const STENCIL_FONT = {
+  0: '111101101101111', 1: '010110010010111', 2: '111001111100111', 3: '111001111001111',
+  4: '101101111001001', 5: '111100111001111', 6: '111100111101111', 7: '111001001010010',
+  8: '111101111101111', 9: '111101111001111', A: '111101111101101', B: '110101110101110',
+  C: '111100100100111', D: '110101101101110', E: '111100110100111', F: '111100110100100',
+  K: '101101110101101', M: '101111111101101', N: '111101101101101', R: '110101110101101',
+  T: '111010010010010', U: '101101101101111', X: '101101010101101', '-': '000000111000000',
+};
+function stencilText(str, cell, x0, y0, z, dir, list, flake) {
+  let cx = x0;
+  for (const ch of str) {
+    const f = STENCIL_FONT[ch];
+    if (f) {
+      for (let r = 0; r < 5; r++)
+        for (let c = 0; c < 3; c++) {
+          if (f[r * 3 + c] !== '1') continue;
+          if (flake() < 0.1) continue;
+          // stencil bridges: cells are inset, so strokes break between cells
+          const g = new THREE.PlaneGeometry(cell * 0.86, cell * 0.86);
+          if (dir < 0) g.rotateY(Math.PI);
+          g.translate((cx + (c + 0.5) * cell) * dir, y0 + (4 - r + 0.5) * cell, z);
+          list.push(g);
+        }
+    }
+    cx += cell * 4;
+  }
+  return cx;
+}
+function crateStencil(s, seed) {
+  let st = seed >>> 0 || 1;
+  const rnd = () => {
+    st ^= st << 13;
+    st ^= st >>> 17;
+    st ^= st << 5;
+    st >>>= 0;
+    return st / 4294967296;
+  };
+  const chars = '0123456789ABCDEFKMNRTUX';
+  const list = [];
+  const zf = s * 0.46 + 0.0095;
+  for (const side of [1, -1]) {
+    // lot code, e.g. "KX-27", across the middle slat
+    let code = '';
+    for (let i = 0; i < 2; i++) code += chars[10 + Math.floor(rnd() * 13)];
+    code += '-';
+    for (let i = 0; i < 2; i++) code += chars[Math.floor(rnd() * 10)];
+    const cell = s * 0.018;
+    const wTxt = code.length * cell * 4 - cell;
+    stencilText(code, cell, -wTxt / 2, -cell * 2.5, side * zf, side, list, rnd);
+    // a short number on the lower slat
+    let num = '';
+    for (let i = 0; i < 3; i++) num += chars[Math.floor(rnd() * 10)];
+    const c2 = s * 0.011;
+    const w2 = num.length * c2 * 4 - c2;
+    stencilText(num, c2, -w2 / 2 + s * 0.18, -s * 0.32 - c2 * 2.5, side * zf, side, list, rnd);
+  }
+  const g = mergeSimple(list);
+  for (const p of list) p.dispose();
+  fillMasks(g, 0.6, 0.3, 0);
+  g.translate(0, s * 0.425, 0);
+  return g;
+}
+
+/**
  * A cardboard carton. The old one was a bevelled block in the wood material,
  * and up close it read as a plywood chest. Cardboard reads by its failures:
  * dented faces, a crushed corner, flaps that never sit flat with a gap down the
@@ -368,6 +438,11 @@ function sandbag(rng, i = 0) {
     // the weave under grime is what makes sandbags read as beanbags.
     out[1] = 0.16 + Math.max(0, -ny) * 0.45 + n * 0.14 + low * low * 0.3 + end * 0.25;
     out[2] = 0.1 + Math.max(0, -ny) * 0.45 + crease * 0.22 + low * low * 0.35 + end * end * 0.5;
+    // the perimeter seam holds dirt in its stitch line
+    const mid = (bb.min.y + bb.max.y) * 0.5;
+    const seam = Math.exp(-(((y - mid) / (dims[1] * 0.07)) ** 2)) * Math.max(0, 1 - Math.abs(ny) * 1.5);
+    out[1] = Math.min(1, out[1] + seam * 0.45);
+    out[2] = Math.min(1, out[2] + seam * 0.3);
   });
   g.translate(0, dims[1] * 0.5, 0);
   return g;
@@ -1066,9 +1141,12 @@ export function registerProps(A, rngIn) {
   P('crate_a_hw', 'metal_rust_prop', crateHardware(0.64), { castShadow: false, maxDist: 45 });
   P('crate_b_hw', 'metal_rust_prop', crateHardware(0.48), { castShadow: false, maxDist: 40 });
   P('crate_c_hw', 'metal_rust_prop', crateHardware(0.82), { castShadow: false, maxDist: 50 });
-  P('crate_a', 'wood_prop', crate(rng, 0.64), { skirt: 0.37, companions: ['crate_a_hw'], ...LOOSE(0.09, 0.022) });
-  P('crate_b', 'wood_prop', crate(rng, 0.48), { companions: ['crate_b_hw'], ...LOOSE(0.10, 0.018) });
-  P('crate_c', 'wood_prop_dark', crate(rng, 0.82), { skirt: 0.45, companions: ['crate_c_hw'], ...LOOSE(0.075, 0.026) });
+  P('crate_a_st', 'stencil', crateStencil(0.64, 0x51a7), { castShadow: false, maxDist: 30 });
+  P('crate_b_st', 'stencil', crateStencil(0.48, 0x2b3c), { castShadow: false, maxDist: 25 });
+  P('crate_c_st', 'stencil', crateStencil(0.82, 0x7e11), { castShadow: false, maxDist: 35 });
+  P('crate_a', 'wood_prop', crate(rng, 0.64), { skirt: 0.37, companions: ['crate_a_hw', 'crate_a_st'], ...LOOSE(0.09, 0.022) });
+  P('crate_b', 'wood_prop', crate(rng, 0.48), { companions: ['crate_b_hw', 'crate_b_st'], ...LOOSE(0.10, 0.018) });
+  P('crate_c', 'wood_prop_dark', crate(rng, 0.82), { skirt: 0.45, companions: ['crate_c_hw', 'crate_c_st'], ...LOOSE(0.075, 0.026) });
   P('crate_flat', 'wood_prop', crate(rng, 0.55, false), LOOSE(0.10, 0.02));
   _cardDims.length = 0;
   _cardRng.s = 0x3c6ef372;

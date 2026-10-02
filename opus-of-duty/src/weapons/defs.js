@@ -113,7 +113,8 @@ export const WEAPON_DEFS = {
     // support hand sits on the rear of the handguard with the barrel and
     // muzzle clear to its left, and the forearm rises steeply from the bottom
     // edge instead of crossing the frame.
-    hipPos: [0.075, -0.165, -0.18],
+    // Raised 17 mm (r1 critic: the shooting hand was hidden under the ammo HUD).
+    hipPos: [0.07, -0.148, -0.185],
     hipRot: [-0.02, 0.1, -0.06],
     adsCant: [0, 0, 0.004],
     /* Eye to the rear lens.

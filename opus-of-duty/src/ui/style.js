@@ -287,6 +287,8 @@ const CSS = `
   position:absolute; left:50%; top:calc(var(--pad) * .55);
   width: calc(640px * var(--k)); height: calc(44px * var(--k));
   transform: translateX(-50%);
+  /* a smoked backing strip: bare ticks washed out against a bright sky */
+  background: linear-gradient(to bottom, rgba(5,8,11,.42), rgba(5,8,11,.22));
   -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 12%, #000 44.5%, transparent 45.5%, transparent 54.5%, #000 55.5%, #000 88%, transparent 100%);
           mask-image: linear-gradient(to right, transparent 0%, #000 12%, #000 44.5%, transparent 45.5%, transparent 54.5%, #000 55.5%, #000 88%, transparent 100%);
   overflow:hidden;
@@ -318,6 +320,9 @@ const CSS = `
   border-left: calc(1.5px * var(--k)) solid rgba(236,240,242,.8);
   border-right: calc(1.5px * var(--k)) solid rgba(236,240,242,.8);
   min-width: calc(56px * var(--k)); text-align:center;
+  background: rgba(5,8,11,.42);
+  padding-top: calc(4px * var(--k)); padding-bottom: calc(4px * var(--k));
+  margin-top: calc(-4px * var(--k));
 }
 .ow-compass-obj { display:none; }
 
@@ -390,20 +395,21 @@ const CSS = `
 /* grenade danger */
 .ow-nade { position:absolute; left:0; top:0; will-change: transform, opacity; }
 .ow-nade-ring {
-  position:absolute; left:50%; top:50%; width:calc(30px * var(--k)); height:calc(30px * var(--k));
-  margin:calc(-15px * var(--k)) 0 0 calc(-15px * var(--k));
-  border: calc(1.5px * var(--k)) solid var(--red); border-radius:50%;
+  position:absolute; left:50%; top:50%; width:calc(42px * var(--k)); height:calc(42px * var(--k));
+  margin:calc(-21px * var(--k)) 0 0 calc(-21px * var(--k));
+  border: calc(2.5px * var(--k)) solid var(--red);
+  box-shadow: 0 0 0 calc(1px * var(--k)) rgba(0,0,0,.45), inset 0 0 0 calc(1px * var(--k)) rgba(0,0,0,.35); border-radius:50%;
   will-change: transform, opacity;
 }
 .ow-nade-core {
-  position:absolute; left:50%; top:50%; width:calc(15px * var(--k)); height:calc(15px * var(--k));
-  margin:calc(-7.5px * var(--k)) 0 0 calc(-7.5px * var(--k));
+  position:absolute; left:50%; top:50%; width:calc(20px * var(--k)); height:calc(20px * var(--k));
+  margin:calc(-10px * var(--k)) 0 0 calc(-10px * var(--k));
 }
 .ow-nade-core svg { width:100%; height:100%; display:block; filter:drop-shadow(0 1px 2px rgba(0,0,0,.9)); }
 .ow-nade-label {
-  position:absolute; left:50%; top:calc(13px * var(--k)); transform:translateX(-50%);
-  font-size: calc(9px * var(--k)); letter-spacing:.24em; color:var(--red); white-space:nowrap;
-  text-shadow: var(--sh);
+  position:absolute; left:50%; top:calc(20px * var(--k)); transform:translateX(-50%);
+  font-size: calc(14px * var(--k)); font-weight:700; letter-spacing:.12em; color:var(--red); white-space:nowrap;
+  text-shadow: var(--sh-o1);
 }
 
 /* ======================================================== damage numbers */
